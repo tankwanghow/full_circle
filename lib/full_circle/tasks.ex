@@ -152,6 +152,9 @@ defmodule FullCircle.Tasks do
           |> Repo.update()
           |> case do
             {:ok, t} ->
+              if Map.has_key?(changeset.changes, :visibility),
+                do: sync_task_note_visibility(t, company)
+
               broadcast(company)
               {:ok, Repo.preload(t, [:assignee, :creator, :closed_by], force: true)}
 
@@ -162,6 +165,15 @@ defmodule FullCircle.Tasks do
     end
   rescue
     Ecto.StaleEntryError -> {:error, :stale}
+  end
+
+  defp sync_task_note_visibility(task, company) do
+    from(n in FullCircle.Notes.Note,
+      where:
+        n.company_id == ^company.id and n.subject_type == "Task" and n.subject_id == ^task.id and
+          is_nil(n.deleted_at)
+    )
+    |> Repo.update_all(set: [visibility: task.visibility])
   end
 
   def delete_task(%CompanyTask{} = task, company, user) do
@@ -298,8 +310,7 @@ defmodule FullCircle.Tasks do
         %{
           "body" => String.trim(body),
           "subject_type" => "Task",
-          "subject_id" => task.id,
-          "visibility" => FullCircle.Notes.Note.private_visibility()
+          "subject_id" => task.id
         },
         company,
         user
@@ -523,6 +534,7 @@ defmodule FullCircle.Tasks do
     ids = Enum.map(tasks, & &1.id)
     latest = latest_notes(ids, company, user)
     counts = Notes.count_by_records(company, user, "Task", ids)
+    links = link_counts(ids, company)
 
     Enum.map(tasks, fn t ->
       %{
@@ -530,7 +542,8 @@ defmodule FullCircle.Tasks do
         task: t,
         group: group_of(t, today),
         latest_note: Map.get(latest, t.id),
-        note_count: Map.get(counts, t.id, 0)
+        note_count: Map.get(counts, t.id, 0),
+        link_count: Map.get(links, t.id, 0)
       }
     end)
   end
@@ -612,6 +625,18 @@ defmodule FullCircle.Tasks do
     end
   end
 
+  defp link_counts([], _company), do: %{}
+
+  defp link_counts(ids, company) do
+    from(l in RecordLink,
+      where: l.company_id == ^company.id and l.from_type == "Task" and l.from_id in ^ids,
+      group_by: l.from_id,
+      select: {l.from_id, count(l.id)}
+    )
+    |> Repo.all()
+    |> Map.new()
+  end
+
   # Newest visible progress note per task, one query for the whole page.
   defp latest_notes([], _company, _user), do: %{}
 
@@ -653,6 +678,26 @@ defmodule FullCircle.Tasks do
       to_id: id,
       created_by_id: user.id
     })
+  end
+
+  @doc """
+  Visible tasks that link to this record (`record_links` with `from_type`
+  "Task"). Open cycles first, then by due date. A task the user cannot see
+  is absent.
+  """
+  def for_record(type, id, company, user) do
+    from(t in visible_to(company, user),
+      join: l in RecordLink,
+      on: l.from_type == "Task" and l.from_id == t.id and l.company_id == ^company.id,
+      where: l.to_type == ^type and l.to_id == ^id,
+      order_by: [
+        asc: fragment("case when ? = 'open' then 0 else 1 end", t.status),
+        asc_nulls_last: t.due_date,
+        asc: t.title,
+        asc: t.id
+      ]
+    )
+    |> Repo.all()
   end
 
   def list_links(%CompanyTask{} = task, company, user) do

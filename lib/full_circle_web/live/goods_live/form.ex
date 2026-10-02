@@ -527,10 +527,8 @@ defmodule FullCircleWeb.GoodLive.Form do
         </div>
       </.form>
     </div>
-    <.live_component
+    <FullCircleWeb.RecordAside.record_aside
       :if={@live_action == :edit and @id != "new"}
-      module={FullCircleWeb.NoteLive.NotesPanelComponent}
-      id="notes-panel"
       record_type="Good"
       record_id={@id}
       current_company={@current_company}

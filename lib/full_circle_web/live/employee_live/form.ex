@@ -644,10 +644,8 @@ defmodule FullCircleWeb.EmployeeLive.Form do
         </div>
       </div>
     </div>
-    <.live_component
+    <FullCircleWeb.RecordAside.record_aside
       :if={@live_action == :edit and @id != "new"}
-      module={FullCircleWeb.NoteLive.NotesPanelComponent}
-      id="notes-panel"
       record_type="Employee"
       record_id={@id}
       current_company={@current_company}

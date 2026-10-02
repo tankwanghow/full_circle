@@ -144,7 +144,7 @@ defmodule FullCircle.Notes do
   end
 
   def create_note(attrs, company, user) do
-    attrs = normalize_visibility(attrs)
+    attrs = attrs |> normalize_visibility() |> follow_task_visibility(company, user)
 
     if can?(user, :create_note, company) do
       changeset =
@@ -171,7 +171,11 @@ defmodule FullCircle.Notes do
   `lock_version` is what detects a concurrent save.
   """
   def update_note(%Note{} = note, attrs, company, user) do
-    attrs = attrs |> normalize_visibility() |> Map.delete("links")
+    attrs =
+      attrs
+      |> normalize_visibility()
+      |> Map.delete("links")
+      |> follow_task_visibility(company, user)
 
     with %Note{} = current <- get_note(note.id, company, user) || {:error, :not_found},
          true <- may_edit?(current, user, rights(company, user)) || :not_authorise do
@@ -303,6 +307,19 @@ defmodule FullCircle.Notes do
 
       true ->
         Ecto.Changeset.add_error(changeset, :subject_id, "not found")
+    end
+  end
+
+  # A note about a task is readable by whoever can see that task, so its stored
+  # visibility is the task's. The writer does not pick a role.
+  defp follow_task_visibility(attrs, company, user) do
+    if attrs["subject_type"] == "Task" and attrs["subject_id"] not in [nil, ""] do
+      case FullCircle.Tasks.get_task(attrs["subject_id"], company, user) do
+        %{visibility: visibility} -> Map.put(attrs, "visibility", visibility)
+        _ -> attrs
+      end
+    else
+      attrs
     end
   end
 

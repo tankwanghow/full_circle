@@ -76,7 +76,7 @@ defmodule FullCircleWeb.NoteComponents do
 
   attr :roles, :boolean,
     default: true,
-    doc: "false shows only Everyone and Private (a task's notes: the task rule overrides roles)"
+    doc: "false shows only Everyone and Private. A note about a Task hides these chips."
 
   @doc """
   Everyone · 🔒 Private · manager · supervisor · cashier · clerk · auditor.

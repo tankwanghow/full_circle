@@ -2689,3 +2689,42 @@ msgstr "发表回复…"
 
 msgid "Reply"
 msgstr "回复"
+
+msgid "New task…"
+msgstr "新任务…"
+
+msgid "Add"
+msgstr "添加"
+
+msgid "No tasks linked to this record."
+msgstr "没有关联到此记录的任务。"
+
+msgid "Could not save the task."
+msgstr "无法保存此任务。"
+
+msgid "Add a task…"
+msgstr "添加任务…"
+
+msgid "due…"
+msgstr "到期…"
+
+msgid "Search tasks"
+msgstr "搜索任务"
+
+msgid "does not repeat"
+msgstr "不重复"
+
+msgid "unassigned"
+msgstr "未指派"
+
+msgid "assigned to %{who}"
+msgstr "指派给 %{who}"
+
+msgid "assigned to"
+msgstr "指派给"
+
+msgid "reminder %{n} days"
+msgstr "提前 %{n} 天提醒"
+
+msgid "Progress notes"
+msgstr "进度备注"

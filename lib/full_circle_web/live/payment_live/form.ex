@@ -698,366 +698,372 @@ defmodule FullCircleWeb.PaymentLive.Form do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-fit min-w-[64rem] max-w-[98vw] mx-auto border rounded-lg border-pink-500 bg-pink-100 p-4 [&>*:not(form)]:[contain:inline-size]">
-      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
-      <.error_box changeset={@form.source} />
-      <.form
-        for={@form}
-        id="object-form"
-        class="[&>*:not(.detail-fit)]:[contain:inline-size]"
-        autocomplete="off"
-        phx-change="validate"
-        phx-submit="save"
-      >
-        <.input type="hidden" field={@form[:payment_no]} />
-        <div class="flex flex-row flex-nowrap">
-          <div class="basis-64 grow shrink">
-            <.input type="hidden" field={@form[:contact_id]} />
-            <.input
-              field={@form[:contact_name]}
-              label={gettext("Pay To")}
-              phx-hook="tributeAutoComplete"
-              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
-            />
+    <div class="mx-auto grid w-fit min-w-[64rem] max-w-[98vw]">
+      <div class="w-fit min-w-[64rem] max-w-[98vw] border rounded-lg border-pink-500 bg-pink-100 p-4 [&>*:not(form)]:[contain:inline-size]">
+        <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
+        <.error_box changeset={@form.source} />
+        <.form
+          for={@form}
+          id="object-form"
+          class="[&>*:not(.detail-fit)]:[contain:inline-size]"
+          autocomplete="off"
+          phx-change="validate"
+          phx-submit="save"
+        >
+          <.input type="hidden" field={@form[:payment_no]} />
+          <div class="flex flex-row flex-nowrap">
+            <div class="basis-64 grow shrink">
+              <.input type="hidden" field={@form[:contact_id]} />
+              <.input
+                field={@form[:contact_name]}
+                label={gettext("Pay To")}
+                phx-hook="tributeAutoComplete"
+                url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
+              />
+            </div>
+            <div class="w-36 shrink-0">
+              <.input field={@form[:reg_no]} label={gettext("Reg No")} readonly tabindex="-1" />
+            </div>
+            <div class="w-36 shrink-0">
+              <.input field={@form[:tax_id]} label={gettext("Tax Id")} readonly tabindex="-1" />
+            </div>
+            <div class="basis-56 grow shrink">
+              <.input type="hidden" field={@form[:funds_account_id]} />
+              <.input
+                field={@form[:funds_account_name]}
+                label={gettext("Funds Account")}
+                phx-hook="tributeAutoComplete"
+                url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
+              />
+            </div>
           </div>
-          <div class="w-36 shrink-0">
-            <.input field={@form[:reg_no]} label={gettext("Reg No")} readonly tabindex="-1" />
+          <div class="flex flex-row flex-nowrap">
+            <div class="w-32 shrink-0">
+              <.input
+                field={@form[:funds_amount]}
+                label={gettext("Funds Amount")}
+                phx-hook="calculatorInput"
+                klass="text-right"
+                step="0.01"
+              />
+            </div>
+            <div class="w-[9.5rem] shrink-0">
+              <.input field={@form[:payment_date]} label={gettext("Payment Date")} type="date" />
+            </div>
+            <div class="basis-48 grow shrink">
+              <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
+            </div>
+            <div class="w-32 shrink-0">
+              <.input
+                feedback={true}
+                type="number"
+                readonly
+                field={@form[:payment_balance]}
+                label={gettext("Payment Balance")}
+                value={Ecto.Changeset.fetch_field!(@form.source, :payment_balance)}
+              />
+            </div>
           </div>
-          <div class="w-36 shrink-0">
-            <.input field={@form[:tax_id]} label={gettext("Tax Id")} readonly tabindex="-1" />
-          </div>
-          <div class="basis-56 grow shrink">
-            <.input type="hidden" field={@form[:funds_account_id]} />
-            <.input
-              field={@form[:funds_account_name]}
-              label={gettext("Funds Account")}
-              phx-hook="tributeAutoComplete"
-              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
-            />
-          </div>
-        </div>
-        <div class="flex flex-row flex-nowrap">
-          <div class="w-32 shrink-0">
-            <.input
-              field={@form[:funds_amount]}
-              label={gettext("Funds Amount")}
-              phx-hook="calculatorInput"
-              klass="text-right"
-              step="0.01"
-            />
-          </div>
-          <div class="w-[9.5rem] shrink-0">
-            <.input field={@form[:payment_date]} label={gettext("Payment Date")} type="date" />
-          </div>
-          <div class="basis-48 grow shrink">
-            <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
-          </div>
-          <div class="w-32 shrink-0">
-            <.input
-              feedback={true}
-              type="number"
-              readonly
-              field={@form[:payment_balance]}
-              label={gettext("Payment Balance")}
-              value={Ecto.Changeset.fetch_field!(@form.source, :payment_balance)}
-            />
-          </div>
-        </div>
 
-        <div class="flex flex-row flex-nowrap mt-2">
-          <div class="w-[14%]">
-            <.input field={@form[:e_inv_internal_id]} label={gettext("E Invoice Internal Id")} />
-          </div>
-          <div class="w-[20%] min-w-[17rem]">
-            <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
-          </div>
-          <div
-            :if={is_nil(@form[:e_inv_uuid].value) and @live_action != :new}
-            class="text-blue-600 hover:font-medium w-[20%] ml-5 mt-6"
-          >
-            <a
-              id={@form[:payment_no].value}
-              href="#"
-              phx-hook="copyAndOpen"
-              copy-text={@form[:payment_no].value}
-              goto-url={"#{@einv_portal}/newdocument"}
+          <div class="flex flex-row flex-nowrap mt-2">
+            <div class="w-[14%]">
+              <.input field={@form[:e_inv_internal_id]} label={gettext("E Invoice Internal Id")} />
+            </div>
+            <div class="w-[20%] min-w-[17rem]">
+              <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
+            </div>
+            <div
+              :if={is_nil(@form[:e_inv_uuid].value) and @live_action != :new}
+              class="text-blue-600 hover:font-medium w-[20%] ml-5 mt-6"
             >
-              {gettext("New E-Invoice")}
-            </a>
-          </div>
-          <div
-            :if={!is_nil(@form[:e_inv_uuid].value)}
-            class="text-blue-600 hover:font-medium ml-5 mt-6"
-          >
-            <.link
-              target="_blank"
-              href={"#{@einv_portal}/documents/#{@form[:e_inv_uuid].value}"}
+              <a
+                id={@form[:payment_no].value}
+                href="#"
+                phx-hook="copyAndOpen"
+                copy-text={@form[:payment_no].value}
+                goto-url={"#{@einv_portal}/newdocument"}
+              >
+                {gettext("New E-Invoice")}
+              </a>
+            </div>
+            <div
+              :if={!is_nil(@form[:e_inv_uuid].value)}
+              class="text-blue-600 hover:font-medium ml-5 mt-6"
             >
-              Open E-Invoice
-            </.link>
+              <.link
+                target="_blank"
+                href={"#{@einv_portal}/documents/#{@form[:e_inv_uuid].value}"}
+              >
+                Open E-Invoice
+              </.link>
+            </div>
+            <div class="shrink-0 ml-2 mt-1">
+              <% {url, qrcode} =
+                FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data, 1) %>
+              <.link target="_blank" href={url}>
+                {qrcode |> raw}
+              </.link>
+            </div>
           </div>
-          <div class="shrink-0 ml-2 mt-1">
-            <% {url, qrcode} =
-              FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data, 1) %>
-            <.link target="_blank" href={url}>
-              {qrcode |> raw}
-            </.link>
-          </div>
-        </div>
 
-        <div class="flex flex-row gap-2 flex-nowrap w-2/3 mx-auto text-center mt-5">
-          <div
-            id="match-trans-tab"
-            phx-click={
-              JS.remove_class("tab-hidden", to: "#match-trans")
-              |> JS.add_class("active")
-              |> JS.add_class("tab-hidden", to: "#payment-details")
-              |> JS.remove_class("active", to: "#payment-details-tab")
-              |> JS.show(to: "#query-match-trans")
-            }
-            class="active basis-1/2 tab"
-          >
-            {gettext("Matchers")} =
-            <span
-              :if={!Decimal.eq?(Ecto.Changeset.fetch_field!(@form.source, :matched_amount), 0)}
-              class="font-normal text-rose-700"
+          <div class="flex flex-row gap-2 flex-nowrap w-2/3 mx-auto text-center mt-5">
+            <div
+              id="match-trans-tab"
+              phx-click={
+                JS.remove_class("tab-hidden", to: "#match-trans")
+                |> JS.add_class("active")
+                |> JS.add_class("tab-hidden", to: "#payment-details")
+                |> JS.remove_class("active", to: "#payment-details-tab")
+                |> JS.show(to: "#query-match-trans")
+              }
+              class="active basis-1/2 tab"
             >
-              {Ecto.Changeset.fetch_field!(@form.source, :matched_amount)
-              |> Decimal.new()
-              |> Decimal.abs()
-              |> Number.Delimit.number_to_delimited()}
-            </span>
-            <span class="text-rose-500">
-              <.icon :if={@matchers_got_error} name="hero-exclamation-triangle-mini" class="h-5 w-5" />
-            </span>
-          </div>
+              {gettext("Matchers")} =
+              <span
+                :if={!Decimal.eq?(Ecto.Changeset.fetch_field!(@form.source, :matched_amount), 0)}
+                class="font-normal text-rose-700"
+              >
+                {Ecto.Changeset.fetch_field!(@form.source, :matched_amount)
+                |> Decimal.new()
+                |> Decimal.abs()
+                |> Number.Delimit.number_to_delimited()}
+              </span>
+              <span class="text-rose-500">
+                <.icon
+                  :if={@matchers_got_error}
+                  name="hero-exclamation-triangle-mini"
+                  class="h-5 w-5"
+                />
+              </span>
+            </div>
 
-          <div
-            id="payment-details-tab"
-            phx-click={
-              JS.add_class("tab-hidden", to: "#match-trans")
-              |> JS.hide(to: "#query-match-trans")
-              |> JS.remove_class("active", to: "#match-trans-tab")
-              |> JS.remove_class("tab-hidden", to: "#payment-details")
-              |> JS.add_class("active")
-            }
-            class="basis-1/2 tab"
-          >
-            {gettext("Details")} =
-            <span
-              :if={!Decimal.eq?(Ecto.Changeset.fetch_field!(@form.source, :payment_detail_amount), 0)}
-              class="font-normal text-rose-700"
+            <div
+              id="payment-details-tab"
+              phx-click={
+                JS.add_class("tab-hidden", to: "#match-trans")
+                |> JS.hide(to: "#query-match-trans")
+                |> JS.remove_class("active", to: "#match-trans-tab")
+                |> JS.remove_class("tab-hidden", to: "#payment-details")
+                |> JS.add_class("active")
+              }
+              class="basis-1/2 tab"
             >
-              {Ecto.Changeset.fetch_field!(@form.source, :payment_detail_amount)
-              |> Number.Delimit.number_to_delimited()}
-            </span>
-            <span class="text-rose-500">
-              <.icon :if={@details_got_error} name="hero-exclamation-triangle-mini" class="h-5 w-5" />
-            </span>
+              {gettext("Details")} =
+              <span
+                :if={
+                  !Decimal.eq?(Ecto.Changeset.fetch_field!(@form.source, :payment_detail_amount), 0)
+                }
+                class="font-normal text-rose-700"
+              >
+                {Ecto.Changeset.fetch_field!(@form.source, :payment_detail_amount)
+                |> Number.Delimit.number_to_delimited()}
+              </span>
+              <span class="text-rose-500">
+                <.icon :if={@details_got_error} name="hero-exclamation-triangle-mini" class="h-5 w-5" />
+              </span>
+            </div>
           </div>
-        </div>
 
-        <.live_component
-          module={FullCircleWeb.InvoiceLive.DetailComponent}
-          id="payment-details"
-          klass="tab-hidden detail-fit text-center border bg-purple-100 mt-2 p-3 rounded-lg border-purple-400"
-          settings={@settings}
-          doc_name="Payment"
-          detail_name={:payment_details}
-          form={@form}
-          taxcodetype="saltaxcode"
-          doc_good_amount={:payment_good_amount}
-          doc_tax_amount={:payment_tax_amount}
-          doc_detail_amount={:payment_detail_amount}
-          current_company={@current_company}
-          current_user={@current_user}
-          matched_trans={[]}
-        />
-
-        <.live_component
-          module={FullCircleWeb.ReceiptLive.MatcherComponent}
-          id="match-trans"
-          klass="text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
-          form={@form}
-          current_company={@current_company}
-          current_user={@current_user}
-        />
-
-        <div class="flex justify-center gap-x-1 mt-1">
-          <.form_action_button
+          <.live_component
+            module={FullCircleWeb.InvoiceLive.DetailComponent}
+            id="payment-details"
+            klass="tab-hidden detail-fit text-center border bg-purple-100 mt-2 p-3 rounded-lg border-purple-400"
+            settings={@settings}
+            doc_name="Payment"
+            detail_name={:payment_details}
             form={@form}
-            live_action={@live_action}
+            taxcodetype="saltaxcode"
+            doc_good_amount={:payment_good_amount}
+            doc_tax_amount={:payment_tax_amount}
+            doc_detail_amount={:payment_detail_amount}
             current_company={@current_company}
-            type="Payment"
+            current_user={@current_user}
+            matched_trans={[]}
           />
-          <.print_button
-            :if={@live_action != :new}
-            company={@current_company}
-            doc_type="Payment"
-            doc_id={@id}
-            class="gray button"
-          />
-          <.pre_print_button
-            :if={@live_action != :new}
-            company={@current_company}
-            doc_type="Payment"
-            doc_id={@id}
-            class="gray button"
-          />
-          <.live_component
-            :if={@live_action == :edit}
-            module={FullCircleWeb.LogLive.Component}
-            current_company={@current_company}
-            id={"log_#{@id}"}
-            show_log={false}
-            entity="payments"
-            entity_id={@id}
-          />
-          <.live_component
-            :if={@live_action == :edit}
-            module={FullCircleWeb.JournalEntryViewLive.Component}
-            id={"journal_#{@id}"}
-            show_journal={false}
-            doc_type="Payment"
-            doc_no={@form.data.payment_no}
-            company_id={@current_company.id}
-          />
-        </div>
-      </.form>
 
-      <div
-        :if={@live_action == :new and @e_inv_preview}
-        class="mt-4 border rounded-lg border-blue-500 bg-blue-50 p-4"
-      >
-        <div class="flex justify-between items-center mb-3">
-          <p class="text-xl font-medium">{gettext("E-Invoice Document")}</p>
-          <.link phx-click="close_e_inv_preview" class="orange button text-sm">
-            {gettext("Close")}
-          </.link>
-        </div>
-        <%= case @e_inv_preview do %>
-          <% {:ok, parsed} -> %>
-            <div class="grid grid-cols-2 gap-4 text-sm">
-              <div class="border rounded p-3 bg-white">
-                <p class="font-bold mb-2">{gettext("Supplier")}</p>
-                <p class="font-medium">{parsed.supplier_name}</p>
-                <p>TIN: {parsed.supplier_tin}</p>
-                <p>BRN: {parsed.supplier_brn}</p>
+          <.live_component
+            module={FullCircleWeb.ReceiptLive.MatcherComponent}
+            id="match-trans"
+            klass="text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
+            form={@form}
+            current_company={@current_company}
+            current_user={@current_user}
+          />
+
+          <div class="flex justify-center gap-x-1 mt-1">
+            <.form_action_button
+              form={@form}
+              live_action={@live_action}
+              current_company={@current_company}
+              type="Payment"
+            />
+            <.print_button
+              :if={@live_action != :new}
+              company={@current_company}
+              doc_type="Payment"
+              doc_id={@id}
+              class="gray button"
+            />
+            <.pre_print_button
+              :if={@live_action != :new}
+              company={@current_company}
+              doc_type="Payment"
+              doc_id={@id}
+              class="gray button"
+            />
+            <.live_component
+              :if={@live_action == :edit}
+              module={FullCircleWeb.LogLive.Component}
+              current_company={@current_company}
+              id={"log_#{@id}"}
+              show_log={false}
+              entity="payments"
+              entity_id={@id}
+            />
+            <.live_component
+              :if={@live_action == :edit}
+              module={FullCircleWeb.JournalEntryViewLive.Component}
+              id={"journal_#{@id}"}
+              show_journal={false}
+              doc_type="Payment"
+              doc_no={@form.data.payment_no}
+              company_id={@current_company.id}
+            />
+          </div>
+        </.form>
+
+        <div
+          :if={@live_action == :new and @e_inv_preview}
+          class="mt-4 border rounded-lg border-blue-500 bg-blue-50 p-4"
+        >
+          <div class="flex justify-between items-center mb-3">
+            <p class="text-xl font-medium">{gettext("E-Invoice Document")}</p>
+            <.link phx-click="close_e_inv_preview" class="orange button text-sm">
+              {gettext("Close")}
+            </.link>
+          </div>
+          <%= case @e_inv_preview do %>
+            <% {:ok, parsed} -> %>
+              <div class="grid grid-cols-2 gap-4 text-sm">
+                <div class="border rounded p-3 bg-white">
+                  <p class="font-bold mb-2">{gettext("Supplier")}</p>
+                  <p class="font-medium">{parsed.supplier_name}</p>
+                  <p>TIN: {parsed.supplier_tin}</p>
+                  <p>BRN: {parsed.supplier_brn}</p>
+                </div>
+                <div class="border rounded p-3 bg-white">
+                  <p class="font-bold mb-2">{gettext("Document Info")}</p>
+                  <p><span class="font-bold">{gettext("Internal ID")}:</span> {parsed.internal_id}</p>
+                  <p><span class="font-bold">{gettext("Issue Date")}:</span> {parsed.issue_date}</p>
+                  <p><span class="font-bold">{gettext("Currency")}:</span> {parsed.currency}</p>
+                  <p><span class="font-bold">{gettext("Type")}:</span> {parsed.type_code}</p>
+                </div>
               </div>
-              <div class="border rounded p-3 bg-white">
-                <p class="font-bold mb-2">{gettext("Document Info")}</p>
-                <p><span class="font-bold">{gettext("Internal ID")}:</span> {parsed.internal_id}</p>
-                <p><span class="font-bold">{gettext("Issue Date")}:</span> {parsed.issue_date}</p>
-                <p><span class="font-bold">{gettext("Currency")}:</span> {parsed.currency}</p>
-                <p><span class="font-bold">{gettext("Type")}:</span> {parsed.type_code}</p>
-              </div>
-            </div>
-            <div class="mt-3 border rounded p-3 bg-white text-sm">
-              <table class="w-full text-sm">
-                <thead>
-                  <tr class="border-b font-bold">
-                    <th class="text-left p-1">#</th>
-                    <th class="text-left p-1">{gettext("Description")}</th>
-                    <th class="text-right p-1">{gettext("Qty")}</th>
-                    <th class="text-left p-1">{gettext("Unit")}</th>
-                    <th class="text-right p-1">{gettext("Unit Price")}</th>
-                    <th class="text-right p-1">{gettext("Discount")}</th>
-                    <th class="text-right p-1">{gettext("Amount")}</th>
-                    <th class="text-right p-1">{gettext("Tax%")}</th>
-                    <th class="text-right p-1">{gettext("Tax")}</th>
-                    <th class="text-left p-1">{gettext("Tax Type")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <%= for {line, idx} <- Enum.with_index(parsed.invoice_lines, 1) do %>
-                    <tr class="border-b">
-                      <td class="p-1">{idx}</td>
-                      <td class="p-1">{line.descriptions}</td>
-                      <td class="text-right p-1">
-                        {:erlang.float_to_binary(line.quantity / 1, decimals: 2)}
-                      </td>
-                      <td class="p-1">{line.unit}</td>
-                      <td class="text-right p-1">
-                        {:erlang.float_to_binary(line.unit_price / 1, decimals: 2)}
-                      </td>
-                      <td class="text-right p-1">
-                        {:erlang.float_to_binary(line.discount / 1, decimals: 2)}
-                      </td>
-                      <td class="text-right p-1">
-                        {:erlang.float_to_binary(
-                          (line.quantity * line.unit_price - line.discount) / 1,
-                          decimals: 2
-                        )}
-                      </td>
-                      <td class="text-right p-1">
-                        {:erlang.float_to_binary(line.tax_rate / 1, decimals: 2)}
-                      </td>
-                      <td class="text-right p-1">
-                        {:erlang.float_to_binary(
-                          Float.round(
-                            (line.quantity * line.unit_price - line.discount) * line.tax_rate / 100,
-                            2
-                          ) / 1,
-                          decimals: 2
-                        )}
-                      </td>
-                      <td class="p-1">{line.tax_code_id_lhdn} ({line.tax_scheme})</td>
+              <div class="mt-3 border rounded p-3 bg-white text-sm">
+                <table class="w-full text-sm">
+                  <thead>
+                    <tr class="border-b font-bold">
+                      <th class="text-left p-1">#</th>
+                      <th class="text-left p-1">{gettext("Description")}</th>
+                      <th class="text-right p-1">{gettext("Qty")}</th>
+                      <th class="text-left p-1">{gettext("Unit")}</th>
+                      <th class="text-right p-1">{gettext("Unit Price")}</th>
+                      <th class="text-right p-1">{gettext("Discount")}</th>
+                      <th class="text-right p-1">{gettext("Amount")}</th>
+                      <th class="text-right p-1">{gettext("Tax%")}</th>
+                      <th class="text-right p-1">{gettext("Tax")}</th>
+                      <th class="text-left p-1">{gettext("Tax Type")}</th>
                     </tr>
-                  <% end %>
-                </tbody>
-              </table>
-              <% subtotal =
-                Enum.reduce(parsed.invoice_lines, 0.0, fn line, acc ->
-                  acc + (line.quantity * line.unit_price - line.discount)
-                end)
+                  </thead>
+                  <tbody>
+                    <%= for {line, idx} <- Enum.with_index(parsed.invoice_lines, 1) do %>
+                      <tr class="border-b">
+                        <td class="p-1">{idx}</td>
+                        <td class="p-1">{line.descriptions}</td>
+                        <td class="text-right p-1">
+                          {:erlang.float_to_binary(line.quantity / 1, decimals: 2)}
+                        </td>
+                        <td class="p-1">{line.unit}</td>
+                        <td class="text-right p-1">
+                          {:erlang.float_to_binary(line.unit_price / 1, decimals: 2)}
+                        </td>
+                        <td class="text-right p-1">
+                          {:erlang.float_to_binary(line.discount / 1, decimals: 2)}
+                        </td>
+                        <td class="text-right p-1">
+                          {:erlang.float_to_binary(
+                            (line.quantity * line.unit_price - line.discount) / 1,
+                            decimals: 2
+                          )}
+                        </td>
+                        <td class="text-right p-1">
+                          {:erlang.float_to_binary(line.tax_rate / 1, decimals: 2)}
+                        </td>
+                        <td class="text-right p-1">
+                          {:erlang.float_to_binary(
+                            Float.round(
+                              (line.quantity * line.unit_price - line.discount) * line.tax_rate / 100,
+                              2
+                            ) / 1,
+                            decimals: 2
+                          )}
+                        </td>
+                        <td class="p-1">{line.tax_code_id_lhdn} ({line.tax_scheme})</td>
+                      </tr>
+                    <% end %>
+                  </tbody>
+                </table>
+                <% subtotal =
+                  Enum.reduce(parsed.invoice_lines, 0.0, fn line, acc ->
+                    acc + (line.quantity * line.unit_price - line.discount)
+                  end)
 
-              tax =
-                Enum.reduce(parsed.invoice_lines, 0.0, fn line, acc ->
-                  acc +
-                    Float.round(
-                      (line.quantity * line.unit_price - line.discount) * line.tax_rate / 100,
-                      2
-                    )
-                end) %>
-              <div class="flex justify-end gap-6 mt-2 font-bold">
-                <span>
-                  {gettext("Subtotal")}: {:erlang.float_to_binary(subtotal / 1, decimals: 2)}
-                </span>
-                <span>{gettext("Tax")}: {:erlang.float_to_binary(tax / 1, decimals: 2)}</span>
-                <span>
-                  {gettext("Total")}: {:erlang.float_to_binary((subtotal + tax) / 1, decimals: 2)}
-                </span>
+                tax =
+                  Enum.reduce(parsed.invoice_lines, 0.0, fn line, acc ->
+                    acc +
+                      Float.round(
+                        (line.quantity * line.unit_price - line.discount) * line.tax_rate / 100,
+                        2
+                      )
+                  end) %>
+                <div class="flex justify-end gap-6 mt-2 font-bold">
+                  <span>
+                    {gettext("Subtotal")}: {:erlang.float_to_binary(subtotal / 1, decimals: 2)}
+                  </span>
+                  <span>{gettext("Tax")}: {:erlang.float_to_binary(tax / 1, decimals: 2)}</span>
+                  <span>
+                    {gettext("Total")}: {:erlang.float_to_binary((subtotal + tax) / 1, decimals: 2)}
+                  </span>
+                </div>
               </div>
-            </div>
-          <% {:error, reason} -> %>
-            <div class="text-red-600 font-bold">{reason}</div>
-        <% end %>
-      </div>
-      <%!-- The Matchers tab's search panel: inside the card (after the main
+            <% {:error, reason} -> %>
+              <div class="text-red-600 font-bold">{reason}</div>
+          <% end %>
+        </div>
+        <%!-- The Matchers tab's search panel: inside the card (after the main
            form, since it has its own form) so it takes the card's width. --%>
-      <.live_component
-        module={FullCircleWeb.ReceiptLive.QryMatcherComponent}
-        id="query-match-trans"
-        klass="text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
-        query={@query}
-        query_match_trans={@query_match_trans}
-        form={@form}
-        cannot_match_doc_type={~w(Payment)}
-        doc_no_field={:payment_no}
+        <.live_component
+          module={FullCircleWeb.ReceiptLive.QryMatcherComponent}
+          id="query-match-trans"
+          klass="text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
+          query={@query}
+          query_match_trans={@query_match_trans}
+          form={@form}
+          cannot_match_doc_type={~w(Payment)}
+          doc_no_field={:payment_no}
+          current_company={@current_company}
+          current_user={@current_user}
+        />
+      </div>
+      <FullCircleWeb.RecordAside.record_aside
+        :if={@live_action == :edit and @id != "new"}
+        record_type="Payment"
+        record_id={@id}
         current_company={@current_company}
         current_user={@current_user}
+        class="min-w-0 w-full [contain:inline-size]"
       />
     </div>
-    <.live_component
-      :if={@live_action == :edit and @id != "new"}
-      module={FullCircleWeb.NoteLive.NotesPanelComponent}
-      id="notes-panel"
-      record_type="Payment"
-      record_id={@id}
-      current_company={@current_company}
-      current_user={@current_user}
-      class="w-11/12"
-    />
     """
   end
 end

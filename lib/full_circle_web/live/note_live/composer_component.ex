@@ -247,6 +247,10 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
 
   # --- render ---------------------------------------------------------------
 
+  defp task_subject?(%{type: "Task"}, _fixed), do: true
+  defp task_subject?(_subject, {"Task", _id}), do: true
+  defp task_subject?(_subject, _fixed), do: false
+
   defp roles_of(form), do: Ecto.Changeset.get_field(form.source, :visibility) || []
 
   defp visibility_label(roles) do
@@ -305,7 +309,10 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
             {@error}
           </p>
 
-          <div :if={@show_roles} class="flex flex-wrap items-center gap-1 pb-2 text-xs">
+          <div
+            :if={@show_roles and not task_subject?(@subject, @fixed_subject)}
+            class="flex flex-wrap items-center gap-1 pb-2 text-xs"
+          >
             <.visibility_chips
               visibility={roles_of(@form)}
               id_prefix={"#{@id}-visibility"}
@@ -314,7 +321,7 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
               private_title={@private_title}
             />
           </div>
-          <div :if={!@show_roles}>
+          <div :if={!@show_roles and not task_subject?(@subject, @fixed_subject)}>
             <input type="hidden" name="note[visibility][]" value="" />
             <input
               :for={role <- roles_of(@form)}
@@ -323,7 +330,12 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
               value={role}
             />
           </div>
-          <p :if={@hint} class="pb-1 text-xs text-slate-500 dark:text-slate-400">{@hint}</p>
+          <p
+            :if={@hint && not task_subject?(@subject, @fixed_subject)}
+            class="pb-1 text-xs text-slate-500 dark:text-slate-400"
+          >
+            {@hint}
+          </p>
 
           <div class="flex flex-wrap items-center gap-1 border-t border-gray-200 pt-2 dark:border-gray-700">
             <.record_chip

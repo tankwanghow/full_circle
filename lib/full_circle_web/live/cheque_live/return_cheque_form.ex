@@ -334,10 +334,8 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeForm do
         </div>
       </.form>
     </div>
-    <.live_component
+    <FullCircleWeb.RecordAside.record_aside
       :if={@live_action == :edit and @id != "new"}
-      module={FullCircleWeb.NoteLive.NotesPanelComponent}
-      id="notes-panel"
       record_type="ReturnCheque"
       record_id={@id}
       current_company={@current_company}

@@ -40,6 +40,96 @@ defmodule FullCircleWeb.TaskComponents do
   defp due_text(%{due_date: d}, _group, _today), do: Helpers.format_date(d)
 
   attr :task, :map, required: true
+  attr :group, :atom, required: true
+  attr :today, :any, required: true
+  attr :company, :map, default: nil
+
+  @doc """
+  Due tile for the task column. Overdue is rose ("3d" / "late"), today is amber,
+  a later date is the day and month, someday is "—", and a closed task says
+  Done or Skipped. The full phrase stays in the markup so "3d late" still matches.
+  """
+  def due_tile(assigns) do
+    assigns =
+      assign(assigns,
+        label: tile_label(assigns.task, assigns.group, assigns.today),
+        lines: tile_lines(assigns.task, assigns.group, assigns.today),
+        title: tile_title(assigns.task, assigns.company)
+      )
+
+    ~H"""
+    <div
+      class={[
+        "flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg px-0.5 text-center leading-none",
+        tile_class(@group, @task)
+      ]}
+      title={@title}
+    >
+      <%= if @lines do %>
+        <span class="text-sm font-bold">{elem(@lines, 0)}</span>
+        <span :if={elem(@lines, 1)} class="mt-0.5 text-[10px] font-semibold uppercase">
+          {elem(@lines, 1)}
+        </span>
+      <% else %>
+        <span class="text-[11px] font-semibold leading-tight">{@label}</span>
+      <% end %>
+      <span class="sr-only">{@label}</span>
+    </div>
+    """
+  end
+
+  defp tile_label(task, :closed, _today) do
+    if task.status == "done", do: gettext("Done"), else: gettext("Skipped")
+  end
+
+  defp tile_label(task, group, today), do: due_text(task, group, today)
+
+  defp tile_lines(task, :overdue, today) do
+    case String.split(due_text(task, :overdue, today), " ", parts: 2) do
+      [top, bottom] -> {top, bottom}
+      _ -> nil
+    end
+  end
+
+  defp tile_lines(%{due_date: d}, :upcoming, _today) when not is_nil(d) do
+    {Integer.to_string(d.day), Calendar.strftime(d, "%b")}
+  end
+
+  defp tile_lines(%{due_date: d}, :due_soon, today) when not is_nil(d) and d == today do
+    {gettext("today"), nil}
+  end
+
+  defp tile_lines(_task, _group, _today), do: nil
+
+  defp tile_class(:overdue, _task),
+    do: "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200"
+
+  defp tile_class(:due_soon, _task),
+    do: "bg-amber-100 text-amber-900 dark:bg-amber-900 dark:text-amber-100"
+
+  defp tile_class(:closed, %{status: "done"}),
+    do: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
+
+  defp tile_class(:someday, _task),
+    do: "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500"
+
+  defp tile_class(_group, _task),
+    do: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200"
+
+  defp tile_title(%{due_date: d}, _company) when not is_nil(d), do: Helpers.format_date(d)
+
+  defp tile_title(%{closed_at: at}, company) when not is_nil(at),
+    do: Helpers.format_datetime(at, company)
+
+  defp tile_title(_task, _company), do: nil
+
+  @doc "Closed date in the company timezone (`dd-mm-yyyy`), or nil."
+  def closed_on(%{closed_at: nil}, _company), do: nil
+
+  def closed_on(%{closed_at: at}, company),
+    do: at |> Timex.to_datetime(company.timezone) |> Helpers.format_date()
+
+  attr :task, :map, required: true
   attr :company, :map, required: true
 
   @doc "Done & skipped list: a Done / Skipped chip and the closed date (company timezone)."
@@ -55,15 +145,10 @@ defmodule FullCircleWeb.TaskComponents do
       ]}>
         {if @task.status == "done", do: gettext("Done"), else: gettext("Skipped")}
       </span>
-      <span class="tabular-nums">{closed_date(@task.closed_at, @company)}</span>
+      <span class="tabular-nums">{closed_on(@task, @company)}</span>
     </div>
     """
   end
-
-  defp closed_date(nil, _company), do: nil
-
-  defp closed_date(at, company),
-    do: at |> Timex.to_datetime(company.timezone) |> Helpers.format_date()
 
   @doc "\"yearly\", \"every 3 months\"… or nil for a one-off."
   def repeat_label(%{recur_unit: nil}), do: nil
@@ -89,7 +174,12 @@ defmodule FullCircleWeb.TaskComponents do
     ~H"""
     <div
       id={@id}
-      class="border-b border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-gray-700 dark:bg-gray-800/60 dark:text-slate-400"
+      class={[
+        "px-4 pb-1 pt-4 text-xs font-bold uppercase tracking-wide",
+        @group == :overdue && "text-rose-600 dark:text-rose-400",
+        @group == :due_soon && "text-amber-600 dark:text-amber-400",
+        @group not in [:overdue, :due_soon] && "text-gray-500 dark:text-gray-400"
+      ]}
     >
       {group_label(@group)}
     </div>

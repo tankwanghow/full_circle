@@ -18,7 +18,11 @@ compose it. A new read path that queries `notes` directly is a leak.
 Plus one rule for tasks: a note with `subject_type "Task"` is also readable by
 anyone who can see that task (`Tasks.visible_to/3`), and `list_versions/3`
 applies that rule per version, using the version's own subject (not the note's
-current one). See `.claude/skills/tasks.md`.
+current one). On write, `create_note/3` and `update_note/4` copy that task's
+`visibility` (`follow_task_visibility/3`); the writer does not pick a role.
+The composer hides Everyone, Private and the role chips whenever the subject
+is a Task. Changing the task's visibility updates those notes. See
+`.claude/skills/tasks.md`.
 
 ## Visibility values
 nil = public (Everyone). Otherwise a non-empty list; `[]` is invalid (DB
@@ -76,11 +80,15 @@ noting journals and cashiers noting credit/debit notes and return cheques.
 1. Entry in `@records` (table with `company_id` + title column) or add it to
    `CommandPalette.Types.type_specs` if it is a posted document.
 2. `type_label/1` clause in `NoteComponents` (gettext).
-3. Panel `live_component` placed **after the record's card** (the outer
-   `<div class="w-N/12 mx-auto border rounded-lg …">`), not inside it, with
-   `class="w-N/12"` matching the card and the `:edit and @id != "new"` guard.
-   The panel caps itself at `max-w-2xl`, so a wide card (invoices, w-11/12)
-   doesn't stretch the notes across the screen.
+3. `FullCircleWeb.RecordAside.record_aside` placed **after the record's card**
+   (the outer `<div class="w-N/12 mx-auto …">` or the fit-width
+   `w-fit min-w-[64rem]` card), not inside it, with `class` matching that
+   card and the `:edit and @id != "new"` guard. The aside is notes on the
+   left and tasks linked to the record on the right; the columns sit side by
+   side once the row is 56rem wide (`@4xl`), and stack on a narrower card.
+   The index notes modal stays the notes panel alone. The task page's
+   progress notes stay the notes panel under the task, inside the task
+   column, not this aside.
 4. Index: alias + `NotesIndex.init(type, RowComponent, key: …, stream: …)` in
    mount (`key`/`stream` default to `:id`/`:objects`), `NotesIndex.count/3`
    before `stream(`, `note_count=` on the row component, `<NotesIndex.modal>`.
@@ -214,8 +222,8 @@ would otherwise show the pre-save text and `lock_version`.
 | `initial_subject` | `%{type, id, title}` prefill for `:new` |
 | `fixed_subject` | `{type, id}` the note must be about; no `about…` chip |
 | `full` | title input and the link row |
-| `default_visibility` | e.g. Private (`["admin"]`) for task panels |
-| `roles` | `false` hides the role chips (task panels) |
+| `default_visibility` | starting visibility for a new note. A note about a Task ignores it; create and update copy the task |
+| `roles` | `false` hides the role chips. A Task subject hides them either way (`task_subject?/2`) |
 | `placeholder`, `submit_label` | "Write a note…" / "Post your reply…"; "Post" / "Reply" / "Save" |
 | `cancellable` | shows Cancel |
 | `notify` | `:liveview` (default) sends `{:composer, id, event}` to the host LiveView. `{module, id}` does `send_update(module, id: id, composer: {composer_id, event})`. Events are `{:saved, mode, note}` or `:cancelled`. |

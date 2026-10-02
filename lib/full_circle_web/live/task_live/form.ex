@@ -1,13 +1,13 @@
 defmodule FullCircleWeb.TaskLive.Form do
   @moduledoc """
-  The task's one page: create, read and edit (like notes, no show page).
-  Below the form: progress notes (the notes panel, Private by default) and the
-  series' past cycles. The assignee gets the fields read-only plus Done/Skip.
+  The task's one page, a column 15% wider than Notes. An open task starts as a
+  post; Edit, new and copy keep that post and turn the lines into fields.
+  Progress notes copy the task's visibility. Past cycles sit under the post.
   """
   use FullCircleWeb, :live_view
 
   import FullCircleWeb.NoteComponents
-  import FullCircleWeb.TaskComponents, only: [close_dialog: 1]
+  import FullCircleWeb.TaskComponents, only: [close_dialog: 1, due_tile: 1, repeat_label: 1]
 
   alias FullCircle.{Linkable, Notes, Tasks}
   alias FullCircle.Tasks.CompanyTask
@@ -22,6 +22,10 @@ defmodule FullCircleWeb.TaskLive.Form do
         show_picker: false,
         params: %{},
         closing: nil,
+        editing: false,
+        today: Tasks.today(com),
+        note_count: 0,
+        link_count: 0,
         users: Tasks.assignable_users(com),
         rights: Tasks.rights(com, user)
       )
@@ -29,14 +33,14 @@ defmodule FullCircleWeb.TaskLive.Form do
     case socket.assigns.live_action do
       :new ->
         if socket.assigns.rights.create,
-          do: {:ok, mount_new(socket)},
+          do: {:ok, mount_new(socket, %CompanyTask{}, gettext("New Task"), params)},
           else: {:ok, deny(socket, gettext("You cannot create tasks."))}
 
       :copy ->
         with {:rights, true} <- {:rights, socket.assigns.rights.create},
              {:task, %CompanyTask{} = src} <-
                {:task, Tasks.get_task(params["task_id"], com, user)} do
-          {:ok, mount_new(socket, copy_of(src, socket.assigns.users), gettext("Copy Task"))}
+          {:ok, mount_new(socket, copy_of(src, socket.assigns.users), gettext("Copy Task"), %{})}
         else
           {:rights, _} -> {:ok, deny(socket, gettext("You cannot create tasks."))}
           {:task, _} -> {:ok, deny(socket, gettext("Task not found."))}
@@ -75,35 +79,59 @@ defmodule FullCircleWeb.TaskLive.Form do
     }
   end
 
-  defp mount_new(socket, prefill \\ %CompanyTask{}, title \\ gettext("New Task")) do
+  defp mount_new(socket, prefill, title, params) do
+    links = link_from_params(params, socket)
+
     assign(socket,
       page_title: title,
       task: prefill,
-      links: [],
+      links: links,
+      link_count: length(links),
       cycles: [],
       cycle_counts: %{},
       can_edit: true,
       can_close: false,
       can_reopen: false,
+      editing: false,
       form: to_form(Tasks.change_task(prefill), as: :task)
     )
   end
+
+  # /tasks/new?link_type=&link_id= opens the full form with that record already
+  # linked (the panel's "Full form"). A bad id is ignored.
+  defp link_from_params(%{"link_type" => type, "link_id" => id}, socket)
+       when is_binary(type) and is_binary(id) do
+    %{current_company: com, current_user: user} = socket.assigns
+
+    case Linkable.resolve(type, id, com, user) do
+      {:ok, target} -> [%{type: type, id: id, title: target.title}]
+      _ -> []
+    end
+  end
+
+  defp link_from_params(_, _socket), do: []
 
   defp assign_task(socket, task) do
     %{current_company: com, current_user: user, rights: r} = socket.assigns
     open? = task.status == "open"
     cycles = Tasks.series_cycles(task, com, user)
+    links = Tasks.list_links(task, com, user)
+    note_counts = Notes.count_by_records(com, user, "Task", [task.id | Enum.map(cycles, & &1.id)])
 
     assign(socket,
-      page_title: task.title,
+      page_title: gettext("Task"),
       task: task,
       params: %{},
-      links: Tasks.list_links(task, com, user),
+      links: links,
+      link_count: length(links),
+      note_count: Map.get(note_counts, task.id, 0),
       cycles: cycles,
-      cycle_counts: Notes.count_by_records(com, user, "Task", Enum.map(cycles, & &1.id)),
+      cycle_counts: Map.delete(note_counts, task.id),
       can_edit: open? and Tasks.may_edit?(task, user, r),
       can_close: open? and Tasks.may_close?(task, user, r),
       can_reopen: not open? and Tasks.may_reopen?(task, user, r),
+      editing: false,
+      show_picker: false,
       form: to_form(Tasks.change_task(task), as: :task)
     )
   end
@@ -127,6 +155,26 @@ defmodule FullCircleWeb.TaskLive.Form do
   @impl true
   def handle_event("validate", %{"task" => params}, socket),
     do: {:noreply, change(socket, params)}
+
+  def handle_event("edit", _, socket) do
+    if socket.assigns.can_edit do
+      {:noreply, assign(socket, editing: true)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("cancel_edit", _, socket) do
+    %{task: task} = socket.assigns
+
+    {:noreply,
+     assign(socket,
+       editing: false,
+       params: %{},
+       show_picker: false,
+       form: to_form(Tasks.change_task(task), as: :task)
+     )}
+  end
 
   def handle_event("visibility_everyone", _, socket),
     do: {:noreply, change(socket, Map.put(socket.assigns.params, "visibility", [""]))}
@@ -156,7 +204,8 @@ defmodule FullCircleWeb.TaskLive.Form do
           socket
       end
 
-    {:noreply, assign(socket, links: Tasks.list_links(task, com, user))}
+    links = Tasks.list_links(task, com, user)
+    {:noreply, assign(socket, links: links, link_count: length(links))}
   end
 
   def handle_event("save", %{"task" => params}, socket) do
@@ -300,7 +349,8 @@ defmodule FullCircleWeb.TaskLive.Form do
     else
       case Tasks.add_link(task, picked.type, picked.id, com, user) do
         {:ok, _} ->
-          {:noreply, assign(socket, links: Tasks.list_links(task, com, user))}
+          links = Tasks.list_links(task, com, user)
+          {:noreply, assign(socket, links: links, link_count: length(links))}
 
         {:error, %Ecto.Changeset{errors: [{_f, error} | _]}} ->
           {:noreply,
@@ -351,198 +401,445 @@ defmodule FullCircleWeb.TaskLive.Form do
     end
   end
 
+  defp email_name(%{email: email}) when is_binary(email), do: email |> String.split("@") |> hd()
+  defp email_name(_), do: nil
+
+  # Same outline pill as ✎ Edit. Color is the only difference. These must not
+  # use the `.button` class: its unlayered padding would win over these utilities.
+  defp pill(color) do
+    "rounded-full border px-3 py-0.5 text-sm #{pill_color(color)}"
+  end
+
+  defp pill_color("gray"),
+    do: "border-gray-300 hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
+
+  defp pill_color("zinc"),
+    do: "border-zinc-400 text-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+
+  defp pill_color("amber"),
+    do: "border-amber-500 text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900"
+
+  defp pill_color("red"),
+    do: "border-red-600 text-red-700 hover:bg-red-50 dark:hover:bg-red-900"
+
+  defp pill_color("green"),
+    do: "border-green-600 text-green-700 hover:bg-green-50 dark:hover:bg-green-900"
+
+  # Done and Skip share one box. The fill differs because finishing and
+  # skipping are different actions. Neither uses the Edit outline.
+  defp close_pill(kind) do
+    "inline-flex w-20 shrink-0 items-center justify-center rounded-full border px-3 py-0.5 text-sm font-medium #{close_style(kind)}"
+  end
+
+  defp close_style("done"),
+    do: "border-green-700 bg-green-600 text-white hover:bg-green-700"
+
+  defp close_style("skip"),
+    do: "border-gray-300 bg-gray-200 text-gray-800 hover:bg-gray-300"
+
+  defp people_line(task) do
+    creator = email_name(task.creator)
+
+    cond do
+      task.status != "open" ->
+        verb = if task.status == "done", do: gettext("Done by"), else: gettext("Skipped by")
+        "#{creator} · #{verb} #{email_name(task.closed_by)}"
+
+      task.assignee ->
+        "#{creator} · " <> gettext("assigned to %{who}", who: email_name(task.assignee))
+
+      true ->
+        "#{creator} · " <> gettext("unassigned")
+    end
+  end
+
+  defp rhythm(task) do
+    [
+      repeat_label(task) || gettext("does not repeat"),
+      task.reminder_before_days && gettext("reminder %{n} days", n: task.reminder_before_days),
+      visibility_label(task.visibility)
+    ]
+    |> Enum.reject(&(&1 in [nil, false]))
+    |> Enum.join(" · ")
+  end
+
+  defp visibility_label(nil), do: gettext("Everyone")
+  defp visibility_label(["admin"]), do: gettext("Private")
+  defp visibility_label(roles) when is_list(roles), do: Enum.join(roles, ", ")
+
+  # The due tile follows the fields being edited, not only the saved task.
+  defp draft_task(form, task) do
+    %{
+      task
+      | due_date: Ecto.Changeset.get_field(form.source, :due_date),
+        reminder_before_days: Ecto.Changeset.get_field(form.source, :reminder_before_days),
+        status: task.status || "open"
+    }
+  end
+
+  defp field_errors(form) do
+    ~w(title descriptions due_date recur_unit recur_every reminder_before_days assignee_id documents_needed visibility)a
+    |> Enum.flat_map(fn field -> Enum.map(form[field].errors, &translate_error/1) end)
+  end
+
+  # Counts stay on the left. Save/Cancel/Copy/Back/Delete/Edit are one group;
+  # Done/Skip/Reopen the other. `gap-7` is only between those two groups.
+  defp action_row(assigns) do
+    ~H"""
+    <div class={["flex flex-wrap items-center gap-7", @class]}>
+      <div class="flex flex-wrap items-center gap-2">
+        <button
+          :if={@save and @can_edit}
+          type="submit"
+          class={["phx-submit-loading:opacity-75", pill("zinc")]}
+        >
+          {gettext("Save")}
+        </button>
+        <button :if={@editing} type="button" phx-click="cancel_edit" class={pill("gray")}>
+          {gettext("Cancel")}
+        </button>
+        <.link
+          :if={@live_action == :edit and @rights.create and not @editing}
+          navigate={~p"/companies/#{@company.id}/tasks/#{@task.id}/copy"}
+          id="copy-task"
+          class={pill("gray")}
+        >
+          {gettext("Copy")}
+        </.link>
+        <.link
+          :if={not @editing}
+          id="back-task"
+          navigate={~p"/companies/#{@company.id}/tasks"}
+          class={pill("amber")}
+        >
+          {gettext("Back")}
+        </.link>
+        <button
+          :if={@can_edit and @live_action == :edit and not @editing}
+          type="button"
+          id="delete-task"
+          phx-click="delete"
+          data-confirm={gettext("Delete this task? A repeating task stops repeating.")}
+          class={pill("red")}
+        >
+          {gettext("Delete")}
+        </button>
+        <button :if={@show_edit} type="button" id="edit-task" phx-click="edit" class={pill("gray")}>
+          ✎ {gettext("Edit")}
+        </button>
+      </div>
+      <div :if={not @editing and (@can_close or @can_reopen)} class="flex flex-wrap items-center gap-2">
+        <button
+          :if={@can_close}
+          type="button"
+          id="done-task"
+          phx-click="open_close"
+          phx-value-kind="done"
+          class={close_pill("done")}
+        >
+          ✓ {gettext("Done")}
+        </button>
+        <button
+          :if={@can_close}
+          type="button"
+          id="skip-task"
+          phx-click="open_close"
+          phx-value-kind="skip"
+          class={close_pill("skip")}
+        >
+          {gettext("Skip")}
+        </button>
+        <button
+          :if={@can_reopen}
+          type="button"
+          id="reopen-task"
+          phx-click="reopen"
+          class={pill("amber")}
+        >
+          {gettext("Reopen")}
+        </button>
+      </div>
+    </div>
+    """
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="mx-auto w-6/12 max-md:w-11/12">
-      <div class="rounded-lg border border-slate-300 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
-        <p class="w-full text-center text-2xl font-medium">{@page_title}</p>
-        <p :if={@live_action == :edit} class="mb-2 text-center text-xs text-slate-500">
-          {gettext("Created by")} {@task.creator.email}
-          <span :if={@task.status != "open"}>
-            · {if @task.status == "done", do: gettext("Done by"), else: gettext("Skipped by")}
-            {@task.closed_by && @task.closed_by.email}
-            {FullCircleWeb.Helpers.format_datetime(@task.closed_at, @current_company)}
-          </span>
-        </p>
-
-        <.form for={@form} id="task-form" phx-change="validate" phx-submit="save" autocomplete="off">
-          <.input field={@form[:title]} label={gettext("Title")} disabled={!@can_edit} />
-          <.input
-            field={@form[:descriptions]}
-            type="textarea"
-            rows="3"
-            label={gettext("Description")}
-            disabled={!@can_edit}
-          />
-          <div class="grid grid-cols-3 gap-2">
-            <.input
-              field={@form[:due_date]}
-              type="date"
-              label={gettext("Due date")}
-              disabled={!@can_edit}
-            />
-            <.input
-              field={@form[:recur_unit]}
-              type="select"
-              options={unit_options()}
-              label={gettext("Repeats every")}
-              disabled={!@can_edit}
-            />
-            <%!-- Always rendered (a hidden input would vanish from form tests and
-                 phx-change); the changeset drops it when there is no unit. --%>
-            <.input
-              field={@form[:recur_every]}
-              type="number"
-              min="1"
-              value={Ecto.Changeset.get_field(@form.source, :recur_every) || 1}
-              label={gettext("Every")}
-              disabled={!@can_edit}
-            />
-          </div>
-          <div class="grid grid-cols-2 gap-2">
-            <.input
-              field={@form[:reminder_before_days]}
-              type="number"
-              min="0"
-              label={gettext("Remind days before")}
-              disabled={!@can_edit}
-            />
-            <.input
-              field={@form[:assignee_id]}
-              type="select"
-              prompt={gettext("Unassigned")}
-              options={assignee_options(@users, @task)}
-              label={gettext("Assignee")}
-              disabled={!@can_edit}
-            />
-          </div>
-          <.input
-            field={@form[:documents_needed]}
-            type="textarea"
-            rows="2"
-            label={gettext("Documents needed (a reminder on Done)")}
-            disabled={!@can_edit}
-          />
-
-          <div class="mt-3 flex flex-wrap items-center gap-1">
-            <span
-              class="mr-1 text-sm font-semibold"
-              title={gettext("Admin, the creator and the assignee can always see it.")}
-            >
-              {gettext("Visible to")}
-            </span>
-            <.visibility_chips
-              visibility={selected_roles(@form)}
-              id_prefix="visibility"
-              field_name="task[visibility][]"
-              disabled={!@can_edit}
-              private_title={gettext("Only admins, the creator and the assignee can see it.")}
-            />
-          </div>
-          <.error :for={msg <- Enum.map(@form[:visibility].errors, &translate_error/1)}>{msg}</.error>
-
-          <div class="mt-2 flex flex-wrap items-center gap-1">
-            <span class="mr-1 text-sm font-semibold">{gettext("Linked records")}</span>
-            <.record_chip :for={l <- @links} type={l.type} target={chip_target(l, @current_company)}>
-              <button
-                :if={@can_edit and @live_action == :edit}
-                type="button"
-                id={"remove-link-#{l.link_id}"}
-                phx-click="remove_link"
-                phx-value-id={l.link_id}
-                title={gettext("Remove")}
-                class="shrink-0"
-              >
-                ✕
-              </button>
-              <button
-                :if={@live_action in [:new, :copy]}
-                type="button"
-                phx-click="remove_new_link"
-                phx-value-id={l.id}
-                title={gettext("Remove")}
-                class="shrink-0"
-              >
-                ✕
-              </button>
-            </.record_chip>
-            <button
-              :if={@can_edit}
-              type="button"
-              id="open-picker"
-              phx-click="toggle_picker"
-              class="rounded-full border border-dashed border-slate-400 px-2 text-xs text-slate-600 dark:text-slate-300"
-            >
-              ＋ {gettext("link a record")}
-            </button>
-          </div>
-
-          <div class="mt-4 flex flex-wrap justify-center gap-2">
-            <.button :if={@can_edit}>{gettext("Save")}</.button>
-            <button
-              :if={@can_close}
-              type="button"
-              id="done-task"
-              phx-click="open_close"
-              phx-value-kind="done"
-              class="green button"
-            >
-              ✓ {gettext("Done")}
-            </button>
-            <button
-              :if={@can_close}
-              type="button"
-              id="skip-task"
-              phx-click="open_close"
-              phx-value-kind="skip"
-              class="gray button"
-            >
-              {gettext("Skip")}
-            </button>
-            <button
-              :if={@can_reopen}
-              type="button"
-              id="reopen-task"
-              phx-click="reopen"
-              class="orange button"
-            >
-              {gettext("Reopen")}
-            </button>
-            <.link
-              :if={@live_action == :edit and @rights.create}
-              navigate={~p"/companies/#{@current_company.id}/tasks/#{@task.id}/copy"}
-              id="copy-task"
-              class="gray button"
-            >
-              {gettext("Copy")}
-            </.link>
-            <.link navigate={~p"/companies/#{@current_company.id}/tasks"} class="orange button">{gettext(
-              "Back"
-            )}</.link>
-            <button
-              :if={@can_edit and @live_action == :edit}
-              type="button"
-              id="delete-task"
-              phx-click="delete"
-              data-confirm={gettext("Delete this task? A repeating task stops repeating.")}
-              class="red button"
-            >
-              {gettext("Delete")}
-            </button>
-          </div>
-        </.form>
-
-        <div :if={@show_picker} class="mt-3">
-          <.live_component
-            module={RecordPickerComponent}
-            id="record-picker"
-            label={gettext("Link a record")}
-            current_company={@current_company}
-            current_user={@current_user}
-          />
-        </div>
+    <div class="mx-auto max-w-[41.4rem] border-x border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+      <div class="h-1 bg-amber-500"></div>
+      <div class="flex items-center gap-4 border-b border-gray-200 px-4 py-2 dark:border-gray-700">
+        <.link
+          id="back-to-tasks"
+          navigate={~p"/companies/#{@current_company.id}/tasks"}
+          class="rounded-full px-2 text-xl hover:bg-gray-100 dark:hover:bg-gray-800"
+          title={gettext("Back")}
+        >
+          ←
+        </.link>
+        <span class="text-lg font-bold">{@page_title}</span>
       </div>
+
+      <%= if @live_action in [:new, :copy] or @editing do %>
+        <div class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+          <.form for={@form} id="task-form" phx-change="validate" phx-submit="save" autocomplete="off">
+            <div class="flex gap-3">
+              <.due_tile
+                task={draft_task(@form, @task)}
+                group={Tasks.group_of(draft_task(@form, @task), @today)}
+                today={@today}
+                company={@current_company}
+              />
+              <div class="min-w-0 flex-1">
+                <div class="text-sm text-gray-500 dark:text-gray-400">
+                  {email_name(@task.creator) || email_name(@current_user)} · {gettext("assigned to")}
+                  <select
+                    name="task[assignee_id]"
+                    disabled={!@can_edit}
+                    class="rounded-full border-gray-400 bg-transparent py-0.5 text-sm dark:border-gray-600 dark:bg-gray-900"
+                  >
+                    <option value="">{gettext("Unassigned")}</option>
+                    <option
+                      :for={{email, id} <- assignee_options(@users, @task)}
+                      value={id}
+                      selected={to_string(id) == to_string(@form[:assignee_id].value || "")}
+                    >
+                      {email}
+                    </option>
+                  </select>
+                </div>
+                <input
+                  type="text"
+                  name="task[title]"
+                  value={@form[:title].value}
+                  placeholder={gettext("Title")}
+                  disabled={!@can_edit}
+                  class="mt-1 w-full rounded-md border border-gray-400 bg-transparent px-2 py-1 text-xl font-bold dark:border-gray-600 dark:bg-gray-900"
+                />
+                <textarea
+                  name="task[descriptions]"
+                  rows="3"
+                  placeholder={gettext("Description")}
+                  disabled={!@can_edit}
+                  class="mt-2 w-full resize-y rounded-md border border-gray-400 bg-transparent px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-900"
+                >{Phoenix.HTML.Form.normalize_value("textarea", @form[:descriptions].value)}</textarea>
+                <div class="mt-2 flex items-center gap-2 text-sm text-amber-800 dark:text-amber-200">
+                  <span class="shrink-0">{gettext("This task expects:")}</span>
+                  <input
+                    type="text"
+                    name="task[documents_needed]"
+                    value={@form[:documents_needed].value}
+                    disabled={!@can_edit}
+                    class="min-w-0 flex-1 rounded-md border border-gray-400 bg-transparent px-2 py-0.5 text-sm text-amber-900 dark:border-gray-600 dark:bg-gray-900 dark:text-amber-100"
+                  />
+                </div>
+                <div class="mt-2 flex flex-wrap items-center gap-1">
+                  <.record_chip
+                    :for={l <- @links}
+                    type={l.type}
+                    target={chip_target(l, @current_company)}
+                  >
+                    <button
+                      :if={@can_edit and @live_action == :edit}
+                      type="button"
+                      id={"remove-link-#{l.link_id}"}
+                      phx-click="remove_link"
+                      phx-value-id={l.link_id}
+                      title={gettext("Remove")}
+                      class="shrink-0"
+                    >
+                      ✕
+                    </button>
+                    <button
+                      :if={@live_action in [:new, :copy]}
+                      type="button"
+                      phx-click="remove_new_link"
+                      phx-value-id={l.id}
+                      title={gettext("Remove")}
+                      class="shrink-0"
+                    >
+                      ✕
+                    </button>
+                  </.record_chip>
+                  <button
+                    :if={@can_edit}
+                    type="button"
+                    id="open-picker"
+                    phx-click="toggle_picker"
+                    class="rounded-full border border-dashed border-slate-400 px-2 text-xs text-slate-600 dark:text-slate-300"
+                  >
+                    ＋ {gettext("link a record")}
+                  </button>
+                </div>
+                <div class="mt-2 flex flex-wrap items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
+                  {gettext("Due date")}
+                  <input
+                    type="date"
+                    name="task[due_date]"
+                    value={Phoenix.HTML.Form.normalize_value("date", @form[:due_date].value)}
+                    disabled={!@can_edit}
+                    class="rounded-full border-gray-400 bg-transparent px-2 py-0.5 text-sm dark:border-gray-600 dark:bg-gray-900"
+                  /> ·
+                  <select
+                    name="task[recur_unit]"
+                    disabled={!@can_edit}
+                    class="rounded-full border-gray-400 bg-transparent py-0.5 text-sm dark:border-gray-600 dark:bg-gray-900"
+                  >
+                    <option
+                      :for={{label, value} <- unit_options()}
+                      value={value}
+                      selected={to_string(value) == to_string(@form[:recur_unit].value || "")}
+                    >
+                      {label}
+                    </option>
+                  </select>
+                  {gettext("Every")}
+                  <%!-- Always rendered: a missing input would vanish from phx-change.
+                       The changeset drops it when there is no unit. --%>
+                  <input
+                    type="number"
+                    name="task[recur_every]"
+                    min="1"
+                    value={Ecto.Changeset.get_field(@form.source, :recur_every) || 1}
+                    disabled={!@can_edit}
+                    class="w-16 rounded-full border-gray-400 bg-transparent px-2 py-0.5 text-center text-sm dark:border-gray-600 dark:bg-gray-900"
+                  /> · {gettext("Remind days before")}
+                  <input
+                    type="number"
+                    name="task[reminder_before_days]"
+                    min="0"
+                    value={@form[:reminder_before_days].value}
+                    disabled={!@can_edit}
+                    class="w-16 rounded-full border-gray-400 bg-transparent px-2 py-0.5 text-center text-sm dark:border-gray-600 dark:bg-gray-900"
+                  />
+                </div>
+                <div
+                  class="mt-1 flex flex-wrap items-center gap-1"
+                  title={gettext("Admin, the creator and the assignee can always see it.")}
+                >
+                  <.visibility_chips
+                    visibility={selected_roles(@form)}
+                    id_prefix="visibility"
+                    field_name="task[visibility][]"
+                    disabled={!@can_edit}
+                    private_title={gettext("Only admins, the creator and the assignee can see it.")}
+                  />
+                </div>
+                <.error :for={msg <- field_errors(@form)}>{msg}</.error>
+                <div class="mt-2 flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+                  <span :if={@live_action == :edit}>📝 {@note_count}</span>
+                  <span :if={@live_action == :edit}>🔗 {@link_count}</span>
+                  <.action_row
+                    class="ml-auto"
+                    save={true}
+                    show_edit={false}
+                    editing={@editing}
+                    can_edit={@can_edit}
+                    can_close={@can_close}
+                    can_reopen={@can_reopen}
+                    live_action={@live_action}
+                    rights={@rights}
+                    task={@task}
+                    company={@current_company}
+                  />
+                </div>
+              </div>
+            </div>
+          </.form>
+
+          <div :if={@show_picker} class="mt-3">
+            <.live_component
+              module={RecordPickerComponent}
+              id="record-picker"
+              label={gettext("Link a record")}
+              current_company={@current_company}
+              current_user={@current_user}
+            />
+          </div>
+        </div>
+      <% else %>
+        <article id="task-post" class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+          <div class="flex gap-3">
+            <.due_tile
+              task={@task}
+              group={Tasks.group_of(@task, @today)}
+              today={@today}
+              company={@current_company}
+            />
+            <div class="min-w-0 flex-1">
+              <div class="text-sm text-gray-500 dark:text-gray-400">{people_line(@task)}</div>
+              <h1 class="text-xl font-bold">{@task.title}</h1>
+              <p
+                :if={@task.descriptions not in [nil, ""]}
+                class="mt-1 whitespace-pre-wrap text-sm text-gray-800 dark:text-gray-200"
+              >
+                {@task.descriptions}
+              </p>
+              <p
+                :if={@task.documents_needed not in [nil, ""]}
+                class="mt-1 text-sm text-amber-800 dark:text-amber-200"
+              >
+                {gettext("This task expects:")} {@task.documents_needed}
+              </p>
+              <div class="mt-2 flex flex-wrap items-center gap-1">
+                <.record_chip
+                  :for={l <- @links}
+                  type={l.type}
+                  target={chip_target(l, @current_company)}
+                >
+                  <button
+                    :if={@can_edit}
+                    type="button"
+                    id={"remove-link-#{l.link_id}"}
+                    phx-click="remove_link"
+                    phx-value-id={l.link_id}
+                    title={gettext("Remove")}
+                    class="shrink-0"
+                  >
+                    ✕
+                  </button>
+                </.record_chip>
+                <button
+                  :if={@can_edit}
+                  type="button"
+                  id="open-picker"
+                  phx-click="toggle_picker"
+                  class="rounded-full border border-dashed border-slate-400 px-2 text-xs text-slate-600 dark:text-slate-300"
+                >
+                  ＋ {gettext("link a record")}
+                </button>
+              </div>
+              <div class="mt-2 text-sm text-gray-500 dark:text-gray-400">{rhythm(@task)}</div>
+              <div class="mt-2 flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+                <span>📝 {@note_count}</span>
+                <span>🔗 {@link_count}</span>
+                <.action_row
+                  class="ml-auto"
+                  save={false}
+                  show_edit={@can_edit}
+                  editing={false}
+                  can_edit={@can_edit}
+                  can_close={@can_close}
+                  can_reopen={@can_reopen}
+                  live_action={@live_action}
+                  rights={@rights}
+                  task={@task}
+                  company={@current_company}
+                />
+              </div>
+            </div>
+          </div>
+          <div :if={@show_picker} class="mt-3">
+            <.live_component
+              module={RecordPickerComponent}
+              id="record-picker"
+              label={gettext("Link a record")}
+              current_company={@current_company}
+              current_user={@current_user}
+            />
+          </div>
+        </article>
+      <% end %>
 
       <.live_component
         :if={@live_action == :edit}
@@ -550,14 +847,16 @@ defmodule FullCircleWeb.TaskLive.Form do
         id="task-notes"
         record_type="Task"
         record_id={@task.id}
+        heading={"📝 #{gettext("Progress notes")}"}
         current_company={@current_company}
         current_user={@current_user}
+        class="mx-3 mb-3"
       />
 
       <section
         :if={@cycles != []}
         id="past-cycles"
-        class="mx-auto mt-3 max-w-2xl rounded-lg border border-slate-200 p-3 text-sm dark:border-gray-700"
+        class="border-t border-gray-200 px-4 py-3 text-sm dark:border-gray-700"
       >
         <h2 class="mb-1 font-semibold">🕘 {gettext("Other cycles")}</h2>
         <.link

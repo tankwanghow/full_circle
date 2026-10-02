@@ -947,578 +947,580 @@ defmodule FullCircleWeb.InvoiceLive.Form do
          and everything except the detail table is excluded from sizing it with
          contain:inline-size, so header fields fill the width the columns need
          instead of pushing the card wider. --%>
-    <div class="w-fit min-w-[64rem] max-w-[98vw] mx-auto border rounded-lg border-yellow-500 bg-yellow-100 p-4 [&>*:not(form)]:[contain:inline-size]">
-      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
-      <.error_box changeset={@form.source} />
-      <div
-        :if={@live_action == :edit and @trading_settlement.linked?}
-        class="mb-3 rounded border border-amber-600 bg-amber-50 px-3 py-2 text-sm"
-        id="trading-settlement-banner"
-      >
-        <p class="font-medium text-amber-900">
-          {gettext("Linked to trading settlement")}
-        </p>
-        <p class="text-amber-800 mt-1">
-          {gettext(
-            "%{n} drop(s) · %{mt} MT · trips: %{trips}. Customer is locked. Unlink if the match was wrong; commercial qty/price edits are allowed.",
-            n: @trading_settlement.line_count,
-            mt: @trading_settlement.actual_sum,
-            trips: Enum.join(@trading_settlement.trip_refs, ", ")
-          )}
-        </p>
-        <button
-          type="button"
-          id="unlink-trading-settlement"
-          phx-click="unlink_trading_settlement"
-          data-confirm={
-            gettext(
-              "Unlink this invoice from trading drops? Drops will reappear on the settlement queue and can be invoiced again."
-            )
-          }
-          class="mt-2 orange button text-sm"
+    <div class="mx-auto grid w-fit min-w-[64rem] max-w-[98vw]">
+      <div class="w-fit min-w-[64rem] max-w-[98vw] border rounded-lg border-yellow-500 bg-yellow-100 p-4 [&>*:not(form)]:[contain:inline-size]">
+        <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
+        <.error_box changeset={@form.source} />
+        <div
+          :if={@live_action == :edit and @trading_settlement.linked?}
+          class="mb-3 rounded border border-amber-600 bg-amber-50 px-3 py-2 text-sm"
+          id="trading-settlement-banner"
         >
-          {gettext("Unlink trading settlement")}
-        </button>
-      </div>
-      <.form
-        for={@form}
-        id="object-form"
-        autocomplete="off"
-        phx-change="validate"
-        phx-submit="save"
-        phx-hook="ctrlEnterAddDetail"
-        class="[&>*:not(.detail-fit)]:[contain:inline-size]"
-      >
-        <.input type="hidden" field={@form[:invoice_no]} />
-        <div class="flex flex-row flex-nowrap">
-          <%!-- Fixed widths for fields of known size (ids, dates); the customer
+          <p class="font-medium text-amber-900">
+            {gettext("Linked to trading settlement")}
+          </p>
+          <p class="text-amber-800 mt-1">
+            {gettext(
+              "%{n} drop(s) · %{mt} MT · trips: %{trips}. Customer is locked. Unlink if the match was wrong; commercial qty/price edits are allowed.",
+              n: @trading_settlement.line_count,
+              mt: @trading_settlement.actual_sum,
+              trips: Enum.join(@trading_settlement.trip_refs, ", ")
+            )}
+          </p>
+          <button
+            type="button"
+            id="unlink-trading-settlement"
+            phx-click="unlink_trading_settlement"
+            data-confirm={
+              gettext(
+                "Unlink this invoice from trading drops? Drops will reappear on the settlement queue and can be invoiced again."
+              )
+            }
+            class="mt-2 orange button text-sm"
+          >
+            {gettext("Unlink trading settlement")}
+          </button>
+        </div>
+        <.form
+          for={@form}
+          id="object-form"
+          autocomplete="off"
+          phx-change="validate"
+          phx-submit="save"
+          phx-hook="ctrlEnterAddDetail"
+          class="[&>*:not(.detail-fit)]:[contain:inline-size]"
+        >
+          <.input type="hidden" field={@form[:invoice_no]} />
+          <div class="flex flex-row flex-nowrap">
+            <%!-- Fixed widths for fields of known size (ids, dates); the customer
                name takes the largest share of what is left. --%>
-          <div class="basis-64 grow shrink">
-            <.input type="hidden" field={@form[:contact_id]} />
-            <.input
-              field={@form[:contact_name]}
-              label={gettext("Customer")}
-              phx-hook={if(@trading_settlement.linked?, do: nil, else: "tributeAutoComplete")}
-              readonly={@trading_settlement.linked?}
-              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
-            />
+            <div class="basis-64 grow shrink">
+              <.input type="hidden" field={@form[:contact_id]} />
+              <.input
+                field={@form[:contact_name]}
+                label={gettext("Customer")}
+                phx-hook={if(@trading_settlement.linked?, do: nil, else: "tributeAutoComplete")}
+                readonly={@trading_settlement.linked?}
+                url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
+              />
+            </div>
+            <div class="w-36 shrink-0">
+              <.input field={@form[:reg_no]} label={gettext("Reg No")} readonly tabindex="-1" />
+            </div>
+            <div class="w-36 shrink-0">
+              <.input field={@form[:tax_id]} label={gettext("Tax Id")} readonly tabindex="-1" />
+            </div>
+            <div class="w-[9.5rem] shrink-0">
+              <.input field={@form[:invoice_date]} label={gettext("Invoice Date")} type="date" />
+            </div>
+            <div class="w-[9.5rem] shrink-0">
+              <.input field={@form[:load_date]} label={gettext("Load Date")} type="date" />
+            </div>
+            <div class="w-[9.5rem] shrink-0">
+              <.input field={@form[:due_date]} label={gettext("Due Date")} type="date" />
+            </div>
           </div>
-          <div class="w-36 shrink-0">
-            <.input field={@form[:reg_no]} label={gettext("Reg No")} readonly tabindex="-1" />
-          </div>
-          <div class="w-36 shrink-0">
-            <.input field={@form[:tax_id]} label={gettext("Tax Id")} readonly tabindex="-1" />
-          </div>
-          <div class="w-[9.5rem] shrink-0">
-            <.input field={@form[:invoice_date]} label={gettext("Invoice Date")} type="date" />
-          </div>
-          <div class="w-[9.5rem] shrink-0">
-            <.input field={@form[:load_date]} label={gettext("Load Date")} type="date" />
-          </div>
-          <div class="w-[9.5rem] shrink-0">
-            <.input field={@form[:due_date]} label={gettext("Due Date")} type="date" />
-          </div>
-        </div>
 
-        <div class="flex flex-row flex-nowrap mt-2">
-          <div class="grow shrink">
-            <.input
-              field={@form[:loader_tags]}
-              label={gettext("Loader Tags")}
-              phx-hook="tributeTagText"
-              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.Invoice&tag_field=loader_tags&tag="}
-            />
-          </div>
-          <div class="grow shrink">
-            <.input
-              field={@form[:loader_wages_tags]}
-              label={gettext("Loader Wages Tags")}
-              phx-hook="tributeTagText"
-              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.Invoice&tag_field=loader_wages_tags&tag="}
-            />
-          </div>
-          <div class="grow shrink">
-            <.input
-              field={@form[:delivery_man_tags]}
-              label={gettext("Delivery Man Tags")}
-              phx-hook="tributeTagText"
-              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.Invoice&tag_field=delivery_man_tags&tag="}
-            />
-          </div>
-          <div class="grow shrink">
-            <.input
-              field={@form[:delivery_wages_tags]}
-              label={gettext("Delivery Wages Tags")}
-              phx-hook="tributeTagText"
-              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.Invoice&tag_field=delivery_wages_tags&tag="}
-            />
-          </div>
-          <%!-- Descriptions sits here, not on the customer row, so the customer
+          <div class="flex flex-row flex-nowrap mt-2">
+            <div class="grow shrink">
+              <.input
+                field={@form[:loader_tags]}
+                label={gettext("Loader Tags")}
+                phx-hook="tributeTagText"
+                url={"/list/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.Invoice&tag_field=loader_tags&tag="}
+              />
+            </div>
+            <div class="grow shrink">
+              <.input
+                field={@form[:loader_wages_tags]}
+                label={gettext("Loader Wages Tags")}
+                phx-hook="tributeTagText"
+                url={"/list/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.Invoice&tag_field=loader_wages_tags&tag="}
+              />
+            </div>
+            <div class="grow shrink">
+              <.input
+                field={@form[:delivery_man_tags]}
+                label={gettext("Delivery Man Tags")}
+                phx-hook="tributeTagText"
+                url={"/list/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.Invoice&tag_field=delivery_man_tags&tag="}
+              />
+            </div>
+            <div class="grow shrink">
+              <.input
+                field={@form[:delivery_wages_tags]}
+                label={gettext("Delivery Wages Tags")}
+                phx-hook="tributeTagText"
+                url={"/list/companies/#{@current_company.id}/#{@current_user.id}/billingtags?klass=FullCircle.Billing.Invoice&tag_field=delivery_wages_tags&tag="}
+              />
+            </div>
+            <%!-- Descriptions sits here, not on the customer row, so the customer
                name keeps its room when the card is narrow. --%>
-          <div class="grow shrink">
-            <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
-          </div>
-        </div>
-
-        <div class="flex flex-row flex-nowrap mt-2">
-          <div class="w-[14%]">
-            <.input field={@form[:e_inv_internal_id]} label={gettext("E Invoice Internal Id")} />
-          </div>
-          <div class="w-[20%] min-w-[17rem]">
-            <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
-          </div>
-          <div
-            :if={is_nil(@form[:e_inv_uuid].value) and @live_action == :edit}
-            class="ml-5 mt-5"
-          >
-            <.link phx-click="preview_e_inv" class="blue button">
-              {gettext("Preview E-Invoice")}
-            </.link>
-          </div>
-          <div
-            :if={!is_nil(@form[:e_inv_uuid].value)}
-            class="text-blue-600 hover:font-medium ml-5 mt-6"
-          >
-            <.link
-              target="_blank"
-              href={"#{@einv_portal}/documents/#{@form[:e_inv_uuid].value}"}
-            >
-              Open E-Invoice
-            </.link>
-          </div>
-          <div class="shrink-0 ml-2 mt-1">
-            <% {url, qrcode} =
-              FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data, 1) %>
-            <.link target="_blank" href={url}>
-              {qrcode |> raw}
-            </.link>
-          </div>
-        </div>
-
-        <.live_component
-          :if={
-            @live_action in [:new, :edit] and @trading_drop_ids == [] and
-              not (@trading_settlement.linked? || false) and
-              not is_nil(blank_id(@form[:contact_id].value))
-          }
-          module={FullCircleWeb.InvoiceLive.TradingAttachComponent}
-          id="trading-invoice-attach"
-          current_company={@current_company}
-          current_user={@current_user}
-          contact_id={blank_id(@form[:contact_id].value)}
-          bill_date={@form[:invoice_date].value}
-          bill_qty={bill_quantity(@form)}
-        />
-
-        <.live_component
-          module={FullCircleWeb.InvoiceLive.DetailComponent}
-          id="invoice_details"
-          klass="detail-fit"
-          settings={@settings}
-          doc_name="Invoice"
-          detail_name={:invoice_details}
-          form={@form}
-          taxcodetype="saltaxcode"
-          doc_good_amount={:invoice_good_amount}
-          doc_tax_amount={:invoice_tax_amount}
-          doc_detail_amount={:invoice_amount}
-          matched_trans={@matched_trans}
-          current_company={@current_company}
-          current_user={@current_user}
-        />
-
-        <div class="flex flex-row justify-center gap-x-1 mt-1">
-          <.form_action_button
-            form={@form}
-            live_action={@live_action}
-            current_company={@current_company}
-            type="Invoice"
-          />
-          <.print_button
-            :if={@live_action == :edit}
-            company={@current_company}
-            doc_type="Invoice"
-            doc_id={@id}
-            class="gray button"
-          />
-          <.pre_print_button
-            :if={@live_action == :edit}
-            company={@current_company}
-            doc_type="Invoice"
-            doc_id={@id}
-            class="gray button"
-          />
-          <.live_component
-            :if={@live_action == :edit}
-            module={FullCircleWeb.LogLive.Component}
-            current_company={@current_company}
-            id={"log_#{@id}"}
-            show_log={false}
-            entity="invoices"
-            entity_id={@id}
-          />
-          <.live_component
-            :if={@live_action == :edit}
-            module={FullCircleWeb.JournalEntryViewLive.Component}
-            id={"journal_#{@id}"}
-            show_journal={false}
-            doc_type="Invoice"
-            doc_no={@form.data.invoice_no}
-            company_id={@current_company.id}
-          />
-        </div>
-      </.form>
-
-      <div
-        :if={@live_action == :new and @e_inv_document}
-        class="mt-4 border rounded-lg border-blue-500 bg-blue-50 p-4"
-      >
-        <div class="flex justify-between items-center mb-3">
-          <p class="text-xl font-medium">{gettext("E-Invoice Document")}</p>
-          <.link phx-click="close_e_inv_document" class="orange button text-sm">
-            {gettext("Close")}
-          </.link>
-        </div>
-        <%= case @e_inv_document do %>
-          <% {:ok, parsed} -> %>
-            <div class="grid grid-cols-2 gap-4 text-sm">
-              <div class="border rounded p-3 bg-white">
-                <p class="font-bold mb-2">{gettext("Customer")}</p>
-                <p class="font-medium">{parsed.customer_name}</p>
-                <p>TIN: {parsed.customer_tin}</p>
-                <p>BRN: {parsed.customer_brn}</p>
-              </div>
-              <div class="border rounded p-3 bg-white">
-                <p class="font-bold mb-2">{gettext("Document Info")}</p>
-                <p><span class="font-bold">{gettext("Internal ID")}:</span> {parsed.internal_id}</p>
-                <p><span class="font-bold">{gettext("Issue Date")}:</span> {parsed.issue_date}</p>
-                <p><span class="font-bold">{gettext("Currency")}:</span> {parsed.currency}</p>
-                <p><span class="font-bold">{gettext("Type")}:</span> {parsed.type_code}</p>
-              </div>
+            <div class="grow shrink">
+              <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
             </div>
-            <div class="mt-3 border rounded p-3 bg-white text-sm">
-              <table class="w-full text-sm">
-                <thead>
-                  <tr class="border-b font-bold">
-                    <th class="text-left p-1">#</th>
-                    <th class="text-left p-1">{gettext("Description")}</th>
-                    <th class="text-right p-1">{gettext("Qty")}</th>
-                    <th class="text-left p-1">{gettext("Unit")}</th>
-                    <th class="text-right p-1">{gettext("Unit Price")}</th>
-                    <th class="text-right p-1">{gettext("Discount")}</th>
-                    <th class="text-right p-1">{gettext("Amount")}</th>
-                    <th class="text-right p-1">{gettext("Tax%")}</th>
-                    <th class="text-right p-1">{gettext("Tax")}</th>
-                    <th class="text-left p-1">{gettext("Tax Type")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <%= for {line, idx} <- Enum.with_index(parsed.invoice_lines, 1) do %>
-                    <tr class="border-b">
-                      <td class="p-1">{idx}</td>
-                      <td class="p-1">{line.descriptions}</td>
-                      <td class="text-right p-1">
-                        {:erlang.float_to_binary(line.quantity / 1, decimals: 2)}
-                      </td>
-                      <td class="p-1">{line.unit}</td>
-                      <td class="text-right p-1">
-                        {:erlang.float_to_binary(line.unit_price / 1, decimals: 2)}
-                      </td>
-                      <td class="text-right p-1">
-                        {:erlang.float_to_binary(line.discount / 1, decimals: 2)}
-                      </td>
-                      <td class="text-right p-1">
-                        {:erlang.float_to_binary(
-                          (line.quantity * line.unit_price - line.discount) / 1,
-                          decimals: 2
-                        )}
-                      </td>
-                      <td class="text-right p-1">
-                        {:erlang.float_to_binary(line.tax_rate / 1, decimals: 2)}
-                      </td>
-                      <td class="text-right p-1">
-                        {:erlang.float_to_binary(
-                          Float.round(
-                            (line.quantity * line.unit_price - line.discount) * line.tax_rate / 100,
-                            2
-                          ) / 1,
-                          decimals: 2
-                        )}
-                      </td>
-                      <td class="p-1">{line.tax_code_id_lhdn} ({line.tax_scheme})</td>
-                    </tr>
-                  <% end %>
-                </tbody>
-              </table>
-              <% subtotal =
-                Enum.reduce(parsed.invoice_lines, 0.0, fn line, acc ->
-                  acc + (line.quantity * line.unit_price - line.discount)
-                end)
+          </div>
 
-              tax =
-                Enum.reduce(parsed.invoice_lines, 0.0, fn line, acc ->
-                  acc +
-                    Float.round(
-                      (line.quantity * line.unit_price - line.discount) * line.tax_rate / 100,
-                      2
-                    )
-                end) %>
-              <div class="flex justify-end gap-6 mt-2 font-bold">
-                <span>
-                  {gettext("Subtotal")}: {:erlang.float_to_binary(subtotal / 1, decimals: 2)}
-                </span>
-                <span>{gettext("Tax")}: {:erlang.float_to_binary(tax / 1, decimals: 2)}</span>
-                <span>
-                  {gettext("Total")}: {:erlang.float_to_binary((subtotal + tax) / 1, decimals: 2)}
-                </span>
-              </div>
+          <div class="flex flex-row flex-nowrap mt-2">
+            <div class="w-[14%]">
+              <.input field={@form[:e_inv_internal_id]} label={gettext("E Invoice Internal Id")} />
             </div>
-          <% {:error, reason} -> %>
-            <div class="text-red-600 font-bold">{reason}</div>
-        <% end %>
-      </div>
-
-      <div :if={@e_inv_preview} class="mt-4 border rounded-lg border-blue-500 bg-blue-50 p-4">
-        <div class="flex justify-between items-center mb-3">
-          <p class="text-xl font-medium">{gettext("E-Invoice Preview")}</p>
-          <.link phx-click="close_preview" class="orange button text-sm">
-            {gettext("Close")}
-          </.link>
-        </div>
-        <%= case @e_inv_preview do %>
-          <% {:ok, preview} -> %>
+            <div class="w-[20%] min-w-[17rem]">
+              <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
+            </div>
             <div
-              :if={preview.warnings != []}
-              class="mb-3 p-3 bg-red-100 border border-red-400 rounded text-sm text-red-700"
+              :if={is_nil(@form[:e_inv_uuid].value) and @live_action == :edit}
+              class="ml-5 mt-5"
             >
-              <p class="font-bold mb-1">{gettext("Validation Warnings (fix before submitting):")}</p>
-              <ul class="list-disc ml-4">
-                <li :for={w <- preview.warnings}>{w}</li>
-              </ul>
+              <.link phx-click="preview_e_inv" class="blue button">
+                {gettext("Preview E-Invoice")}
+              </.link>
             </div>
-            <form phx-change="update_preview" id="preview-form">
+            <div
+              :if={!is_nil(@form[:e_inv_uuid].value)}
+              class="text-blue-600 hover:font-medium ml-5 mt-6"
+            >
+              <.link
+                target="_blank"
+                href={"#{@einv_portal}/documents/#{@form[:e_inv_uuid].value}"}
+              >
+                Open E-Invoice
+              </.link>
+            </div>
+            <div class="shrink-0 ml-2 mt-1">
+              <% {url, qrcode} =
+                FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data, 1) %>
+              <.link target="_blank" href={url}>
+                {qrcode |> raw}
+              </.link>
+            </div>
+          </div>
+
+          <.live_component
+            :if={
+              @live_action in [:new, :edit] and @trading_drop_ids == [] and
+                not (@trading_settlement.linked? || false) and
+                not is_nil(blank_id(@form[:contact_id].value))
+            }
+            module={FullCircleWeb.InvoiceLive.TradingAttachComponent}
+            id="trading-invoice-attach"
+            current_company={@current_company}
+            current_user={@current_user}
+            contact_id={blank_id(@form[:contact_id].value)}
+            bill_date={@form[:invoice_date].value}
+            bill_qty={bill_quantity(@form)}
+          />
+
+          <.live_component
+            module={FullCircleWeb.InvoiceLive.DetailComponent}
+            id="invoice_details"
+            klass="detail-fit"
+            settings={@settings}
+            doc_name="Invoice"
+            detail_name={:invoice_details}
+            form={@form}
+            taxcodetype="saltaxcode"
+            doc_good_amount={:invoice_good_amount}
+            doc_tax_amount={:invoice_tax_amount}
+            doc_detail_amount={:invoice_amount}
+            matched_trans={@matched_trans}
+            current_company={@current_company}
+            current_user={@current_user}
+          />
+
+          <div class="flex flex-row justify-center gap-x-1 mt-1">
+            <.form_action_button
+              form={@form}
+              live_action={@live_action}
+              current_company={@current_company}
+              type="Invoice"
+            />
+            <.print_button
+              :if={@live_action == :edit}
+              company={@current_company}
+              doc_type="Invoice"
+              doc_id={@id}
+              class="gray button"
+            />
+            <.pre_print_button
+              :if={@live_action == :edit}
+              company={@current_company}
+              doc_type="Invoice"
+              doc_id={@id}
+              class="gray button"
+            />
+            <.live_component
+              :if={@live_action == :edit}
+              module={FullCircleWeb.LogLive.Component}
+              current_company={@current_company}
+              id={"log_#{@id}"}
+              show_log={false}
+              entity="invoices"
+              entity_id={@id}
+            />
+            <.live_component
+              :if={@live_action == :edit}
+              module={FullCircleWeb.JournalEntryViewLive.Component}
+              id={"journal_#{@id}"}
+              show_journal={false}
+              doc_type="Invoice"
+              doc_no={@form.data.invoice_no}
+              company_id={@current_company.id}
+            />
+          </div>
+        </.form>
+
+        <div
+          :if={@live_action == :new and @e_inv_document}
+          class="mt-4 border rounded-lg border-blue-500 bg-blue-50 p-4"
+        >
+          <div class="flex justify-between items-center mb-3">
+            <p class="text-xl font-medium">{gettext("E-Invoice Document")}</p>
+            <.link phx-click="close_e_inv_document" class="orange button text-sm">
+              {gettext("Close")}
+            </.link>
+          </div>
+          <%= case @e_inv_document do %>
+            <% {:ok, parsed} -> %>
               <div class="grid grid-cols-2 gap-4 text-sm">
                 <div class="border rounded p-3 bg-white">
-                  <p class="font-bold mb-2">{gettext("Supplier")}</p>
-                  <p class="font-medium">{preview.supplier.name}</p>
-                  <div class="grid grid-cols-2 gap-1 mt-1">
-                    <label class="text-xs text-gray-500">TIN</label>
-                    <input
-                      type="text"
-                      name="preview[supplier_tin]"
-                      value={preview.supplier.tin}
-                      class="text-sm border rounded px-1"
-                    />
-                    <label class="text-xs text-gray-500">BRN</label>
-                    <input
-                      type="text"
-                      name="preview[supplier_brn]"
-                      value={preview.supplier.brn}
-                      class="text-sm border rounded px-1"
-                    />
-                    <label class="text-xs text-gray-500">SST</label>
-                    <input
-                      type="text"
-                      name="preview[supplier_sst]"
-                      value={preview.supplier.sst}
-                      class="text-sm border rounded px-1"
-                    />
-                    <label class="text-xs text-gray-500">MSIC</label>
-                    <input
-                      type="text"
-                      name="preview[supplier_msic]"
-                      value={preview.supplier.msic}
-                      class="text-sm border rounded px-1"
-                    />
-                    <label class="text-xs text-gray-500">Tel</label>
-                    <input
-                      type="text"
-                      name="preview[supplier_tel]"
-                      value={preview.supplier.tel}
-                      class="text-sm border rounded px-1"
-                    />
-                    <label class="text-xs text-gray-500">Email</label>
-                    <input
-                      type="text"
-                      name="preview[supplier_email]"
-                      value={preview.supplier.email}
-                      class="text-sm border rounded px-1"
-                    />
-                    <label class="text-xs text-gray-500">{gettext("Address")}</label>
-                    <input
-                      type="text"
-                      name="preview[supplier_address]"
-                      value={preview.supplier.address}
-                      class="text-sm border rounded px-1"
-                    />
-                    <label class="text-xs text-gray-500">{gettext("City")}</label>
-                    <input
-                      type="text"
-                      name="preview[supplier_city]"
-                      value={preview.supplier.city}
-                      class="text-sm border rounded px-1"
-                    />
-                    <label class="text-xs text-gray-500">{gettext("Postal Code")}</label>
-                    <input
-                      type="text"
-                      name="preview[supplier_zipcode]"
-                      value={preview.supplier.zipcode}
-                      class="text-sm border rounded px-1"
-                    />
-                    <label class="text-xs text-gray-500">{gettext("State")}</label>
-                    <input
-                      type="text"
-                      name="preview[supplier_state]"
-                      value={preview.supplier.state}
-                      class="text-sm border rounded px-1"
-                    />
-                  </div>
+                  <p class="font-bold mb-2">{gettext("Customer")}</p>
+                  <p class="font-medium">{parsed.customer_name}</p>
+                  <p>TIN: {parsed.customer_tin}</p>
+                  <p>BRN: {parsed.customer_brn}</p>
                 </div>
                 <div class="border rounded p-3 bg-white">
-                  <p class="font-bold mb-2">{gettext("Customer")}</p>
-                  <p class="font-medium">{preview.customer.name}</p>
-                  <div class="grid grid-cols-2 gap-1 mt-1">
-                    <label class="text-xs text-gray-500">TIN</label>
-                    <input
-                      type="text"
-                      name="preview[customer_tin]"
-                      value={preview.customer.tin}
-                      class="text-sm border rounded px-1"
-                    />
-                    <label class="text-xs text-gray-500">BRN</label>
-                    <input
-                      type="text"
-                      name="preview[customer_brn]"
-                      value={preview.customer.brn}
-                      class="text-sm border rounded px-1"
-                    />
-                    <label class="text-xs text-gray-500">SST</label>
-                    <input
-                      type="text"
-                      name="preview[customer_sst]"
-                      value={preview.customer.sst}
-                      class="text-sm border rounded px-1"
-                    />
-                    <label class="text-xs text-gray-500">Tel</label>
-                    <input
-                      type="text"
-                      name="preview[customer_tel]"
-                      value={preview.customer.tel}
-                      class="text-sm border rounded px-1"
-                    />
-                    <label class="text-xs text-gray-500">Email</label>
-                    <input
-                      type="text"
-                      name="preview[customer_email]"
-                      value={preview.customer.email}
-                      class="text-sm border rounded px-1"
-                    />
-                    <label class="text-xs text-gray-500">{gettext("Address")}</label>
-                    <input
-                      type="text"
-                      name="preview[customer_address]"
-                      value={preview.customer.address}
-                      class="text-sm border rounded px-1"
-                    />
-                    <label class="text-xs text-gray-500">{gettext("City")}</label>
-                    <input
-                      type="text"
-                      name="preview[customer_city]"
-                      value={preview.customer.city}
-                      class="text-sm border rounded px-1"
-                    />
-                    <label class="text-xs text-gray-500">{gettext("Postal Code")}</label>
-                    <input
-                      type="text"
-                      name="preview[customer_zipcode]"
-                      value={preview.customer.zipcode}
-                      class="text-sm border rounded px-1"
-                    />
-                    <label class="text-xs text-gray-500">{gettext("State")}</label>
-                    <input
-                      type="text"
-                      name="preview[customer_state]"
-                      value={preview.customer.state}
-                      class="text-sm border rounded px-1"
-                    />
-                  </div>
+                  <p class="font-bold mb-2">{gettext("Document Info")}</p>
+                  <p><span class="font-bold">{gettext("Internal ID")}:</span> {parsed.internal_id}</p>
+                  <p><span class="font-bold">{gettext("Issue Date")}:</span> {parsed.issue_date}</p>
+                  <p><span class="font-bold">{gettext("Currency")}:</span> {parsed.currency}</p>
+                  <p><span class="font-bold">{gettext("Type")}:</span> {parsed.type_code}</p>
                 </div>
               </div>
-            </form>
-            <div class="mt-3 border rounded p-3 bg-white text-sm">
-              <div class="flex gap-4 mb-2">
-                <span>
-                  <span class="font-bold">{gettext("Invoice No")}:</span> {preview.invoice_no}
-                </span>
-                <span><span class="font-bold">{gettext("Date")}:</span> {preview.invoice_date}</span>
-                <span><span class="font-bold">{gettext("Currency")}:</span> MYR</span>
-                <span><span class="font-bold">{gettext("Type")}:</span> Invoice (01)</span>
-              </div>
-              <table class="w-full text-sm">
-                <thead>
-                  <tr class="border-b font-bold">
-                    <th class="text-left p-1">#</th>
-                    <th class="text-left p-1">{gettext("Description")}</th>
-                    <th class="text-right p-1">{gettext("Qty")}</th>
-                    <th class="text-left p-1">{gettext("Unit")}</th>
-                    <th class="text-right p-1">{gettext("Unit Price")}</th>
-                    <th class="text-right p-1">{gettext("Discount")}</th>
-                    <th class="text-right p-1">{gettext("Amount")}</th>
-                    <th class="text-right p-1">{gettext("Tax%")}</th>
-                    <th class="text-right p-1">{gettext("Tax")}</th>
-                    <th class="text-left p-1">{gettext("Tax Type")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <%= for line <- preview.lines do %>
-                    <tr class="border-b">
-                      <td class="p-1">{line.idx}</td>
-                      <td class="p-1">{line.description}</td>
-                      <td class="text-right p-1">{line.quantity}</td>
-                      <td class="p-1">{line.unit} → {line.lhdn_unit}</td>
-                      <td class="text-right p-1">{line.unit_price}</td>
-                      <td class="text-right p-1">{line.discount}</td>
-                      <td class="text-right p-1">{line.good_amount}</td>
-                      <td class="text-right p-1">{line.tax_rate}</td>
-                      <td class="text-right p-1">{line.tax_amount}</td>
-                      <td class="p-1">{line.tax_type}</td>
+              <div class="mt-3 border rounded p-3 bg-white text-sm">
+                <table class="w-full text-sm">
+                  <thead>
+                    <tr class="border-b font-bold">
+                      <th class="text-left p-1">#</th>
+                      <th class="text-left p-1">{gettext("Description")}</th>
+                      <th class="text-right p-1">{gettext("Qty")}</th>
+                      <th class="text-left p-1">{gettext("Unit")}</th>
+                      <th class="text-right p-1">{gettext("Unit Price")}</th>
+                      <th class="text-right p-1">{gettext("Discount")}</th>
+                      <th class="text-right p-1">{gettext("Amount")}</th>
+                      <th class="text-right p-1">{gettext("Tax%")}</th>
+                      <th class="text-right p-1">{gettext("Tax")}</th>
+                      <th class="text-left p-1">{gettext("Tax Type")}</th>
                     </tr>
-                  <% end %>
-                </tbody>
-              </table>
-              <div class="flex justify-end gap-6 mt-2 font-bold">
-                <span>{gettext("Subtotal")}: {preview.total_excl}</span>
-                <span>{gettext("Tax")}: {preview.total_tax}</span>
-                <span>{gettext("Total")}: {preview.total_incl}</span>
+                  </thead>
+                  <tbody>
+                    <%= for {line, idx} <- Enum.with_index(parsed.invoice_lines, 1) do %>
+                      <tr class="border-b">
+                        <td class="p-1">{idx}</td>
+                        <td class="p-1">{line.descriptions}</td>
+                        <td class="text-right p-1">
+                          {:erlang.float_to_binary(line.quantity / 1, decimals: 2)}
+                        </td>
+                        <td class="p-1">{line.unit}</td>
+                        <td class="text-right p-1">
+                          {:erlang.float_to_binary(line.unit_price / 1, decimals: 2)}
+                        </td>
+                        <td class="text-right p-1">
+                          {:erlang.float_to_binary(line.discount / 1, decimals: 2)}
+                        </td>
+                        <td class="text-right p-1">
+                          {:erlang.float_to_binary(
+                            (line.quantity * line.unit_price - line.discount) / 1,
+                            decimals: 2
+                          )}
+                        </td>
+                        <td class="text-right p-1">
+                          {:erlang.float_to_binary(line.tax_rate / 1, decimals: 2)}
+                        </td>
+                        <td class="text-right p-1">
+                          {:erlang.float_to_binary(
+                            Float.round(
+                              (line.quantity * line.unit_price - line.discount) * line.tax_rate / 100,
+                              2
+                            ) / 1,
+                            decimals: 2
+                          )}
+                        </td>
+                        <td class="p-1">{line.tax_code_id_lhdn} ({line.tax_scheme})</td>
+                      </tr>
+                    <% end %>
+                  </tbody>
+                </table>
+                <% subtotal =
+                  Enum.reduce(parsed.invoice_lines, 0.0, fn line, acc ->
+                    acc + (line.quantity * line.unit_price - line.discount)
+                  end)
+
+                tax =
+                  Enum.reduce(parsed.invoice_lines, 0.0, fn line, acc ->
+                    acc +
+                      Float.round(
+                        (line.quantity * line.unit_price - line.discount) * line.tax_rate / 100,
+                        2
+                      )
+                  end) %>
+                <div class="flex justify-end gap-6 mt-2 font-bold">
+                  <span>
+                    {gettext("Subtotal")}: {:erlang.float_to_binary(subtotal / 1, decimals: 2)}
+                  </span>
+                  <span>{gettext("Tax")}: {:erlang.float_to_binary(tax / 1, decimals: 2)}</span>
+                  <span>
+                    {gettext("Total")}: {:erlang.float_to_binary((subtotal + tax) / 1, decimals: 2)}
+                  </span>
+                </div>
               </div>
-            </div>
-            <div class="mt-3 flex justify-center gap-2">
-              <.link
-                phx-click="submit_e_inv"
-                data-confirm={gettext("Confirm submit to LHDN?")}
-                class="green button"
+            <% {:error, reason} -> %>
+              <div class="text-red-600 font-bold">{reason}</div>
+          <% end %>
+        </div>
+
+        <div :if={@e_inv_preview} class="mt-4 border rounded-lg border-blue-500 bg-blue-50 p-4">
+          <div class="flex justify-between items-center mb-3">
+            <p class="text-xl font-medium">{gettext("E-Invoice Preview")}</p>
+            <.link phx-click="close_preview" class="orange button text-sm">
+              {gettext("Close")}
+            </.link>
+          </div>
+          <%= case @e_inv_preview do %>
+            <% {:ok, preview} -> %>
+              <div
+                :if={preview.warnings != []}
+                class="mb-3 p-3 bg-red-100 border border-red-400 rounded text-sm text-red-700"
               >
-                {gettext("Submit to LHDN")}
-              </.link>
-              <.link phx-click="close_preview" class="orange button">
-                {gettext("Cancel")}
-              </.link>
-            </div>
-          <% {:error, reason} -> %>
-            <div class="text-red-600 font-bold">{reason}</div>
-        <% end %>
+                <p class="font-bold mb-1">
+                  {gettext("Validation Warnings (fix before submitting):")}
+                </p>
+                <ul class="list-disc ml-4">
+                  <li :for={w <- preview.warnings}>{w}</li>
+                </ul>
+              </div>
+              <form phx-change="update_preview" id="preview-form">
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                  <div class="border rounded p-3 bg-white">
+                    <p class="font-bold mb-2">{gettext("Supplier")}</p>
+                    <p class="font-medium">{preview.supplier.name}</p>
+                    <div class="grid grid-cols-2 gap-1 mt-1">
+                      <label class="text-xs text-gray-500">TIN</label>
+                      <input
+                        type="text"
+                        name="preview[supplier_tin]"
+                        value={preview.supplier.tin}
+                        class="text-sm border rounded px-1"
+                      />
+                      <label class="text-xs text-gray-500">BRN</label>
+                      <input
+                        type="text"
+                        name="preview[supplier_brn]"
+                        value={preview.supplier.brn}
+                        class="text-sm border rounded px-1"
+                      />
+                      <label class="text-xs text-gray-500">SST</label>
+                      <input
+                        type="text"
+                        name="preview[supplier_sst]"
+                        value={preview.supplier.sst}
+                        class="text-sm border rounded px-1"
+                      />
+                      <label class="text-xs text-gray-500">MSIC</label>
+                      <input
+                        type="text"
+                        name="preview[supplier_msic]"
+                        value={preview.supplier.msic}
+                        class="text-sm border rounded px-1"
+                      />
+                      <label class="text-xs text-gray-500">Tel</label>
+                      <input
+                        type="text"
+                        name="preview[supplier_tel]"
+                        value={preview.supplier.tel}
+                        class="text-sm border rounded px-1"
+                      />
+                      <label class="text-xs text-gray-500">Email</label>
+                      <input
+                        type="text"
+                        name="preview[supplier_email]"
+                        value={preview.supplier.email}
+                        class="text-sm border rounded px-1"
+                      />
+                      <label class="text-xs text-gray-500">{gettext("Address")}</label>
+                      <input
+                        type="text"
+                        name="preview[supplier_address]"
+                        value={preview.supplier.address}
+                        class="text-sm border rounded px-1"
+                      />
+                      <label class="text-xs text-gray-500">{gettext("City")}</label>
+                      <input
+                        type="text"
+                        name="preview[supplier_city]"
+                        value={preview.supplier.city}
+                        class="text-sm border rounded px-1"
+                      />
+                      <label class="text-xs text-gray-500">{gettext("Postal Code")}</label>
+                      <input
+                        type="text"
+                        name="preview[supplier_zipcode]"
+                        value={preview.supplier.zipcode}
+                        class="text-sm border rounded px-1"
+                      />
+                      <label class="text-xs text-gray-500">{gettext("State")}</label>
+                      <input
+                        type="text"
+                        name="preview[supplier_state]"
+                        value={preview.supplier.state}
+                        class="text-sm border rounded px-1"
+                      />
+                    </div>
+                  </div>
+                  <div class="border rounded p-3 bg-white">
+                    <p class="font-bold mb-2">{gettext("Customer")}</p>
+                    <p class="font-medium">{preview.customer.name}</p>
+                    <div class="grid grid-cols-2 gap-1 mt-1">
+                      <label class="text-xs text-gray-500">TIN</label>
+                      <input
+                        type="text"
+                        name="preview[customer_tin]"
+                        value={preview.customer.tin}
+                        class="text-sm border rounded px-1"
+                      />
+                      <label class="text-xs text-gray-500">BRN</label>
+                      <input
+                        type="text"
+                        name="preview[customer_brn]"
+                        value={preview.customer.brn}
+                        class="text-sm border rounded px-1"
+                      />
+                      <label class="text-xs text-gray-500">SST</label>
+                      <input
+                        type="text"
+                        name="preview[customer_sst]"
+                        value={preview.customer.sst}
+                        class="text-sm border rounded px-1"
+                      />
+                      <label class="text-xs text-gray-500">Tel</label>
+                      <input
+                        type="text"
+                        name="preview[customer_tel]"
+                        value={preview.customer.tel}
+                        class="text-sm border rounded px-1"
+                      />
+                      <label class="text-xs text-gray-500">Email</label>
+                      <input
+                        type="text"
+                        name="preview[customer_email]"
+                        value={preview.customer.email}
+                        class="text-sm border rounded px-1"
+                      />
+                      <label class="text-xs text-gray-500">{gettext("Address")}</label>
+                      <input
+                        type="text"
+                        name="preview[customer_address]"
+                        value={preview.customer.address}
+                        class="text-sm border rounded px-1"
+                      />
+                      <label class="text-xs text-gray-500">{gettext("City")}</label>
+                      <input
+                        type="text"
+                        name="preview[customer_city]"
+                        value={preview.customer.city}
+                        class="text-sm border rounded px-1"
+                      />
+                      <label class="text-xs text-gray-500">{gettext("Postal Code")}</label>
+                      <input
+                        type="text"
+                        name="preview[customer_zipcode]"
+                        value={preview.customer.zipcode}
+                        class="text-sm border rounded px-1"
+                      />
+                      <label class="text-xs text-gray-500">{gettext("State")}</label>
+                      <input
+                        type="text"
+                        name="preview[customer_state]"
+                        value={preview.customer.state}
+                        class="text-sm border rounded px-1"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </form>
+              <div class="mt-3 border rounded p-3 bg-white text-sm">
+                <div class="flex gap-4 mb-2">
+                  <span>
+                    <span class="font-bold">{gettext("Invoice No")}:</span> {preview.invoice_no}
+                  </span>
+                  <span><span class="font-bold">{gettext("Date")}:</span> {preview.invoice_date}</span>
+                  <span><span class="font-bold">{gettext("Currency")}:</span> MYR</span>
+                  <span><span class="font-bold">{gettext("Type")}:</span> Invoice (01)</span>
+                </div>
+                <table class="w-full text-sm">
+                  <thead>
+                    <tr class="border-b font-bold">
+                      <th class="text-left p-1">#</th>
+                      <th class="text-left p-1">{gettext("Description")}</th>
+                      <th class="text-right p-1">{gettext("Qty")}</th>
+                      <th class="text-left p-1">{gettext("Unit")}</th>
+                      <th class="text-right p-1">{gettext("Unit Price")}</th>
+                      <th class="text-right p-1">{gettext("Discount")}</th>
+                      <th class="text-right p-1">{gettext("Amount")}</th>
+                      <th class="text-right p-1">{gettext("Tax%")}</th>
+                      <th class="text-right p-1">{gettext("Tax")}</th>
+                      <th class="text-left p-1">{gettext("Tax Type")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <%= for line <- preview.lines do %>
+                      <tr class="border-b">
+                        <td class="p-1">{line.idx}</td>
+                        <td class="p-1">{line.description}</td>
+                        <td class="text-right p-1">{line.quantity}</td>
+                        <td class="p-1">{line.unit} → {line.lhdn_unit}</td>
+                        <td class="text-right p-1">{line.unit_price}</td>
+                        <td class="text-right p-1">{line.discount}</td>
+                        <td class="text-right p-1">{line.good_amount}</td>
+                        <td class="text-right p-1">{line.tax_rate}</td>
+                        <td class="text-right p-1">{line.tax_amount}</td>
+                        <td class="p-1">{line.tax_type}</td>
+                      </tr>
+                    <% end %>
+                  </tbody>
+                </table>
+                <div class="flex justify-end gap-6 mt-2 font-bold">
+                  <span>{gettext("Subtotal")}: {preview.total_excl}</span>
+                  <span>{gettext("Tax")}: {preview.total_tax}</span>
+                  <span>{gettext("Total")}: {preview.total_incl}</span>
+                </div>
+              </div>
+              <div class="mt-3 flex justify-center gap-2">
+                <.link
+                  phx-click="submit_e_inv"
+                  data-confirm={gettext("Confirm submit to LHDN?")}
+                  class="green button"
+                >
+                  {gettext("Submit to LHDN")}
+                </.link>
+                <.link phx-click="close_preview" class="orange button">
+                  {gettext("Cancel")}
+                </.link>
+              </div>
+            <% {:error, reason} -> %>
+              <div class="text-red-600 font-bold">{reason}</div>
+          <% end %>
+        </div>
       </div>
+      <FullCircleWeb.RecordAside.record_aside
+        :if={@live_action == :edit and @id != "new"}
+        record_type="Invoice"
+        record_id={@id}
+        current_company={@current_company}
+        current_user={@current_user}
+        class="min-w-0 w-full [contain:inline-size]"
+      />
     </div>
-    <.live_component
-      :if={@live_action == :edit and @id != "new"}
-      module={FullCircleWeb.NoteLive.NotesPanelComponent}
-      id="notes-panel"
-      record_type="Invoice"
-      record_id={@id}
-      current_company={@current_company}
-      current_user={@current_user}
-      class="w-11/12"
-    />
     """
   end
 end

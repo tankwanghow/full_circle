@@ -433,233 +433,237 @@ defmodule FullCircleWeb.DebitNoteLive.Form do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="w-fit min-w-[64rem] max-w-[98vw] mx-auto border rounded-lg border-emerald-500 bg-emerald-100 p-4 [&>*:not(form)]:[contain:inline-size]">
-      <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
-      <.error_box changeset={@form.source} />
-      <.form
-        for={@form}
-        id="object-form"
-        class="[&>*:not(.detail-fit)]:[contain:inline-size]"
-        autocomplete="off"
-        phx-change="validate"
-        phx-submit="save"
-      >
-        <.input type="hidden" field={@form[:note_no]} />
-        <div class="flex flex-row flex-nowrap">
-          <div class="basis-64 grow shrink">
-            <.input type="hidden" field={@form[:contact_id]} />
-            <.input
-              field={@form[:contact_name]}
-              label={gettext("Debit Note To")}
-              phx-hook="tributeAutoComplete"
-              url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
-            />
+    <div class="mx-auto grid w-fit min-w-[64rem] max-w-[98vw]">
+      <div class="w-fit min-w-[64rem] max-w-[98vw] border rounded-lg border-emerald-500 bg-emerald-100 p-4 [&>*:not(form)]:[contain:inline-size]">
+        <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
+        <.error_box changeset={@form.source} />
+        <.form
+          for={@form}
+          id="object-form"
+          class="[&>*:not(.detail-fit)]:[contain:inline-size]"
+          autocomplete="off"
+          phx-change="validate"
+          phx-submit="save"
+        >
+          <.input type="hidden" field={@form[:note_no]} />
+          <div class="flex flex-row flex-nowrap">
+            <div class="basis-64 grow shrink">
+              <.input type="hidden" field={@form[:contact_id]} />
+              <.input
+                field={@form[:contact_name]}
+                label={gettext("Debit Note To")}
+                phx-hook="tributeAutoComplete"
+                url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
+              />
+            </div>
+            <div class="w-36 shrink-0">
+              <.input field={@form[:reg_no]} label={gettext("Reg No")} readonly tabindex="-1" />
+            </div>
+            <div class="w-36 shrink-0">
+              <.input field={@form[:tax_id]} label={gettext("Tax Id")} readonly tabindex="-1" />
+            </div>
+            <div class="w-[9.5rem] shrink-0">
+              <.input field={@form[:note_date]} label={gettext("Debit Note Date")} type="date" />
+            </div>
+            <div class="w-40 shrink-0">
+              <.input
+                feedback={true}
+                type="number"
+                readonly
+                field={@form[:note_balance]}
+                label={gettext("Debit Note Balance")}
+                value={Ecto.Changeset.fetch_field!(@form.source, :note_balance)}
+              />
+            </div>
           </div>
-          <div class="w-36 shrink-0">
-            <.input field={@form[:reg_no]} label={gettext("Reg No")} readonly tabindex="-1" />
-          </div>
-          <div class="w-36 shrink-0">
-            <.input field={@form[:tax_id]} label={gettext("Tax Id")} readonly tabindex="-1" />
-          </div>
-          <div class="w-[9.5rem] shrink-0">
-            <.input field={@form[:note_date]} label={gettext("Debit Note Date")} type="date" />
-          </div>
-          <div class="w-40 shrink-0">
-            <.input
-              feedback={true}
-              type="number"
-              readonly
-              field={@form[:note_balance]}
-              label={gettext("Debit Note Balance")}
-              value={Ecto.Changeset.fetch_field!(@form.source, :note_balance)}
-            />
-          </div>
-        </div>
 
-        <div class="flex flex-row flex-nowrap mt-2">
-          <div class="w-[14%]">
-            <.input field={@form[:e_inv_internal_id]} label={gettext("E Invoice Internal Id")} />
-          </div>
-          <div class="w-[20%] min-w-[17rem]">
-            <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
-          </div>
-          <div
-            :if={is_nil(@form[:e_inv_uuid].value) and @live_action != :new}
-            class="text-blue-600 hover:font-medium w-[20%] ml-5 mt-6"
-          >
-            <a
-              id={@form[:note_no].value}
-              href="#"
-              phx-hook="copyAndOpen"
-              copy-text={@form[:note_no].value}
-              goto-url={"#{@einv_portal}/newdocument"}
+          <div class="flex flex-row flex-nowrap mt-2">
+            <div class="w-[14%]">
+              <.input field={@form[:e_inv_internal_id]} label={gettext("E Invoice Internal Id")} />
+            </div>
+            <div class="w-[20%] min-w-[17rem]">
+              <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
+            </div>
+            <div
+              :if={is_nil(@form[:e_inv_uuid].value) and @live_action != :new}
+              class="text-blue-600 hover:font-medium w-[20%] ml-5 mt-6"
             >
-              {gettext("New E-Invoice")}
-            </a>
-          </div>
-          <div
-            :if={!is_nil(@form[:e_inv_uuid].value)}
-            class="text-blue-600 hover:font-medium ml-5 mt-6"
-          >
-            <.link
-              target="_blank"
-              href={"#{@einv_portal}/documents/#{@form[:e_inv_uuid].value}"}
+              <a
+                id={@form[:note_no].value}
+                href="#"
+                phx-hook="copyAndOpen"
+                copy-text={@form[:note_no].value}
+                goto-url={"#{@einv_portal}/newdocument"}
+              >
+                {gettext("New E-Invoice")}
+              </a>
+            </div>
+            <div
+              :if={!is_nil(@form[:e_inv_uuid].value)}
+              class="text-blue-600 hover:font-medium ml-5 mt-6"
             >
-              Open E-Invoice
-            </.link>
+              <.link
+                target="_blank"
+                href={"#{@einv_portal}/documents/#{@form[:e_inv_uuid].value}"}
+              >
+                Open E-Invoice
+              </.link>
+            </div>
+            <div class="shrink-0 ml-2 mt-1">
+              <% {url, qrcode} =
+                FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data, 1) %>
+              <.link target="_blank" href={url}>
+                {qrcode |> raw}
+              </.link>
+            </div>
           </div>
-          <div class="shrink-0 ml-2 mt-1">
-            <% {url, qrcode} =
-              FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data, 1) %>
-            <.link target="_blank" href={url}>
-              {qrcode |> raw}
-            </.link>
-          </div>
-        </div>
 
-        <div class="flex flex-row gap-2 flex-nowrap w-2/3 mx-auto text-center mt-5">
-          <div
-            id="debit-note-details-tab"
-            phx-click={
-              JS.add_class("tab-hidden", to: "#match-trans")
-              |> JS.hide(to: "#query-match-trans")
-              |> JS.remove_class("active", to: "#match-trans-tab")
-              |> JS.remove_class("tab-hidden", to: "#debit-note-details")
-              |> JS.add_class("active")
-            }
-            class="active basis-1/2 tab"
-          >
-            {gettext("Details")} =
-            <span
-              :if={!Decimal.eq?(Ecto.Changeset.fetch_field!(@form.source, :note_amount), 0)}
-              class="font-normal text-rose-700"
+          <div class="flex flex-row gap-2 flex-nowrap w-2/3 mx-auto text-center mt-5">
+            <div
+              id="debit-note-details-tab"
+              phx-click={
+                JS.add_class("tab-hidden", to: "#match-trans")
+                |> JS.hide(to: "#query-match-trans")
+                |> JS.remove_class("active", to: "#match-trans-tab")
+                |> JS.remove_class("tab-hidden", to: "#debit-note-details")
+                |> JS.add_class("active")
+              }
+              class="active basis-1/2 tab"
             >
-              {Ecto.Changeset.fetch_field!(@form.source, :note_amount)
-              |> Number.Delimit.number_to_delimited()}
-            </span>
-            <span class="text-rose-500">
-              <.icon :if={@details_got_error} name="hero-exclamation-triangle-mini" class="h-5 w-5" />
-            </span>
-          </div>
+              {gettext("Details")} =
+              <span
+                :if={!Decimal.eq?(Ecto.Changeset.fetch_field!(@form.source, :note_amount), 0)}
+                class="font-normal text-rose-700"
+              >
+                {Ecto.Changeset.fetch_field!(@form.source, :note_amount)
+                |> Number.Delimit.number_to_delimited()}
+              </span>
+              <span class="text-rose-500">
+                <.icon :if={@details_got_error} name="hero-exclamation-triangle-mini" class="h-5 w-5" />
+              </span>
+            </div>
 
-          <div
-            id="match-trans-tab"
-            phx-click={
-              JS.remove_class("tab-hidden", to: "#match-trans")
-              |> JS.add_class("active")
-              |> JS.add_class("tab-hidden", to: "#debit-note-details")
-              |> JS.remove_class("active", to: "#debit-note-details-tab")
-              |> JS.show(to: "#query-match-trans")
-            }
-            class="basis-1/2 tab"
-          >
-            {gettext("Matchers")} =
-            <span
-              :if={!Decimal.eq?(Ecto.Changeset.fetch_field!(@form.source, :matched_amount), 0)}
-              class="font-normal text-rose-700"
+            <div
+              id="match-trans-tab"
+              phx-click={
+                JS.remove_class("tab-hidden", to: "#match-trans")
+                |> JS.add_class("active")
+                |> JS.add_class("tab-hidden", to: "#debit-note-details")
+                |> JS.remove_class("active", to: "#debit-note-details-tab")
+                |> JS.show(to: "#query-match-trans")
+              }
+              class="basis-1/2 tab"
             >
-              {Ecto.Changeset.fetch_field!(@form.source, :matched_amount)
-              |> Decimal.new()
-              |> Decimal.abs()
-              |> Number.Delimit.number_to_delimited()}
-            </span>
-            <span class="text-rose-500">
-              <.icon :if={@matchers_got_error} name="hero-exclamation-triangle-mini" class="h-5 w-5" />
-            </span>
+              {gettext("Matchers")} =
+              <span
+                :if={!Decimal.eq?(Ecto.Changeset.fetch_field!(@form.source, :matched_amount), 0)}
+                class="font-normal text-rose-700"
+              >
+                {Ecto.Changeset.fetch_field!(@form.source, :matched_amount)
+                |> Decimal.new()
+                |> Decimal.abs()
+                |> Number.Delimit.number_to_delimited()}
+              </span>
+              <span class="text-rose-500">
+                <.icon
+                  :if={@matchers_got_error}
+                  name="hero-exclamation-triangle-mini"
+                  class="h-5 w-5"
+                />
+              </span>
+            </div>
           </div>
-        </div>
 
-        <.live_component
-          module={FullCircleWeb.CreditNoteLive.DetailComponent}
-          id="debit-note-details"
-          klass="detail-fit text-center border bg-purple-100 mt-2 p-3 rounded-lg border-purple-400"
-          doc_name="DebitNote"
-          detail_name={:debit_note_details}
-          form={@form}
-          taxcodetype="taxcode"
-          doc_desc_amount={:note_desc_amount}
-          doc_tax_amount={:note_tax_amount}
-          doc_detail_amount={:note_amount}
-          current_company={@current_company}
-          current_user={@current_user}
-          matched_trans={[]}
-        />
-
-        <.live_component
-          module={FullCircleWeb.ReceiptLive.MatcherComponent}
-          id="match-trans"
-          klass="tab-hidden text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
-          form={@form}
-          current_company={@current_company}
-          current_user={@current_user}
-        />
-
-        <div class="flex justify-center gap-x-1 mt-1">
-          <.form_action_button
+          <.live_component
+            module={FullCircleWeb.CreditNoteLive.DetailComponent}
+            id="debit-note-details"
+            klass="detail-fit text-center border bg-purple-100 mt-2 p-3 rounded-lg border-purple-400"
+            doc_name="DebitNote"
+            detail_name={:debit_note_details}
             form={@form}
-            live_action={@live_action}
+            taxcodetype="taxcode"
+            doc_desc_amount={:note_desc_amount}
+            doc_tax_amount={:note_tax_amount}
+            doc_detail_amount={:note_amount}
             current_company={@current_company}
-            type="DebitNote"
+            current_user={@current_user}
+            matched_trans={[]}
           />
-          <.print_button
-            :if={@live_action != :new}
-            company={@current_company}
-            doc_type="DebitNote"
-            doc_id={@id}
-            class="blue button"
-          />
-          <.pre_print_button
-            :if={@live_action != :new}
-            company={@current_company}
-            doc_type="DebitNote"
-            doc_id={@id}
-            class="blue button"
-          />
+
           <.live_component
-            :if={@live_action == :edit}
-            module={FullCircleWeb.LogLive.Component}
+            module={FullCircleWeb.ReceiptLive.MatcherComponent}
+            id="match-trans"
+            klass="tab-hidden text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
+            form={@form}
             current_company={@current_company}
-            id={"log_#{@id}"}
-            show_log={false}
-            entity="debit_notes"
-            entity_id={@id}
+            current_user={@current_user}
           />
-          <.live_component
-            :if={@live_action == :edit}
-            module={FullCircleWeb.JournalEntryViewLive.Component}
-            id={"journal_#{@id}"}
-            show_journal={false}
-            doc_type="DebitNote"
-            doc_no={@form.data.note_no}
-            company_id={@current_company.id}
-          />
-        </div>
-      </.form>
-      <%!-- The Matchers tab's search panel: inside the card (after the main
+
+          <div class="flex justify-center gap-x-1 mt-1">
+            <.form_action_button
+              form={@form}
+              live_action={@live_action}
+              current_company={@current_company}
+              type="DebitNote"
+            />
+            <.print_button
+              :if={@live_action != :new}
+              company={@current_company}
+              doc_type="DebitNote"
+              doc_id={@id}
+              class="blue button"
+            />
+            <.pre_print_button
+              :if={@live_action != :new}
+              company={@current_company}
+              doc_type="DebitNote"
+              doc_id={@id}
+              class="blue button"
+            />
+            <.live_component
+              :if={@live_action == :edit}
+              module={FullCircleWeb.LogLive.Component}
+              current_company={@current_company}
+              id={"log_#{@id}"}
+              show_log={false}
+              entity="debit_notes"
+              entity_id={@id}
+            />
+            <.live_component
+              :if={@live_action == :edit}
+              module={FullCircleWeb.JournalEntryViewLive.Component}
+              id={"journal_#{@id}"}
+              show_journal={false}
+              doc_type="DebitNote"
+              doc_no={@form.data.note_no}
+              company_id={@current_company.id}
+            />
+          </div>
+        </.form>
+        <%!-- The Matchers tab's search panel: inside the card (after the main
            form, since it has its own form) so it takes the card's width. --%>
-      <.live_component
-        module={FullCircleWeb.ReceiptLive.QryMatcherComponent}
-        id="query-match-trans"
-        klass="hidden text-center border-4 bg-green-200 mt-4 p-3 rounded-lg border-green-800"
-        query={@query}
-        query_match_trans={@query_match_trans}
-        form={@form}
-        cannot_match_doc_type={~w(DebitNote Receipt Payment CreditNote)}
-        doc_no_field={:note_no}
+        <.live_component
+          module={FullCircleWeb.ReceiptLive.QryMatcherComponent}
+          id="query-match-trans"
+          klass="hidden text-center border-4 bg-green-200 mt-4 p-3 rounded-lg border-green-800"
+          query={@query}
+          query_match_trans={@query_match_trans}
+          form={@form}
+          cannot_match_doc_type={~w(DebitNote Receipt Payment CreditNote)}
+          doc_no_field={:note_no}
+          current_company={@current_company}
+          current_user={@current_user}
+        />
+      </div>
+      <FullCircleWeb.RecordAside.record_aside
+        :if={@live_action == :edit and @id != "new"}
+        record_type="DebitNote"
+        record_id={@id}
         current_company={@current_company}
         current_user={@current_user}
+        class="min-w-0 w-full [contain:inline-size]"
       />
     </div>
-    <.live_component
-      :if={@live_action == :edit and @id != "new"}
-      module={FullCircleWeb.NoteLive.NotesPanelComponent}
-      id="notes-panel"
-      record_type="DebitNote"
-      record_id={@id}
-      current_company={@current_company}
-      current_user={@current_user}
-      class="w-9/12"
-    />
     """
   end
 end

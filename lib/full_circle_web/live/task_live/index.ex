@@ -1,12 +1,11 @@
 defmodule FullCircleWeb.TaskLive.Index do
   @moduledoc """
-  Tasks list: open tasks grouped Overdue · Due soon · Upcoming · Someday, or
-  closed ones newest first. One line per task (decluttered-index contract);
-  group headings are stream items of their own.
+  Tasks column: the same narrow feed as Notes, with an amber top line and a
+  due tile instead of a person avatar. Open tasks are grouped Overdue · Due
+  soon · Upcoming · Someday. Group headings are stream items of their own.
   """
   use FullCircleWeb, :live_view
 
-  import FullCircleWeb.ListComponents
   import FullCircleWeb.TaskComponents
 
   alias FullCircle.Tasks
@@ -22,7 +21,15 @@ defmodule FullCircleWeb.TaskLive.Index do
 
       {:ok,
        socket
-       |> assign(page_title: gettext("Tasks"), rights: Tasks.rights(com, user), closing: nil)
+       |> assign(
+         page_title: gettext("Tasks"),
+         rights: Tasks.rights(com, user),
+         closing: nil,
+         compose_title: "",
+         compose_due: "",
+         show_due: false,
+         compose_private: false
+       )
        |> stream_configure(:rows, dom_id: &"tasks-#{&1.id}")}
     else
       {:ok,
@@ -66,10 +73,61 @@ defmodule FullCircleWeb.TaskLive.Index do
 
   @impl true
   def handle_event("search", %{"search" => s}, socket) do
+    {:noreply, push_patch(socket, to: index_path(socket, Map.merge(socket.assigns.search, s)))}
+  end
+
+  def handle_event("scope", %{"scope" => scope}, socket) do
     {:noreply,
-     push_patch(socket,
-       to: ~p"/companies/#{socket.assigns.current_company.id}/tasks?#{%{search: s}}"
+     push_patch(socket, to: index_path(socket, Map.put(socket.assigns.search, "scope", scope)))}
+  end
+
+  def handle_event("compose", %{"compose" => p}, socket) do
+    {:noreply,
+     assign(socket,
+       compose_title: p["title"] || "",
+       compose_due: p["due_date"] || socket.assigns.compose_due
      )}
+  end
+
+  def handle_event("toggle_due", _, socket) do
+    show = not socket.assigns.show_due
+
+    {:noreply,
+     assign(socket,
+       show_due: show,
+       compose_due: if(show, do: socket.assigns.compose_due, else: "")
+     )}
+  end
+
+  def handle_event("toggle_private", _, socket) do
+    {:noreply, assign(socket, compose_private: not socket.assigns.compose_private)}
+  end
+
+  def handle_event("add", %{"compose" => p}, socket) do
+    %{current_company: com, current_user: user} = socket.assigns
+    title = String.trim(p["title"] || "")
+
+    attrs = %{
+      "title" => title,
+      "due_date" => if(socket.assigns.show_due, do: blank(p["due_date"]), else: nil),
+      "visibility" =>
+        if(socket.assigns.compose_private,
+          do: FullCircle.Notes.Note.private_visibility(),
+          else: nil
+        )
+    }
+
+    case Tasks.create_task(attrs, com, user) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> assign(compose_title: "", compose_due: "", show_due: false, compose_private: false)
+         |> put_flash(:info, gettext("Task saved."))
+         |> load(true, 1)}
+
+      _ ->
+        {:noreply, put_flash(socket, :warn, gettext("Could not save the task."))}
+    end
   end
 
   def handle_event("next-page", _, socket),
@@ -120,147 +178,233 @@ defmodule FullCircleWeb.TaskLive.Index do
   @impl true
   def handle_info({:tasks_changed, _}, socket), do: {:noreply, load(socket, true, 1)}
 
+  defp index_path(socket, search) do
+    ~p"/companies/#{socket.assigns.current_company.id}/tasks?#{%{search: search}}"
+  end
+
+  defp blank(nil), do: nil
+  defp blank(""), do: nil
+  defp blank(value), do: value
+
+  defp draft_due(due) do
+    case Date.from_iso8601(due || "") do
+      {:ok, date} -> date
+      _ -> nil
+    end
+  end
+
+  defp row_meta(%{group: :closed, task: task}, company) do
+    status = if task.status == "done", do: gettext("Done"), else: gettext("Skipped")
+    [status, closed_on(task, company)] |> Enum.reject(&is_nil/1) |> Enum.join(" · ")
+  end
+
+  defp row_meta(%{task: task}, _company) do
+    repeat = repeat_label(task) || gettext("does not repeat")
+    who = assignee_name(task) || gettext("unassigned")
+    "#{repeat} · #{who}"
+  end
+
+  defp assignee_name(%{assignee: %{email: email}}), do: email |> String.split("@") |> hd()
+  defp assignee_name(_task), do: nil
+
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="mx-auto w-11/12 max-w-[96rem]">
-      <.form for={%{}} as={:search} id="search-form" phx-submit="search" autocomplete="off">
-        <.list_bar title={@page_title}>
-          <div class="grow min-w-56">
-            <.filter_label>{gettext("Search")}</.filter_label>
-            <.input
-              id="search_terms"
-              name="search[terms]"
-              type="search"
-              value={@search["terms"]}
-              placeholder={gettext("title, description or assignee…")}
-            />
-          </div>
-          <div class="w-28">
-            <.filter_label>{gettext("Whose")}</.filter_label>
-            <.input
-              id="search_scope"
-              name="search[scope]"
-              type="select"
-              options={[{gettext("Mine"), "mine"}, {gettext("All"), "all"}]}
-              value={@search["scope"]}
-            />
-          </div>
-          <div class="w-36">
-            <.filter_label>{gettext("State")}</.filter_label>
-            <.input
-              id="search_state"
-              name="search[state]"
-              type="select"
-              options={[{gettext("Open"), "open"}, {gettext("Done & skipped"), "closed"}]}
-              value={@search["state"]}
-            />
-          </div>
-          <.button class="h-9 w-10">🔍</.button>
-          <:actions>
-            <.link
-              :if={@rights.create}
-              navigate={~p"/companies/#{@current_company.id}/tasks/new"}
-              class="blue button"
-              id="new_task"
-            >
-              + {gettext("New Task")}
-            </.link>
-          </:actions>
-        </.list_bar>
-      </.form>
+    <div class="mx-auto max-w-[41.4rem] border-x border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+      <div class="h-1 bg-amber-500"></div>
+      <div class="flex border-b border-gray-200 dark:border-gray-700">
+        <button
+          :for={{scope, label} <- [{"mine", gettext("Mine")}, {"all", gettext("All")}]}
+          id={"tab-#{scope}"}
+          type="button"
+          phx-click="scope"
+          phx-value-scope={scope}
+          class={[
+            "flex-1 py-3 text-sm font-bold hover:bg-gray-50 dark:hover:bg-gray-800",
+            if(@search["scope"] == scope,
+              do: "text-gray-900 shadow-[inset_0_-3px_0_#f59e0b] dark:text-gray-100",
+              else: "text-gray-500"
+            )
+          ]}
+        >
+          {label}
+        </button>
+      </div>
 
-      <.list_table>
-        <:head>
-          <div :if={@search["state"] == "closed"} class="w-44 shrink-0">{gettext("Closed")}</div>
-          <div :if={@search["state"] != "closed"} class="w-24 shrink-0">{gettext("Due")}</div>
-          <div class="w-[28%] shrink-0">{gettext("Task")}</div>
-          <div class="w-28 shrink-0">{gettext("Repeats")}</div>
-          <div class="w-40 shrink-0">{gettext("Assignee")}</div>
-          <div class="flex-1 min-w-0">{gettext("Latest note")}</div>
-          <div class="w-10 shrink-0 text-right">📝</div>
-          <div class="w-32 shrink-0"></div>
-        </:head>
-        <div id="tasks_list" phx-update="stream">
-          <div id="tasks-empty" class="hidden only:block p-4 text-sm text-slate-500">
-            {gettext("Nothing here.")}
+      <div :if={@rights.create} class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+        <.form
+          for={%{}}
+          as={:compose}
+          id="task-compose"
+          phx-change="compose"
+          phx-submit="add"
+          autocomplete="off"
+        >
+          <div class="flex gap-3">
+            <button
+              type="button"
+              phx-click="toggle_due"
+              class="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg bg-amber-800 text-[11px] font-bold leading-none text-amber-50"
+            >
+              <%= if date = draft_due(@compose_due) do %>
+                <span class="text-sm">{date.day}</span>
+                <span class="mt-0.5 text-[10px] font-medium">{Calendar.strftime(date, "%b")}</span>
+              <% else %>
+                {gettext("Due")}
+              <% end %>
+            </button>
+            <div class="min-w-0 flex-1">
+              <input
+                type="text"
+                name="compose[title]"
+                value={@compose_title}
+                placeholder={gettext("Add a task…")}
+                class="w-full border-0 bg-transparent p-0 text-sm placeholder:text-gray-500 focus:ring-0 dark:bg-transparent"
+              />
+              <input
+                :if={@show_due}
+                type="date"
+                name="compose[due_date]"
+                value={@compose_due}
+                class="mt-2 rounded border-gray-300 py-0.5 text-xs dark:border-gray-600 dark:bg-gray-800"
+              />
+              <div class="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  phx-click="toggle_due"
+                  class="rounded-full border border-gray-300 px-2 py-0.5 text-xs text-gray-600 dark:border-gray-600 dark:text-gray-300"
+                >
+                  {gettext("due…")}
+                </button>
+                <button
+                  type="button"
+                  phx-click="toggle_private"
+                  class={[
+                    "rounded-full border px-2 py-0.5 text-xs",
+                    if(@compose_private,
+                      do:
+                        "border-rose-400 bg-rose-100 text-rose-800 dark:border-rose-700 dark:bg-rose-950 dark:text-rose-200",
+                      else: "border-gray-300 text-gray-600 dark:border-gray-600 dark:text-gray-300"
+                    )
+                  ]}
+                >
+                  {if @compose_private, do: gettext("Private"), else: gettext("Everyone")}
+                </button>
+                <.link
+                  id="new_task"
+                  navigate={~p"/companies/#{@current_company.id}/tasks/new"}
+                  class="text-xs text-gray-500 hover:underline dark:text-gray-400"
+                >
+                  {gettext("Full form")}
+                </.link>
+                <button
+                  type="submit"
+                  class="ml-auto rounded-full bg-amber-500 px-3 py-0.5 text-sm font-bold text-white hover:bg-amber-600"
+                >
+                  {gettext("Add")}
+                </button>
+              </div>
+            </div>
           </div>
-          <%= for {dom_id, item} <- @streams.rows do %>
-            <%= if item[:heading] do %>
-              <.group_heading id={dom_id} group={item.heading} />
-            <% else %>
-              <div id={dom_id} class={row_class()}>
-                <div class={line_class()}>
-                  <.closed_cell
-                    :if={item.group == :closed}
-                    task={item.task}
-                    company={@current_company}
-                  />
-                  <.due_cell
-                    :if={item.group != :closed}
-                    task={item.task}
-                    group={item.group}
-                    today={@today}
-                  />
-                  <.link
-                    navigate={~p"/companies/#{@current_company.id}/tasks/#{item.task.id}"}
-                    class="w-[28%] shrink-0 truncate font-medium hover:underline"
-                    title={item.task.title}
-                  >
-                    {item.task.title}
-                  </.link>
-                  <div class={["w-28 shrink-0 truncate text-xs", muted_class()]}>
-                    <span :if={repeat_label(item.task)}>↻ {repeat_label(item.task)}</span>
-                  </div>
-                  <div
-                    class="w-40 shrink-0 truncate"
-                    title={item.task.assignee && item.task.assignee.email}
-                  >
-                    {(item.task.assignee && item.task.assignee.email) || "—"}
-                  </div>
-                  <div
-                    class={["flex-1 min-w-0 truncate text-xs", muted_class()]}
-                    title={
-                      item.latest_note &&
-                        FullCircleWeb.Helpers.format_datetime(
-                          item.latest_note.inserted_at,
-                          @current_company
-                        )
+        </.form>
+      </div>
+
+      <div class="border-b border-gray-200 px-4 py-2 dark:border-gray-700">
+        <div class="flex items-center gap-2">
+          <form id="search-form" phx-change="search" phx-submit="search" class="flex-1">
+            <input
+              type="search"
+              name="search[terms]"
+              value={@search["terms"]}
+              phx-debounce="300"
+              autocomplete="off"
+              placeholder={"🔍 " <> gettext("Search tasks")}
+              class="w-full rounded-full border-0 bg-gray-100 px-4 py-1.5 text-sm focus:ring-1 focus:ring-amber-400 dark:bg-gray-800"
+            />
+          </form>
+          <form id="state-form" phx-change="search">
+            <select
+              name="search[state]"
+              class="rounded-full border-gray-300 py-1 text-xs dark:border-gray-600 dark:bg-gray-800"
+            >
+              <option value="open" selected={@search["state"] == "open"}>{gettext("Open")}</option>
+              <option value="closed" selected={@search["state"] == "closed"}>
+                {gettext("Done & skipped")}
+              </option>
+            </select>
+          </form>
+        </div>
+      </div>
+
+      <div id="tasks_list" phx-update="stream">
+        <div id="tasks-empty" class="hidden only:block px-4 py-8 text-center text-sm text-gray-500">
+          {gettext("Nothing here.")}
+        </div>
+        <%= for {dom_id, item} <- @streams.rows do %>
+          <%= if item[:heading] do %>
+            <.group_heading id={dom_id} group={item.heading} />
+          <% else %>
+            <article
+              id={dom_id}
+              class="flex gap-3 border-b border-gray-200 px-4 py-3 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800/60"
+            >
+              <.due_tile
+                task={item.task}
+                group={item.group}
+                today={@today}
+                company={@current_company}
+              />
+              <div class="min-w-0 flex-1">
+                <.link
+                  navigate={~p"/companies/#{@current_company.id}/tasks/#{item.task.id}"}
+                  class="font-bold hover:underline"
+                >
+                  {item.task.title}
+                </.link>
+                <div class="text-sm text-gray-500 dark:text-gray-400">
+                  {row_meta(item, @current_company)}
+                </div>
+                <p
+                  :if={item.latest_note}
+                  class="mt-0.5 truncate text-sm text-gray-700 dark:text-gray-300"
+                >
+                  {item.latest_note.body}
+                </p>
+                <div class="mt-1 flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                  <span>📝 {item.note_count}</span>
+                  <span>🔗 {item.link_count}</span>
+                  <span
+                    :if={
+                      item.task.status == "open" and
+                        Tasks.may_close?(item.task, @current_user, @rights)
                     }
+                    class="ml-auto flex gap-1"
                   >
-                    {item.latest_note && item.latest_note.body}
-                  </div>
-                  <div class={["w-10 shrink-0 text-right tabular-nums text-xs", muted_class()]}>
-                    {if item.note_count > 0, do: item.note_count}
-                  </div>
-                  <div class="w-32 shrink-0 flex justify-end gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
-                    <%= if item.task.status == "open" and Tasks.may_close?(item.task, @current_user, @rights) do %>
-                      <button
-                        type="button"
-                        phx-click="open_close"
-                        phx-value-id={item.task.id}
-                        phx-value-kind="done"
-                        class={["rounded-full px-2 py-0.5 text-xs font-medium", chip_class(:ok)]}
-                      >
-                        ✓ {gettext("Done")}
-                      </button>
-                      <button
-                        type="button"
-                        phx-click="open_close"
-                        phx-value-id={item.task.id}
-                        phx-value-kind="skip"
-                        class={["rounded-full px-2 py-0.5 text-xs font-medium", chip_class(:muted)]}
-                      >
-                        {gettext("Skip")}
-                      </button>
-                    <% end %>
-                  </div>
+                    <button
+                      type="button"
+                      phx-click="open_close"
+                      phx-value-id={item.task.id}
+                      phx-value-kind="done"
+                      class="rounded-full bg-emerald-600 px-2.5 py-0.5 text-xs font-semibold text-white hover:bg-emerald-500"
+                    >
+                      ✓ {gettext("Done")}
+                    </button>
+                    <button
+                      type="button"
+                      phx-click="open_close"
+                      phx-value-id={item.task.id}
+                      phx-value-kind="skip"
+                      class="rounded-full bg-gray-200 px-2.5 py-0.5 text-xs font-semibold text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200"
+                    >
+                      {gettext("Skip")}
+                    </button>
+                  </span>
                 </div>
               </div>
-            <% end %>
+            </article>
           <% end %>
-        </div>
-      </.list_table>
+        <% end %>
+      </div>
       <.infinite_scroll_footer ended={@end_of_timeline?} />
       <.close_dialog :if={@closing} closing={@closing} />
     </div>

@@ -59,6 +59,11 @@ The Matchers tab's search panel (`QryMatcherComponent`, `id="query-match-trans"`
 lives **inside the card, after the main `<.form>`** — it has its own form and
 forms cannot nest — so it takes the card's width.
 
+Notes and tasks sit **under** the card, not in it. A grid wrapper
+(`mx-auto grid w-fit min-w-[64rem] max-w-[98vw]`) holds the card (still
+`div.w-fit >` the title) and `RecordAside`. The aside's class includes
+`[contain:inline-size]` so it fills the card's width and does not widen it.
+
 ## Header rows
 
 Equal `grow shrink` fields squeeze the name fields once the card is narrow.

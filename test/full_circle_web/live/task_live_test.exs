@@ -117,6 +117,18 @@ defmodule FullCircleWeb.TaskLiveTest do
       assert has_element?(lv, "#tasks-#{t.id}")
       refute has_element?(lv, "#tasks-#{t.id} button[phx-value-kind=done]")
       refute has_element?(lv, "a#new_task")
+      refute has_element?(lv, "#task-compose")
+    end
+
+    test "quick-add creates a task from the title", %{conn: conn, admin: admin, comp: comp} do
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks")
+
+      lv |> form("#task-compose", %{"compose" => %{"title" => "Order bags"}}) |> render_submit()
+
+      assert has_element?(lv, "#tasks_list", "Order bags")
+
+      assert [%{task: %{title: "Order bags", visibility: nil, due_date: nil}}] =
+               Tasks.list_tasks(comp, admin, %{"scope" => "mine"}, page: 1, per_page: 10)
     end
 
     test "guest is turned away", %{admin: admin, comp: comp} do
@@ -157,6 +169,22 @@ defmodule FullCircleWeb.TaskLiveTest do
       assert task.assignee_id == clerk.id
     end
 
+    test "Done and Skip sit apart from Save, Copy, Back and Delete", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      t = task_fixture(comp, admin, %{"title" => "File EPF"})
+      {:ok, _lv, html} = live(conn, ~p"/companies/#{comp.id}/tasks/#{t.id}")
+
+      assert html =~ "gap-7"
+      assert html =~ "rounded-full border px-3 py-0.5 text-sm"
+      refute html =~ "button slim"
+      {delete_at, _} = :binary.match(html, "id=\"delete-task\"")
+      {done_at, _} = :binary.match(html, "id=\"done-task\"")
+      assert delete_at < done_at
+    end
+
     test "assignee sees fields read-only with Done and Skip; creator edits", %{
       admin: admin,
       comp: comp
@@ -167,12 +195,26 @@ defmodule FullCircleWeb.TaskLiveTest do
       {:ok, lv, _} =
         live(log_in_user(build_conn(), clerk), ~p"/companies/#{comp.id}/tasks/#{t.id}")
 
-      assert has_element?(lv, "#task-form input[name='task[title]'][disabled]")
+      assert has_element?(lv, "#task-post", "Service genset")
       assert has_element?(lv, "#done-task")
+      refute has_element?(lv, "#edit-task")
+      refute has_element?(lv, "#task-form")
       refute has_element?(lv, "#delete-task")
 
       {:ok, lv, _} =
         live(log_in_user(build_conn(), admin), ~p"/companies/#{comp.id}/tasks/#{t.id}")
+
+      assert has_element?(lv, "#done-task")
+      assert has_element?(lv, "#skip-task")
+      assert has_element?(lv, "#copy-task")
+      assert has_element?(lv, "#back-task")
+      assert has_element?(lv, "#delete-task")
+      lv |> element("#edit-task") |> render_click()
+      refute has_element?(lv, "#done-task")
+      refute has_element?(lv, "#skip-task")
+      refute has_element?(lv, "#copy-task")
+      refute has_element?(lv, "#back-task")
+      refute has_element?(lv, "#delete-task")
 
       lv
       |> form("#task-form", %{"task" => %{"title" => "Service genset (3-monthly)"}})
@@ -201,8 +243,8 @@ defmodule FullCircleWeb.TaskLiveTest do
         lv |> form("#close-form", %{"close" => %{"note" => ""}}) |> render_submit()
 
       {:ok, lv, html} = live(conn, to)
-      # the next cycle's date input carries the ISO date
-      assert html =~ "2026-11-15"
+      # the post shows the due date in the company format
+      assert html =~ "15-11-2026"
       assert has_element?(lv, "#past-cycles", "15-10-2026")
 
       {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/#{t.id}")
@@ -226,17 +268,6 @@ defmodule FullCircleWeb.TaskLiveTest do
       refute has_element?(lv, "#close-dialog")
     end
 
-    test "progress notes panel defaults to Private on a task", %{
-      conn: conn,
-      admin: admin,
-      comp: comp
-    } do
-      t = task_fixture(comp, admin)
-      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/#{t.id}")
-      lv |> element("#task-notes-new") |> render_click()
-      assert has_element?(lv, "#task-notes-visibility-private[data-selected]")
-    end
-
     test "a hidden task is not found", %{admin: admin, comp: comp} do
       t = task_fixture(comp, admin, %{"visibility" => ["admin"]})
       clerk = user_with_role(comp, admin, "clerk")
@@ -256,24 +287,25 @@ defmodule FullCircleWeb.TaskLiveTest do
       })
     end
 
-    test "task notes panel offers Everyone and Private only, with a hint", %{
+    test "a task note takes the task's visibility and offers no role chips", %{
       conn: conn,
       admin: admin,
       comp: comp
     } do
-      t = task_fixture(comp, admin)
+      t = task_fixture(comp, admin, %{"visibility" => ["clerk"]})
       {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/#{t.id}")
       lv |> element("#task-notes-new") |> render_click()
 
-      assert has_element?(lv, "#task-notes-visibility-everyone")
-      assert has_element?(lv, "#task-notes-visibility-private")
+      refute has_element?(lv, "#task-notes-visibility-everyone")
+      refute has_element?(lv, "#task-notes-visibility-private")
       refute has_element?(lv, "#task-notes-form input[value=manager]")
 
-      assert has_element?(
-               lv,
-               "#task-notes-form",
-               "Everyone who can see this task can read its notes."
-             )
+      lv
+      |> form("#task-notes-form", %{"note" => %{"body" => "paid at the counter"}})
+      |> render_submit()
+
+      assert [%{note: note}] = FullCircle.Notes.notes_for_record("Task", t.id, comp, admin)
+      assert note.visibility == ["clerk"]
     end
 
     test "other cycles show their note count", %{conn: conn, admin: admin, comp: comp} do
@@ -317,6 +349,7 @@ defmodule FullCircleWeb.TaskLiveTest do
       |> FullCircle.Repo.update!()
 
       {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/#{t.id}")
+      lv |> element("#edit-task") |> render_click()
       assert has_element?(lv, "#task-form option[value='#{clerk.id}'][selected]")
 
       lv |> form("#task-form", %{"task" => %{"title" => "Genset service"}}) |> render_submit()
@@ -392,7 +425,12 @@ defmodule FullCircleWeb.TaskLiveTest do
       assert has_element?(lv, "#task-form option[value=year][selected]")
       assert has_element?(lv, "#task-form input[name='task[recur_every]'][value='1']")
       assert has_element?(lv, "#task-form input[name='task[reminder_before_days]'][value='30']")
-      assert has_element?(lv, "#task-form", "insurance cover note")
+
+      assert has_element?(
+               lv,
+               "#task-form input[name='task[documents_needed]'][value='insurance cover note']"
+             )
+
       assert has_element?(lv, "#task-form", "renew at JPJ")
       assert has_element?(lv, "#task-form option[value='#{clerk.id}'][selected]")
       assert has_element?(lv, "#task-form input[name='task[visibility][]'][value=manager]")

@@ -8,7 +8,6 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
   import FullCircleWeb.NoteComponents
 
   alias FullCircle.Notes
-  alias FullCircle.Notes.Note
 
   # The quick-add composer saved (or was cancelled).
   @impl true
@@ -36,6 +35,7 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
       |> assign_new(:class, fn -> nil end)
       |> assign_new(:layout, fn -> :card end)
       |> assign_new(:adding, fn -> false end)
+      |> assign_new(:heading, fn -> nil end)
 
     key = {socket.assigns.record_type, socket.assigns.record_id}
 
@@ -81,11 +81,8 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
       class={
         if @layout == :card,
           do: [
-            "mx-auto mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900",
-            @class,
-            # Posts are short text + a thumbnail row: a readable column, even under
-            # a wide invoice card (w-11/12), keeps the eye from travelling.
-            "max-w-2xl"
+            "overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900",
+            @class
           ],
           else: ["bg-white dark:bg-gray-900", @class]
       }
@@ -94,7 +91,7 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
         :if={@layout == :card}
         class="flex items-center gap-2 border-b border-gray-200 px-4 py-2 dark:border-gray-700"
       >
-        <span class="font-semibold">📝 {gettext("Notes")}</span>
+        <span class="font-semibold">{@heading || "📝 #{gettext("Notes")}"}</span>
         <span class="text-sm text-gray-500">{length(@items)}</span>
         <.link
           :if={@can_create}
@@ -127,17 +124,8 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
           id={@id}
           notify={{__MODULE__, @id}}
           fixed_subject={{@record_type, @record_id}}
-          roles_open={@layout == :card}
+          roles_open={@layout == :card and @record_type != "Task"}
           roles={@record_type != "Task"}
-          default_visibility={if @record_type == "Task", do: Note.private_visibility()}
-          private_title={
-            if @record_type == "Task",
-              do: gettext("Only the people who can see this task (and admins) can read it.")
-          }
-          hint={
-            if @record_type == "Task",
-              do: gettext("Everyone who can see this task can read its notes.")
-          }
           avatar={@layout == :thread}
           cancellable={@layout == :card}
           placeholder={if @layout == :thread, do: gettext("Post your reply…")}

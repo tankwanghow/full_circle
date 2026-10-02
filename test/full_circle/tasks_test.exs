@@ -334,7 +334,26 @@ defmodule FullCircle.TasksTest do
 
       assert [%{note: n}] = Notes.notes_for_record("Task", task.id, company, cashier)
       assert n.body == "paid, receipt attached"
-      assert n.visibility == ["admin"]
+      assert n.visibility == ["manager"]
+    end
+
+    test "changing visibility updates progress notes to match", ctx do
+      %{company: company, admin: admin, task: task} = ctx
+
+      assert {:ok, _} =
+               Notes.create_note(
+                 %{"body" => "started", "subject_type" => "Task", "subject_id" => task.id},
+                 company,
+                 admin
+               )
+
+      assert [%{note: %{visibility: ["manager"]}}] =
+               Notes.notes_for_record("Task", task.id, company, admin)
+
+      assert {:ok, _} = Tasks.update_task(task, %{"visibility" => ["clerk"]}, company, admin)
+
+      assert [%{note: %{visibility: ["clerk"]}}] =
+               Notes.notes_for_record("Task", task.id, company, admin)
     end
 
     test "Skip also spawns the next cycle; a blank note adds none", ctx do
@@ -803,6 +822,15 @@ defmodule FullCircle.TasksTest do
       assert row.note_count == 2
     end
 
+    test "rows carry how many records the task links", ctx do
+      contact = contact_fixture(ctx.company, ctx.admin)
+      {:ok, _} = Tasks.add_link(ctx.soon, "Contact", contact.id, ctx.company, ctx.admin)
+
+      rows = rows(ctx, ctx.admin, %{"scope" => "all"})
+      assert Enum.find(rows, &(&1.task.id == ctx.soon.id)).link_count == 1
+      assert Enum.find(rows, &(&1.task.id == ctx.someday.id)).link_count == 0
+    end
+
     test "pages", ctx do
       page1 = rows(ctx, ctx.admin, %{"scope" => "all"}, per_page: 2)
       page3 = rows(ctx, ctx.admin, %{"scope" => "all"}, page: 3, per_page: 2)
@@ -831,6 +859,49 @@ defmodule FullCircle.TasksTest do
     test "today is the company's local date", %{company: company} do
       assert Tasks.today(%{company | timezone: "Asia/Kuala_Lumpur"}) ==
                DateTime.now!("Asia/Kuala_Lumpur") |> DateTime.to_date()
+    end
+  end
+
+  describe "for_record/4" do
+    test "visible tasks linked to the record, open and dated first", %{
+      company: company,
+      admin: admin
+    } do
+      contact = contact_fixture(company, admin, %{"name" => "Ah Seng"})
+      other = contact_fixture(company, admin, %{"name" => "Other"})
+      clerk = user_with_role(company, admin, "clerk")
+
+      task_fixture(company, admin, %{
+        "title" => "Someday",
+        "links" => [%{"type" => "Contact", "id" => contact.id}]
+      })
+
+      task_fixture(company, admin, %{
+        "title" => "Call",
+        "due_date" => "2026-04-01",
+        "links" => [%{"type" => "Contact", "id" => contact.id}]
+      })
+
+      task_fixture(company, admin, %{
+        "title" => "Elsewhere",
+        "links" => [%{"type" => "Contact", "id" => other.id}]
+      })
+
+      task_fixture(company, admin, %{"title" => "Unlinked"})
+
+      task_fixture(company, admin, %{
+        "title" => "Secret",
+        "visibility" => ["admin"],
+        "links" => [%{"type" => "Contact", "id" => contact.id}]
+      })
+
+      assert Tasks.for_record("Contact", contact.id, company, admin)
+             |> Enum.map(& &1.title) == ["Call", "Secret", "Someday"]
+
+      assert Tasks.for_record("Contact", contact.id, company, clerk) |> Enum.map(& &1.title) == [
+               "Call",
+               "Someday"
+             ]
     end
   end
 end
