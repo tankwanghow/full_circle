@@ -138,6 +138,9 @@ means "the people who can see this task (and admins)". The rule applies on
 every Notes read path — feed, search, panel, counts, backlinks, attachment
 download — and to `list_versions/3`'s per-version filter.
 
+Superseded 2026-10-02: notes about a task store the task's visibility
+(`follow_task_visibility`); see `.claude/skills/tasks.md`.
+
 ## 5. Behaviour — `FullCircle.Tasks`
 
 - **`create_task(attrs, links, company, user)`** — `Ecto.Multi`: insert the

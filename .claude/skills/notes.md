@@ -19,7 +19,10 @@ Plus one rule for tasks: a note with `subject_type "Task"` is also readable by
 anyone who can see that task (`Tasks.visible_to/3`), and `list_versions/3`
 applies that rule per version, using the version's own subject (not the note's
 current one). On write, `create_note/3` and `update_note/4` copy that task's
-`visibility` (`follow_task_visibility/3`); the writer does not pick a role.
+`visibility` (`follow_task_visibility/2`); the writer does not pick a role.
+The copy is read inside the note's transaction with `FOR SHARE` on the task
+row (`read_task_visibility/3`), keyed on the changeset's subject, so an edit
+that sends only a forged `visibility` is overridden (and is a no-op save).
 The composer hides Everyone, Private and the role chips whenever the subject
 is a Task. Changing the task's visibility updates those notes. See
 `.claude/skills/tasks.md`.
@@ -223,6 +226,7 @@ would otherwise show the pre-save text and `lock_version`.
 | `fixed_subject` | `{type, id}` the note must be about; no `about…` chip |
 | `full` | title input and the link row |
 | `default_visibility` | starting visibility for a new note. A note about a Task ignores it; create and update copy the task |
+| `roles_open` | chips shown at first (default: `full`). A box that starts folded keeps its "Everyone ▾" pill (`#{id}-roles-toggle`) while the chips are open, and the pill folds them again |
 | `roles` | `false` hides the role chips. A Task subject hides them either way (`task_subject?/2`) |
 | `placeholder`, `submit_label` | "Write a note…" / "Post your reply…"; "Post" / "Reply" / "Save" |
 | `cancellable` | shows Cancel |

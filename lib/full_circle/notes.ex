@@ -144,7 +144,7 @@ defmodule FullCircle.Notes do
   end
 
   def create_note(attrs, company, user) do
-    attrs = attrs |> normalize_visibility() |> follow_task_visibility(company, user)
+    attrs = normalize_visibility(attrs)
 
     if can?(user, :create_note, company) do
       changeset =
@@ -153,7 +153,8 @@ defmodule FullCircle.Notes do
         |> validate_subject(company, user)
 
       Multi.new()
-      |> Multi.insert(:note, changeset)
+      |> Multi.run(:task_visibility, fn repo, _ -> read_task_visibility(repo, changeset) end)
+      |> Multi.insert(:note, &follow_task_visibility(changeset, &1.task_visibility))
       |> insert_links(Map.get(attrs, "links") || [], company, user)
       |> Repo.transaction()
       |> case do
@@ -171,15 +172,16 @@ defmodule FullCircle.Notes do
   `lock_version` is what detects a concurrent save.
   """
   def update_note(%Note{} = note, attrs, company, user) do
-    attrs =
-      attrs
-      |> normalize_visibility()
-      |> Map.delete("links")
-      |> follow_task_visibility(company, user)
+    attrs = attrs |> normalize_visibility() |> Map.delete("links")
 
     with %Note{} = current <- get_note(note.id, company, user) || {:error, :not_found},
          true <- may_edit?(current, user, rights(company, user)) || :not_authorise do
       changeset = note |> Note.changeset(attrs) |> validate_subject(company, user)
+
+      # Unlocked first read so a forged visibility alone is a no-op save; the
+      # locked read inside the transaction is the one that is stored.
+      {:ok, preview} = read_task_visibility(Repo, changeset, false)
+      changeset = follow_task_visibility(changeset, preview)
 
       if changeset.changes == %{} do
         {:ok, current}
@@ -191,7 +193,8 @@ defmodule FullCircle.Notes do
 
         Multi.new()
         |> snapshot(current, user, note.lock_version)
-        |> Multi.update(:note, changeset)
+        |> Multi.run(:task_visibility, fn repo, _ -> read_task_visibility(repo, changeset) end)
+        |> Multi.update(:note, &follow_task_visibility(changeset, &1.task_visibility))
         |> Repo.transaction()
         |> case do
           {:ok, %{note: n}} ->
@@ -311,17 +314,40 @@ defmodule FullCircle.Notes do
   end
 
   # A note about a task is readable by whoever can see that task, so its stored
-  # visibility is the task's. The writer does not pick a role.
-  defp follow_task_visibility(attrs, company, user) do
-    if attrs["subject_type"] == "Task" and attrs["subject_id"] not in [nil, ""] do
-      case FullCircle.Tasks.get_task(attrs["subject_id"], company, user) do
-        %{visibility: visibility} -> Map.put(attrs, "visibility", visibility)
-        _ -> attrs
-      end
+  # visibility is the task's; the writer does not pick a role. Whether the
+  # writer may see the task was already decided by validate_subject (a new or
+  # changed subject) or by an earlier save (an unchanged one); this only copies.
+  #
+  # Run inside the note's transaction, the read takes FOR SHARE on the task
+  # row. Tasks.update_task changes the task and syncs its notes in one
+  # transaction whose UPDATE holds that row, so the two serialise: a note
+  # written while the task narrows either waits and reads the new visibility,
+  # or commits first and is caught by the sync.
+  defp read_task_visibility(repo, changeset, lock? \\ true) do
+    with "Task" <- Ecto.Changeset.get_field(changeset, :subject_type),
+         id when not is_nil(id) <- Ecto.Changeset.get_field(changeset, :subject_id),
+         company_id = Ecto.Changeset.get_field(changeset, :company_id),
+         %{visibility: visibility} <- repo.one(task_visibility_query(id, company_id, lock?)) do
+      {:ok, {:task, visibility}}
     else
-      attrs
+      _ -> {:ok, :not_a_task}
     end
   end
+
+  defp task_visibility_query(id, company_id, lock?) do
+    q =
+      from(t in FullCircle.Tasks.CompanyTask,
+        where: t.id == ^id and t.company_id == ^company_id and is_nil(t.deleted_at),
+        select: %{visibility: t.visibility}
+      )
+
+    if lock?, do: from(t in q, lock: "FOR SHARE"), else: q
+  end
+
+  defp follow_task_visibility(changeset, {:task, visibility}),
+    do: Ecto.Changeset.put_change(changeset, :visibility, visibility)
+
+  defp follow_task_visibility(changeset, :not_a_task), do: changeset
 
   # Form checkboxes send a hidden "" so an all-unticked group still submits;
   # "no roles ticked" means public, which is nil.

@@ -356,6 +356,94 @@ defmodule FullCircle.TasksTest do
                Notes.notes_for_record("Task", task.id, company, admin)
     end
 
+    test "visibility sync only touches this task's live notes", ctx do
+      %{company: company, admin: admin, task: task} = ctx
+      sibling = task_fixture(company, admin, %{"title" => "sibling", "visibility" => ["manager"]})
+      mine = note_fixture(company, admin, %{"subject_type" => "Task", "subject_id" => task.id})
+      gone = note_fixture(company, admin, %{"subject_type" => "Task", "subject_id" => task.id})
+      {:ok, _} = Notes.delete_note(gone, company, admin)
+
+      theirs =
+        note_fixture(company, admin, %{"subject_type" => "Task", "subject_id" => sibling.id})
+
+      other = FullCircle.SysFixtures.company_fixture(admin, %{})
+
+      foreign =
+        Repo.insert!(%Notes.Note{
+          company_id: other.id,
+          author_id: admin.id,
+          updated_by_id: admin.id,
+          body: "same id, other company",
+          subject_type: "Task",
+          subject_id: task.id,
+          visibility: ["manager"]
+        })
+
+      assert {:ok, _} = Tasks.update_task(task, %{"visibility" => ["clerk"]}, company, admin)
+
+      vis = fn n -> Repo.get!(Notes.Note, n.id).visibility end
+      assert vis.(mine) == ["clerk"]
+      assert vis.(gone) == ["manager"]
+      assert vis.(theirs) == ["manager"]
+      assert vis.(foreign) == ["manager"]
+    end
+
+    test "a failing note sync rolls the task update back", ctx do
+      %{company: company, admin: admin, task: task} = ctx
+      note_fixture(company, admin, %{"subject_type" => "Task", "subject_id" => task.id})
+
+      Repo.query!("""
+      CREATE FUNCTION fixes_c_fail_note_sync() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN RAISE EXCEPTION 'note sync failed'; END $$
+      """)
+
+      Repo.query!("""
+      CREATE TRIGGER fixes_c_fail_note_sync BEFORE UPDATE OF visibility ON notes
+      FOR EACH ROW EXECUTE FUNCTION fixes_c_fail_note_sync()
+      """)
+
+      assert_raise Postgrex.Error, ~r/note sync failed/, fn ->
+        Tasks.update_task(task, %{"visibility" => ["clerk"]}, company, admin)
+      end
+
+      assert Repo.get!(CompanyTask, task.id).visibility == ["manager"]
+    end
+
+    test "a task note's forged visibility is replaced by the task's, on create and update",
+         ctx do
+      %{company: company, admin: admin, task: task} = ctx
+
+      assert {:ok, note} =
+               Notes.create_note(
+                 %{
+                   "body" => "forged",
+                   "subject_type" => "Task",
+                   "subject_id" => task.id,
+                   "visibility" => ["clerk"]
+                 },
+                 company,
+                 admin
+               )
+
+      assert note.visibility == ["manager"]
+
+      assert {:ok, note} =
+               Notes.update_note(
+                 note,
+                 %{"body" => "edited", "visibility" => [""]},
+                 company,
+                 admin
+               )
+
+      assert note.body == "edited"
+      assert note.visibility == ["manager"]
+
+      # A visibility-only forgery is a no-op save: no version, no lock bump.
+      assert {:ok, same} = Notes.update_note(note, %{"visibility" => ["clerk"]}, company, admin)
+      assert same.visibility == ["manager"]
+      assert same.lock_version == note.lock_version
+    end
+
     test "Skip also spawns the next cycle; a blank note adds none", ctx do
       %{company: company, admin: admin, task: task} = ctx
 

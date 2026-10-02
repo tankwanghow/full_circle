@@ -147,19 +147,28 @@ defmodule FullCircle.Tasks do
           {:error, changeset}
 
         true ->
-          changeset
-          |> Ecto.Changeset.optimistic_lock(:lock_version)
-          |> Repo.update()
+          # One transaction: a task narrowed without its notes would leak them.
+          # The UPDATE's row lock also serialises with a note being written
+          # about this task (Notes reads the task FOR SHARE in its own
+          # transaction), so no note keeps the old, wider visibility.
+          Multi.new()
+          |> Multi.update(:task, Ecto.Changeset.optimistic_lock(changeset, :lock_version))
+          |> Multi.run(:notes, fn repo, %{task: t} ->
+            if Map.has_key?(changeset.changes, :visibility),
+              do: {:ok, sync_task_note_visibility(repo, t, company)},
+              else: {:ok, 0}
+          end)
+          |> Repo.transaction()
           |> case do
-            {:ok, t} ->
-              if Map.has_key?(changeset.changes, :visibility),
-                do: sync_task_note_visibility(t, company)
-
+            {:ok, %{task: t}} ->
               broadcast(company)
               {:ok, Repo.preload(t, [:assignee, :creator, :closed_by], force: true)}
 
-            {:error, cs} ->
+            {:error, :task, cs, _} ->
               {:error, cs}
+
+            {:error, _step, reason, _} ->
+              {:error, reason}
           end
       end
     end
@@ -167,13 +176,16 @@ defmodule FullCircle.Tasks do
     Ecto.StaleEntryError -> {:error, :stale}
   end
 
-  defp sync_task_note_visibility(task, company) do
-    from(n in FullCircle.Notes.Note,
-      where:
-        n.company_id == ^company.id and n.subject_type == "Task" and n.subject_id == ^task.id and
-          is_nil(n.deleted_at)
-    )
-    |> Repo.update_all(set: [visibility: task.visibility])
+  defp sync_task_note_visibility(repo, task, company) do
+    {n, _} =
+      from(n in FullCircle.Notes.Note,
+        where:
+          n.company_id == ^company.id and n.subject_type == "Task" and
+            n.subject_id == ^task.id and is_nil(n.deleted_at)
+      )
+      |> repo.update_all(set: [visibility: task.visibility])
+
+    n
   end
 
   def delete_task(%CompanyTask{} = task, company, user) do
