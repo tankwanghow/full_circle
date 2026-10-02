@@ -2728,3 +2728,27 @@ msgstr "提前 %{n} 天提醒"
 
 msgid "Progress notes"
 msgstr "进度备注"
+
+msgid "Visible to the same people as the note it replies to."
+msgstr "可见范围与所回复的备注相同。"
+
+msgid "reply to"
+msgstr "回复"
+
+msgid "reply to a deleted note"
+msgstr "回复已删除的备注"
+
+msgid "reply to a note you can't see"
+msgstr "回复你无法查看的备注"
+
+msgid "Replying to"
+msgstr "回复给"
+
+msgid "Replying to a deleted note"
+msgstr "回复给已删除的备注"
+
+msgid "Replying to a note you can't see"
+msgstr "回复给你无法查看的备注"
+
+msgid "Linked from"
+msgstr "被以下备注关联"

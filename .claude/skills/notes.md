@@ -151,7 +151,36 @@ of any kind (PDFs as tiles) then "+n more"; the note page shows every file.
 
 ## Counts
 `Notes.count_by_records/4` = notes about ∪ notes linking, each note once,
-visibility applied, two queries per call.
+visibility applied, two queries per call (record panels' 📝 counts). The
+feed's 💬 is different: live **replies** only (`feed_details/3`), a note that
+merely links here never counts.
+
+## Replies (`reply_to_id`)
+Spec: `docs/superpowers/specs/2026-10-02-note-replies-design.md`.
+- A reply has `reply_to_id` = its thread's **root** (a note with no
+  `reply_to_id`); replying to a reply attaches to that root. One level, never
+  chains.
+- A reply's `subject_type`, `subject_id` and `visibility` always equal its
+  root's: `create_note/3` copies them (client values ignored) and
+  `update_note/4` drops them from a reply's attrs; `reply_to_id` never changes
+  after create. So a reply about a record shows in that record's panel.
+- A root's save that changes subject or visibility updates its live replies
+  in the same transaction (`sync_replies/3`). A task's visibility sync
+  reaches replies too (they are about the task).
+- **Lock order: task row → root note → reply note.** `:task_visibility`
+  (task `FOR SHARE`), then `:root` (root `FOR SHARE`, `lock_root/2`), then
+  `snapshot/4` (note `FOR UPDATE`). A deleted root: a new reply is refused
+  (`reply_to_id: ["can't be replied to"]`); editing an existing reply keeps
+  its stored values (`lock_root_or_keep/2`).
+- Reads: `Notes.thread/3` (visible live replies, oldest first, as feed
+  items), `Notes.root_of/3` (`:self` | `{:root, n}` | `{:deleted, nil}` |
+  `{:hidden, nil}`), `feed_details/3` `reply_to:` `%{id, title, state}` for
+  the "↩ reply to …" tag in `note_post/1` (hidden when `host` is the root).
+- A refused target (unknown, unreadable, deleted, other company, malformed)
+  is a changeset error, never a crash.
+- `FullCircle.Notes.ReplyBackfill.run/1` converted old note-on-note rows
+  (subject = a note) in the `add_reply_to_to_notes` migration: true root via
+  a recursive CTE with a cycle guard, a `note_versions` snapshot first.
 
 ## One post component: `note_post/1`
 The feed and every notes panel render the same `note_post/1`, so a note
@@ -209,8 +238,8 @@ view), not `/edit`.
 
 ## One write box: `ComposerComponent`
 `NoteLive.ComposerComponent` is the only note write box. Hosts: the feed
-(`id="compose"`), the note page (`id="note"`), and every notes panel (the
-panel's own id, so a reply box is `notes-panel` on the note page). It owns
+(`id="compose"`), the note page (`id="note"` for new/edit, `id="reply"` for
+the reply box), and every notes panel (the panel's own id). It owns
 the form, calls `Notes.create_note/3` or `Notes.update_note/4`, and notifies
 the host. Half-typed text survives ordinary host re-renders. The box resets
 on first mount, after save or cancel, and when the host passes another note
@@ -222,7 +251,8 @@ would otherwise show the pre-save text and `lock_version`.
 | attr | meaning |
 |---|---|
 | `id` | prefixes every input id (`#{id}_note`, `#{id}-open-picker`, …) |
-| `mode` | `:new` (default) · `:edit`. A reply is `:new` plus `fixed_subject` and the reply placeholder; there is no `:reply` branch |
+| `mode` | `:new` (default) · `:edit` |
+| `reply_to` | `%Note{}` root: a reply box. A box is *replying* when `reply_to` is set or it edits a note with `reply_to_id`: no about… chip, no visibility chips/pill, a `#{id}-reply-scope` line ("Visible to the same people as the note it replies to."), every pick is a link, create sends `reply_to_id` |
 | `note` | the note being edited (`:edit`) |
 | `initial_subject` | `%{type, id, title}` prefill for `:new` |
 | `fixed_subject` | `{type, id}` the note must be about; no `about…` chip |
@@ -257,10 +287,18 @@ A pick reaches the box through `RecordPickerComponent`'s `notify`:
   handled here.
 - History (`#toggle-history`, `#note-history`) lists versions with the same
   per-version filter as `list_versions/3`.
-- Replies: `NotesPanelComponent` with `layout={:thread}`, `id="notes-panel"`
-  and `notify_parent`. A posted reply sends `{:notes_changed, "Note", id}`
-  so the post's 💬 count refreshes. The reply box is hidden from people who
-  cannot create notes.
+- Thread, top to bottom: `#replying-to` (reply pages only: the root as a
+  post in `#replying-to-post` with its own `#toggle-root-history` →
+  `#root-history`; `#replying-to-gone` when the root is deleted or hidden),
+  `#thread-before` (earlier replies), the note itself, `#thread-after`
+  (later replies; all replies on a root page), the reply box (composer
+  `id="reply"`, root `#reply-box`, form `#reply-form`, `reply_to` = the
+  root; hidden without `:create_note` or when the root is gone), and
+  `#linked-from` (notes that only link here, `relation: :linked`). Thread
+  items are `#thread-<id>` with `host={"Note", root_id}` so they carry no
+  "↩ reply to" tag. A posted reply sends `{:composer, "reply", …}` and the
+  page reloads the thread and 💬 count. The history markup is one private
+  `history_list/1` for both the note and the root.
 - `/notes/new` (including `?subject_type=&subject_id=`) is the composer at
   full size. Files attach after the first save. Posting navigates to the
   new note's page.

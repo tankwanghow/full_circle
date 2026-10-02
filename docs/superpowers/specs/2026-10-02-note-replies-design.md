@@ -1,7 +1,7 @@
 # Note replies — Design change
 
 Date: 2026-10-02
-Status: proposed (discussed in chat); awaiting user review.
+Status: implemented 2026-10-02 (plan docs/superpowers/plans/2026-10-02-note-replies.md).
 Changes: how a reply to a note is stored. Builds on
 `docs/superpowers/specs/2026-10-02-note-page-redesign-design.md` (the note page's reply
 thread) and `.claude/skills/notes.md`. Notes are not deployed yet, so only dev data has
