@@ -1,12 +1,10 @@
 defmodule FullCircleWeb.NoteLive.Form do
   @moduledoc """
-  The note's one page: create, read and edit (there is no separate show page,
-  like every other FullCircle record). Users who can read a note but not edit
-  it get the same page with the inputs locked.
-
-  Title, body, visibility and the subject are form fields saved with Save.
-  Files and links on a saved note take effect immediately, like elsewhere in
-  FullCircle; on a new note, picked links are queued and saved with the note.
+  The note's page, shaped like the feed (an x.com single-post page): the note
+  as a large post, ✎ Edit turning it into the shared write box in place, files
+  and history inside the post, and the replies thread below. /notes/new is the
+  write box full size. /notes/:id opens the post; /notes/:id/edit opens it in
+  edit mode when the user may edit. Contract: `.claude/skills/notes.md`.
   """
   use FullCircleWeb, :live_view
 
@@ -14,14 +12,12 @@ defmodule FullCircleWeb.NoteLive.Form do
 
   alias FullCircle.{Linkable, Notes}
   alias FullCircle.Notes.{Attachments, Note}
-  alias FullCircleWeb.NoteLive.RecordPickerComponent
+  alias FullCircleWeb.NoteLive.{ComposerComponent, NotesPanelComponent}
 
   @impl true
   def mount(params, _session, socket) do
-    com = socket.assigns.current_company
-    user = socket.assigns.current_user
-
-    socket = assign(socket, show_picker: false, show_history: false, history: [], params: %{})
+    %{current_company: com, current_user: user} = socket.assigns
+    socket = assign(socket, show_history: false, history: [], editing: false, edit_note: nil)
 
     case socket.assigns.live_action do
       :new ->
@@ -29,10 +25,19 @@ defmodule FullCircleWeb.NoteLive.Form do
           do: {:ok, mount_new(socket, params)},
           else: {:ok, deny(socket, gettext("You cannot create notes."))}
 
-      action when action in [:edit, :show] ->
+      action ->
         case Notes.get_note(params["note_id"], com, user) do
-          %Note{} = note -> {:ok, mount_edit(socket, note)}
-          nil -> {:ok, deny(socket, gettext("Note not found."))}
+          %Note{} = note ->
+            socket = assign_note(socket, note)
+
+            {:ok,
+             if(action == :edit and socket.assigns.can_edit,
+               do: start_edit(socket),
+               else: socket
+             )}
+
+          nil ->
+            {:ok, deny(socket, gettext("Note not found."))}
         end
     end
   end
@@ -44,84 +49,59 @@ defmodule FullCircleWeb.NoteLive.Form do
   end
 
   defp mount_new(socket, params) do
+    %{current_company: com, current_user: user} = socket.assigns
+
     subject =
       with t when is_binary(t) <- params["subject_type"],
-           {:ok, target} <-
-             Linkable.resolve(
-               t,
-               params["subject_id"],
-               socket.assigns.current_company,
-               socket.assigns.current_user
-             ) do
+           {:ok, target} <- Linkable.resolve(t, params["subject_id"], com, user) do
         %{type: t, id: target.id, title: target.title}
       else
         _ -> nil
       end
 
-    socket
-    |> assign(
+    assign(socket,
       page_title: gettext("New Note"),
-      note: %Note{},
+      note: nil,
+      item: nil,
       subject: subject,
-      links: [],
-      can_edit: true,
+      can_edit: false,
       can_delete: false
     )
-    |> assign(form: to_form(Notes.change_note(%Note{}, subject_attrs(subject))))
   end
 
-  defp mount_edit(socket, note) do
-    %{current_company: com, current_user: user} = socket.assigns
-    can_edit = Notes.can_edit?(note, com, user)
-
-    socket
-    |> assign(
-      page_title: if(can_edit, do: gettext("Edit Note"), else: gettext("Note")),
-      can_edit: can_edit,
-      can_delete: Notes.can_delete?(note, com, user)
-    )
-    |> assign_note(note)
-  end
-
-  # Everything that follows the saved note: the form, subject, links and
-  # backlinks. Called on mount and after a successful save.
+  # Everything shown for a saved note: rights, the post item, files, history.
   defp assign_note(socket, note) do
     %{current_company: com, current_user: user} = socket.assigns
 
     socket
     |> assign(
+      page_title: gettext("Note"),
       note: note,
-      subject: subject_of(note, com, user),
-      form: to_form(Notes.change_note(note)),
-      params: %{},
-      links: Notes.list_links(note, com, user)
+      can_edit: Notes.can_edit?(note, com, user),
+      can_delete: Notes.can_delete?(note, com, user),
+      item: %{
+        id: note.id,
+        note: note,
+        d: Map.fetch!(Notes.feed_details([note], com, user), note.id)
+      }
     )
     |> assign_history()
   end
 
-  defp subject_of(%Note{subject_type: nil}, _com, _user), do: nil
+  # The write box edits the note as it was when Edit was pressed: refreshing
+  # the files mid-edit must not hand it a newer lock_version, or a save would
+  # silently overwrite someone else's edit instead of reporting it as stale.
+  defp start_edit(socket),
+    do: assign(socket, editing: true, edit_note: socket.assigns.note)
 
-  defp subject_of(%Note{subject_type: t, subject_id: id}, com, user) do
-    case Linkable.resolve(t, id, com, user) do
-      {:ok, target} -> %{type: t, id: id, title: target.title}
-      _ -> %{type: t, id: id, title: gettext("(unavailable)")}
-    end
-  end
+  defp stop_edit(socket), do: assign(socket, editing: false, edit_note: nil)
 
-  # Files and links change without a Save. Refresh them without touching the
-  # form (half-typed text) or the note's lock_version (a concurrent-edit guard).
-  defp refresh_related(socket) do
+  defp reload(socket) do
     %{note: note, current_company: com, current_user: user} = socket.assigns
 
     case Notes.get_note(note.id, com, user) do
-      nil ->
-        deny(socket, gettext("Note not found."))
-
-      fresh ->
-        assign(socket,
-          note: %{note | attachments: fresh.attachments},
-          links: Notes.list_links(note, com, user)
-        )
+      nil -> deny(socket, gettext("Note not found."))
+      fresh -> assign_note(socket, fresh)
     end
   end
 
@@ -133,55 +113,18 @@ defmodule FullCircleWeb.NoteLive.Form do
     assign(socket, history: Notes.version_changes(Notes.list_versions(note, com, user), note))
   end
 
-  defp subject_attrs(nil), do: %{"subject_type" => nil, "subject_id" => nil}
-  defp subject_attrs(s), do: %{"subject_type" => s.type, "subject_id" => s.id}
-
-  defp change(socket, params) do
-    cs =
-      socket.assigns.note
-      |> Notes.change_note(Map.merge(params, subject_attrs(socket.assigns.subject)))
-      |> Map.put(:action, :validate)
-
-    assign(socket, form: to_form(cs), params: params)
-  end
-
   @impl true
-  def handle_event("validate", %{"note" => params}, socket),
-    do: {:noreply, change(socket, params)}
+  def handle_event("edit", _, socket) do
+    if socket.assigns.can_edit and not socket.assigns.editing,
+      do: {:noreply, start_edit(socket)},
+      else: {:noreply, socket}
+  end
 
-  def handle_event("visibility_everyone", _, socket),
-    do: {:noreply, change(socket, Map.put(socket.assigns.params, "visibility", [""]))}
-
-  def handle_event("visibility_private", _, socket),
+  def handle_event("toggle_history", _, socket),
     do:
-      {:noreply,
-       change(socket, Map.put(socket.assigns.params, "visibility", Note.private_visibility()))}
+      {:noreply, socket |> assign(show_history: !socket.assigns.show_history) |> assign_history()}
 
-  def handle_event("clear_subject", _, socket), do: {:noreply, assign(socket, subject: nil)}
-
-  def handle_event("toggle_picker", _, socket),
-    do: {:noreply, assign(socket, show_picker: !socket.assigns.show_picker)}
-
-  def handle_event("toggle_history", _, socket) do
-    {:noreply, socket |> assign(show_history: !socket.assigns.show_history) |> assign_history()}
-  end
-
-  def handle_event("remove_new_link", %{"id" => id}, socket) do
-    {:noreply, assign(socket, links: Enum.reject(socket.assigns.links, &(&1.id == id)))}
-  end
-
-  def handle_event("remove_link", %{"id" => link_id}, socket) do
-    Notes.remove_link(
-      socket.assigns.note,
-      link_id,
-      socket.assigns.current_company,
-      socket.assigns.current_user
-    )
-
-    {:noreply, refresh_related(socket)}
-  end
-
-  def handle_event("attachment_uploaded", _, socket), do: {:noreply, refresh_related(socket)}
+  def handle_event("attachment_uploaded", _, socket), do: {:noreply, reload(socket)}
 
   def handle_event("remove_attachment", %{"id" => id}, socket) do
     case Enum.find(socket.assigns.note.attachments, &(&1.id == id)) do
@@ -190,331 +133,181 @@ defmodule FullCircleWeb.NoteLive.Form do
 
       att ->
         Attachments.remove(att, socket.assigns.current_company, socket.assigns.current_user)
-        {:noreply, refresh_related(socket)}
+        {:noreply, reload(socket)}
     end
   end
 
   def handle_event("delete", _, socket) do
-    case Notes.delete_note(
-           socket.assigns.note,
-           socket.assigns.current_company,
-           socket.assigns.current_user
-         ) do
+    %{note: note, current_company: com, current_user: user} = socket.assigns
+
+    case Notes.delete_note(note, com, user) do
       {:ok, _} ->
         {:noreply,
          socket
          |> put_flash(:info, gettext("Note deleted."))
-         |> push_navigate(to: ~p"/companies/#{socket.assigns.current_company.id}/notes")}
+         |> push_navigate(to: ~p"/companies/#{com.id}/notes")}
 
       _ ->
         {:noreply, put_flash(socket, :warn, gettext("Not Authorise."))}
     end
   end
 
-  def handle_event("save", %{"note" => params}, socket) do
-    params = Map.merge(params, subject_attrs(socket.assigns.subject))
-    com = socket.assigns.current_company
-    user = socket.assigns.current_user
-
-    case socket.assigns.live_action do
-      :new ->
-        links = Enum.map(socket.assigns.links, &%{"type" => &1.type, "id" => &1.id})
-
-        case Notes.create_note(Map.put(params, "links", links), com, user) do
-          {:ok, note} ->
-            {:noreply,
-             socket
-             |> put_flash(:info, gettext("Note saved."))
-             |> push_navigate(to: ~p"/companies/#{com.id}/notes/#{note.id}/edit")}
-
-          error ->
-            {:noreply, save_error(socket, error, params)}
-        end
-
-      :edit ->
-        case Notes.update_note(socket.assigns.note, params, com, user) do
-          {:ok, note} ->
-            {:noreply, socket |> assign_note(note) |> put_flash(:info, gettext("Note saved."))}
-
-          error ->
-            {:noreply, save_error(socket, error, params)}
-        end
-    end
-  end
-
-  defp save_error(socket, {:error, :stale}, params) do
-    socket
-    |> assign(form: to_form(Notes.change_note(socket.assigns.note, params)))
-    |> put_flash(:warn, gettext("someone else changed this note — reload to see their version"))
-  end
-
-  defp save_error(socket, {:error, %Ecto.Changeset{} = cs}, _params),
-    do: assign(socket, form: to_form(cs))
-
-  defp save_error(socket, {:error, {:link, :not_found}}, _params),
-    do: put_flash(socket, :warn, gettext("A linked record no longer exists."))
-
-  defp save_error(socket, _, _params), do: put_flash(socket, :warn, gettext("Not Authorise."))
-
-  # One picker. With no subject yet, a pick sets the subject; once there is
-  # one, picks become links (the label says which). On a saved note a link is
-  # added straight away; on a new note it is queued until Save.
   @impl true
-  def handle_info({:record_picked, "record-picker", picked}, socket) do
-    %{subject: subject, note: note} = socket.assigns
-    socket = assign(socket, show_picker: false)
-
-    cond do
-      picked.type == "Note" and picked.id == note.id and is_nil(subject) ->
-        {:noreply, put_flash(socket, :warn, gettext("A note cannot be about itself."))}
-
-      is_nil(subject) ->
-        {:noreply, assign(socket, subject: picked)}
-
-      picked.type == subject.type and picked.id == subject.id ->
-        {:noreply, socket}
-
-      socket.assigns.live_action == :new ->
-        links = Enum.uniq_by(socket.assigns.links ++ [picked], &{&1.type, &1.id})
-        {:noreply, assign(socket, links: links)}
-
-      true ->
-        {:noreply, add_link(socket, picked)}
-    end
+  def handle_info({:composer, "note", {:saved, :new, note}}, socket) do
+    {:noreply,
+     socket
+     |> put_flash(:info, gettext("Note saved."))
+     |> push_navigate(to: ~p"/companies/#{socket.assigns.current_company.id}/notes/#{note.id}")}
   end
 
-  defp add_link(socket, picked) do
-    %{note: note, current_company: com, current_user: user} = socket.assigns
-
-    case Notes.add_link(note, picked.type, picked.id, com, user) do
-      {:ok, _} ->
-        refresh_related(socket)
-
-      # The changeset says which rule refused it ("already linked", "cannot
-      # link to itself"); show that, not a blanket guess.
-      {:error, %Ecto.Changeset{errors: [{_field, error} | _]}} ->
-        put_flash(socket, :warn, FullCircleWeb.CoreComponents.translate_error(error))
-
-      _ ->
-        put_flash(socket, :warn, gettext("Could not link that record."))
-    end
+  def handle_info({:composer, "note", {:saved, :edit, _note}}, socket) do
+    {:noreply, socket |> stop_edit() |> reload() |> put_flash(:info, gettext("Note saved."))}
   end
 
-  # A record_chip target for the subject or a link. Saved links already carry a
-  # resolved target (from list_links); the subject and links queued on a new
-  # note are %{type, id, title}.
-  defp chip_target(%{target: target}, _company), do: target
+  # Links on a saved note apply immediately, so a cancelled edit still reloads.
+  def handle_info({:composer, "note", :cancelled}, socket),
+    do: {:noreply, socket |> stop_edit() |> reload()}
 
-  defp chip_target(%{type: type, id: id, title: title}, company),
-    do: {:ok, %{title: title, url: Linkable.url(type, id, company)}}
+  # A reply was posted in the thread: refresh the post's 💬 count.
+  def handle_info({:notes_changed, "Note", _id}, socket), do: {:noreply, reload(socket)}
+
+  def handle_info(_msg, socket), do: {:noreply, socket}
+
+  defp edited?(%Note{} = note), do: note.updated_at != note.inserted_at
+
+  defp show_value(nil), do: "—"
+  defp show_value(list) when is_list(list), do: Enum.join(list, ", ")
+  defp show_value(v), do: to_string(v)
 
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="mx-auto w-6/12 max-md:w-11/12">
-      <div class="rounded-lg border border-yellow-500 bg-yellow-100 p-4 dark:border-yellow-700 dark:bg-yellow-950">
-        <p class="w-full text-center text-3xl font-medium">{@page_title}</p>
-        <p
-          :if={@live_action == :edit}
-          class="mb-2 text-center text-xs text-gray-600 dark:text-gray-400"
+    <div class="mx-auto max-w-xl border-x border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+      <div class="flex items-center gap-4 border-b border-gray-200 px-4 py-2 dark:border-gray-700">
+        <.link
+          id="back-to-notes"
+          navigate={~p"/companies/#{@current_company.id}/notes"}
+          class="rounded-full px-2 text-xl hover:bg-gray-100 dark:hover:bg-gray-800"
+          title={gettext("Back")}
         >
-          {gettext("Written by")} {@note.author.email} · {FullCircleWeb.Helpers.format_datetime(
-            @note.inserted_at,
-            @current_company
-          )}
-          <span :if={@note.updated_at != @note.inserted_at}>
-            · {gettext("edited by")} {@note.updated_by.email}
-            {FullCircleWeb.Helpers.format_datetime(@note.updated_at, @current_company)}
-          </span>
-        </p>
-
-        <.form for={@form} id="note-form" phx-change="validate" phx-submit="save" autocomplete="off">
-          <.input field={@form[:title]} label={gettext("Title (optional)")} disabled={!@can_edit} />
-          <.input
-            field={@form[:body]}
-            type="textarea"
-            rows="6"
-            label={gettext("Note")}
-            disabled={!@can_edit}
-          />
-
-          <div class="mt-3">
-            <div class="flex flex-wrap items-center gap-1">
-              <span
-                class="mr-1 text-sm font-semibold"
-                title={gettext("Admin and the writer can always read it.")}
-              >
-                {gettext("Readable by")}
-              </span>
-              <.visibility_chips
-                visibility={selected_roles(@form)}
-                id_prefix="visibility"
-                disabled={!@can_edit}
-              />
-            </div>
-            <.error :for={msg <- Enum.map(@form[:visibility].errors, &translate_error/1)}>
-              {msg}
-            </.error>
-          </div>
-
-          <div class="mt-2">
-            <div class="flex flex-wrap items-center gap-1">
-              <span class="mr-1 text-sm font-semibold">{gettext("About & links")}</span>
-              <.record_chip
-                :if={@subject}
-                type={@subject.type}
-                target={chip_target(@subject, @current_company)}
-                kind={:subject}
-              >
-                <button
-                  :if={@can_edit}
-                  type="button"
-                  id="clear-subject"
-                  phx-click="clear_subject"
-                  title={gettext("Clear")}
-                  class="shrink-0"
-                >
-                  ✕
-                </button>
-              </.record_chip>
-              <.record_chip :for={l <- @links} type={l.type} target={chip_target(l, @current_company)}>
-                <button
-                  :if={@can_edit and @live_action == :edit}
-                  type="button"
-                  id={"remove-link-#{l.link_id}"}
-                  phx-click="remove_link"
-                  phx-value-id={l.link_id}
-                  title={gettext("Remove")}
-                  class="shrink-0"
-                >
-                  ✕
-                </button>
-                <button
-                  :if={@live_action == :new}
-                  type="button"
-                  phx-click="remove_new_link"
-                  phx-value-id={l.id}
-                  title={gettext("Remove")}
-                  class="shrink-0"
-                >
-                  ✕
-                </button>
-              </.record_chip>
-              <button
-                :if={@can_edit}
-                type="button"
-                id="open-picker"
-                phx-click="toggle_picker"
-                class="rounded-full border border-dashed border-gray-400 px-2 text-xs text-gray-600 hover:bg-white dark:border-gray-500 dark:text-gray-300 dark:hover:bg-gray-800"
-              >
-                ＋ {if @subject, do: gettext("link a record"), else: gettext("what is it about?")}
-              </button>
-              <span
-                :if={!@subject and @links == [] and !@can_edit}
-                class="text-xs text-gray-500"
-              >
-                {gettext("nothing in particular")}
-              </span>
-            </div>
-            <.error :for={
-              msg <-
-                Enum.map(
-                  @form[:subject_id].errors ++ @form[:subject_type].errors,
-                  &translate_error/1
-                )
-            }>
-              {msg}
-            </.error>
-          </div>
-
-          <div class="mt-4 flex justify-center gap-2">
-            <.button :if={@can_edit}>{gettext("Save")}</.button>
-            <.link navigate={~p"/companies/#{@current_company.id}/notes"} class="orange button">
-              {gettext("Back")}
-            </.link>
+          ←
+        </.link>
+        <span class="text-lg font-bold">{@page_title}</span>
+        <details :if={@can_delete} class="relative ml-auto">
+          <summary class="cursor-pointer list-none rounded-full px-2 text-xl hover:bg-gray-100 dark:hover:bg-gray-800">
+            ⋯
+          </summary>
+          <div class="absolute right-0 z-10 mt-1 w-40 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800">
             <button
-              :if={@can_delete}
               type="button"
               id="delete-note"
               phx-click="delete"
               data-confirm={gettext("Delete this note? Its history is kept.")}
-              class="red button"
+              class="block w-full px-3 py-1.5 text-left text-sm text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950"
             >
               {gettext("Delete")}
             </button>
           </div>
-        </.form>
+        </details>
+      </div>
 
-        <div :if={@show_picker} class="mt-3">
+      <div :if={is_nil(@note)} class="px-4 py-3">
+        <.live_component
+          module={ComposerComponent}
+          id="note"
+          full
+          avatar
+          initial_subject={@subject}
+          current_company={@current_company}
+          current_user={@current_user}
+        />
+        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          {gettext("Save the note first, then attach files.")}
+        </p>
+      </div>
+
+      <%= if @note do %>
+        <.note_post
+          :if={!@editing}
+          id="note-post"
+          item={@item}
+          current_company={@current_company}
+          detail
+        >
+          <:actions>
+            <button
+              :if={@can_edit}
+              type="button"
+              id="edit-note"
+              phx-click="edit"
+              class="rounded-full border border-gray-300 px-3 py-0.5 text-sm hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
+            >
+              ✎ {gettext("Edit")}
+            </button>
+            <.attach_button :if={@can_edit} note_id={@note.id} current_company={@current_company} />
+            <button
+              type="button"
+              id="toggle-history"
+              phx-click="toggle_history"
+              class="text-xs text-gray-500 hover:underline dark:text-gray-400"
+            >
+              {gettext("History")} {if @show_history, do: "▾", else: "▸"}
+            </button>
+          </:actions>
+        </.note_post>
+
+        <div :if={@editing} class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
           <.live_component
-            module={RecordPickerComponent}
-            id="record-picker"
-            label={
-              if @subject,
-                do: gettext("Link other records"),
-                else: gettext("Set what this note is about")
-            }
+            module={ComposerComponent}
+            id="note"
+            mode={:edit}
+            note={@edit_note}
+            full
+            avatar
+            cancellable
+            submit_label={gettext("Save")}
             current_company={@current_company}
             current_user={@current_user}
           />
+          <div id="note-files" class="mt-3">
+            <div class="mb-2 flex items-center">
+              <span class="text-sm font-semibold">📎 {gettext("Files")}</span>
+              <span class="ml-auto">
+                <.attach_button note_id={@note.id} current_company={@current_company} />
+              </span>
+            </div>
+            <.attachment_tiles
+              attachments={@note.attachments}
+              current_company={@current_company}
+              can_edit
+            />
+          </div>
+          <button
+            type="button"
+            id="toggle-history"
+            phx-click="toggle_history"
+            class="mt-2 text-xs text-gray-500 hover:underline dark:text-gray-400"
+          >
+            {gettext("History")} {if @show_history, do: "▾", else: "▸"}
+          </button>
         </div>
-      </div>
 
-      <%!-- Three boxes under the card: files, notes about this note, history. --%>
-      <section class="mt-3 rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-700 dark:bg-gray-900/40">
-        <div class="mb-2 flex items-center">
-          <h2 class="text-sm font-semibold">
-            📎 {gettext("Files")}
-            <span :if={@live_action == :edit and @note.attachments != []} class="text-gray-500">
-              ({length(@note.attachments)})
-            </span>
-          </h2>
-          <span :if={@live_action == :edit and @can_edit} class="ml-auto">
-            <.attach_button note_id={@note.id} current_company={@current_company} />
-          </span>
-        </div>
-        <%= if @live_action == :edit do %>
-          <.attachment_tiles
-            attachments={@note.attachments}
-            current_company={@current_company}
-            can_edit={@can_edit}
-          />
-          <p :if={@note.attachments == []} class="text-sm text-gray-500">{gettext("None")}</p>
-        <% else %>
-          <p class="text-sm text-gray-500">{gettext("Save the note first, then attach files.")}</p>
-        <% end %>
-      </section>
-
-      <%!-- Notes about this note (and notes linking to it): the same panel as
-           on every record page, so follow-ups can be added right here. --%>
-      <.live_component
-        :if={@live_action == :edit}
-        module={FullCircleWeb.NoteLive.NotesPanelComponent}
-        id="notes-panel"
-        record_type="Note"
-        record_id={@note.id}
-        current_company={@current_company}
-        current_user={@current_user}
-      />
-
-      <section
-        :if={@live_action == :edit}
-        class="mt-3 rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-gray-700 dark:bg-gray-900/40"
-      >
-        <button
-          id="toggle-history"
-          type="button"
-          phx-click="toggle_history"
-          class="text-sm font-semibold hover:text-blue-700 dark:hover:text-blue-300"
+        <div
+          :if={@show_history}
+          id="note-history"
+          class="border-b border-gray-200 px-4 py-2 text-sm dark:border-gray-700"
         >
-          {if @show_history, do: "▾", else: "▸"} 🕘 {gettext("History")}
-        </button>
-        <div :if={@show_history} class="mt-2">
+          <p :if={edited?(@note)} class="text-xs text-gray-500 dark:text-gray-400">
+            {gettext("edited by")} {@note.updated_by && @note.updated_by.email} · {FullCircleWeb.Helpers.format_datetime(
+              @note.updated_at,
+              @current_company
+            )}
+          </p>
           <div
             :for={h <- @history}
-            class="my-1 rounded border border-gray-300 p-2 text-sm dark:border-gray-600"
+            class="my-1 rounded border border-gray-200 p-2 dark:border-gray-700"
           >
-            <div class="text-xs text-gray-500">
+            <div class="text-xs text-gray-500 dark:text-gray-400">
               {gettext("Version")} {h.version.version} · {gettext("replaced by")} {h.version.edited_by.email}
               {FullCircleWeb.Helpers.format_datetime(h.version.inserted_at, @current_company)}
             </div>
@@ -526,16 +319,23 @@ defmodule FullCircleWeb.NoteLive.Form do
               <span class="whitespace-pre-wrap bg-green-100 dark:bg-green-900">{show_value(new)}</span>
             </div>
           </div>
-          <p :if={@history == []} class="text-sm text-gray-500">{gettext("Never edited.")}</p>
+          <p :if={@history == []} class="text-gray-500 dark:text-gray-400">
+            {gettext("Never edited.")}
+          </p>
         </div>
-      </section>
+
+        <.live_component
+          module={NotesPanelComponent}
+          id="notes-panel"
+          layout={:thread}
+          record_type="Note"
+          record_id={@note.id}
+          notify_parent
+          current_company={@current_company}
+          current_user={@current_user}
+        />
+      <% end %>
     </div>
     """
   end
-
-  defp selected_roles(form), do: Ecto.Changeset.get_field(form.source, :visibility) || []
-
-  defp show_value(nil), do: "—"
-  defp show_value(list) when is_list(list), do: Enum.join(list, ", ")
-  defp show_value(v), do: to_string(v)
 end

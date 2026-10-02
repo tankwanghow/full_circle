@@ -41,13 +41,26 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
   def update(assigns, socket) do
     first? = is_nil(socket.assigns[:rev])
 
+    # A host handing over another note, or a newer save of it, starts the box
+    # afresh. LiveView keeps a removed component's state when it is rendered
+    # again before the client confirms the removal (the note page: Save, then
+    # Edit straight away), so first? alone would show the pre-save text and
+    # lock_version. Hosts pass the same note on ordinary re-renders, which
+    # keeps half-typed text.
+    renote? =
+      not first? and Map.has_key?(assigns, :note) and
+        note_key(assigns.note) != note_key(socket.assigns[:note])
+
     socket =
       Enum.reduce(@defaults, assign(socket, assigns), fn {k, v}, s ->
         assign_new(s, k, fn -> v end)
       end)
 
-    {:ok, if(first?, do: reset(socket), else: socket)}
+    {:ok, if(first? or renote?, do: reset(socket), else: socket)}
   end
+
+  defp note_key(%Note{id: id, lock_version: v}), do: {id, v}
+  defp note_key(_), do: nil
 
   # --- state ----------------------------------------------------------------
 

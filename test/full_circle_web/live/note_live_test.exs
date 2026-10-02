@@ -200,13 +200,13 @@ defmodule FullCircleWeb.NoteLiveTest do
     end
   end
 
-  # The edit page doubles as the note's page (there is no separate show page).
+  # /notes/:id is the post view; /notes/:id/edit opens it in edit mode.
   describe "note page" do
     defp pick(lv, type, terms, id) do
-      lv |> element("#open-picker") |> render_click()
-      lv |> form("#record-picker form", %{"type" => type, "terms" => terms}) |> render_change()
-      lv |> element("#record-picker-pick-#{id}") |> render_click()
-      # The pick reaches the form via send/2; read the page after it lands.
+      lv |> element("#note-open-picker") |> render_click()
+      lv |> form("#note-picker form", %{"type" => type, "terms" => terms}) |> render_change()
+      lv |> element("#note-picker-pick-#{id}") |> render_click()
+      # The pick reaches the composer via send_update; read the page after it lands.
       render(lv)
     end
 
@@ -221,19 +221,18 @@ defmodule FullCircleWeb.NoteLiveTest do
       html = pick(lv, "Contact", "Ali", ali.id)
       # Once a subject is set, the same ＋ chip offers links instead.
       assert html =~ "link a record"
-      assert lv |> element("#open-picker") |> render_click() =~ "Link other records"
-      lv |> element("#open-picker") |> render_click()
+      assert lv |> element("#note-open-picker") |> render_click() =~ "Link other records"
+      lv |> element("#note-open-picker") |> render_click()
 
       pick(lv, "Contact", "Mei", mei.id)
       # Picking the subject again does not also make it a link.
       pick(lv, "Contact", "Ali", ali.id)
 
-      {:error, {:live_redirect, %{to: to}}} =
-        lv |> form("#note-form", %{"note" => %{"body" => "welded the gate"}}) |> render_submit()
+      lv |> form("#note-form", %{"note" => %{"body" => "welded the gate"}}) |> render_submit()
 
       [note] = FullCircle.Repo.all(FullCircle.Notes.Note)
       # Saving a new note lands on its page, where files can be attached.
-      assert to == edit_path(comp, note)
+      assert_redirect(lv, ~p"/companies/#{comp.id}/notes/#{note.id}")
       assert note.subject_id == ali.id
       assert [%{id: id}] = FullCircle.Notes.list_links(note, comp, admin)
       assert id == mei.id
@@ -244,9 +243,9 @@ defmodule FullCircleWeb.NoteLiveTest do
       ali = contact_fixture(comp, admin, %{"name" => "Ali Welding"})
       {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/new")
       pick(lv, "Contact", "Ali", ali.id)
-      lv |> element("#clear-subject") |> render_click()
-      html = lv |> element("#open-picker") |> render_click()
-      assert html =~ "Set what this note is about"
+      lv |> element("#note-clear-subject") |> render_click()
+      html = lv |> element("#note-open-picker") |> render_click()
+      assert html =~ "What is this note about?"
     end
 
     test "on a saved note, links are added and removed straight away",
@@ -290,7 +289,7 @@ defmodule FullCircleWeb.NoteLiveTest do
 
       # subject chip: capped, full text in the tooltip, remove button outside the cut text
       assert has_element?(lv, ~s{span.max-w-xs[title="Note · #{long}"]})
-      assert has_element?(lv, ~s{span.max-w-xs[title="Note · #{long}"] #clear-subject})
+      assert has_element?(lv, ~s{span.max-w-xs[title="Note · #{long}"] #note-clear-subject})
       # link chip uses the same capped chip
       [link] = FullCircle.Notes.list_links(note, comp, admin)
 
@@ -378,7 +377,7 @@ defmodule FullCircleWeb.NoteLiveTest do
       refute has_element?(lv, "label.role-chip", "admin")
       refute has_element?(lv, "label.role-chip", "guest")
       assert has_element?(lv, "label.role-chip", "manager")
-      assert has_element?(lv, "#visibility-private")
+      assert has_element?(lv, "#note-visibility-private")
     end
 
     test "Private makes the note admins-and-writer only; a role then replaces it",
@@ -386,24 +385,27 @@ defmodule FullCircleWeb.NoteLiveTest do
       note = note_fixture(comp, admin, %{"body" => "b"})
       {:ok, lv, _} = live(conn, edit_path(comp, note))
 
-      lv |> element("#visibility-private") |> render_click()
-      assert has_element?(lv, "#visibility-private[data-selected]")
+      lv |> element("#note-visibility-private") |> render_click()
+      assert has_element?(lv, "#note-visibility-private[data-selected]")
       lv |> form("#note-form") |> render_submit()
       assert FullCircle.Repo.get!(FullCircle.Notes.Note, note.id).visibility == ["admin"]
 
-      # Ticking a role while Private is on switches to that role.
+      # Saving returns to the post view; edit again. Ticking a role while
+      # Private is on switches to that role.
+      lv |> element("#edit-note") |> render_click()
+
       lv
       |> form("#note-form", %{"note" => %{"visibility" => ["admin", "clerk"]}})
       |> render_change()
 
-      refute has_element?(lv, "#visibility-private[data-selected]")
+      refute has_element?(lv, "#note-visibility-private[data-selected]")
       assert has_element?(lv, "label.role-chip[data-selected]", "clerk")
     end
 
     test "the Everyone chip clears the role list", %{conn: conn, admin: admin, comp: comp} do
       note = note_fixture(comp, admin, %{"body" => "b", "visibility" => ["manager"]})
       {:ok, lv, _} = live(conn, edit_path(comp, note))
-      lv |> element("#visibility-everyone") |> render_click()
+      lv |> element("#note-visibility-everyone") |> render_click()
       lv |> form("#note-form") |> render_submit()
       assert FullCircle.Repo.get!(FullCircle.Notes.Note, note.id).visibility == nil
     end
@@ -418,9 +420,24 @@ defmodule FullCircleWeb.NoteLiveTest do
          %{conn: conn, admin: admin, comp: comp} do
       note = note_fixture(comp, admin, %{"body" => "v1"})
       {:ok, lv, _} = live(conn, edit_path(comp, note))
-      html = lv |> form("#note-form", %{"note" => %{"body" => "v2"}}) |> render_submit()
-      assert html =~ "Note saved."
+      lv |> form("#note-form", %{"note" => %{"body" => "v2"}}) |> render_submit()
+      assert render(lv) =~ "Note saved."
+      assert has_element?(lv, "#note-post", "v2")
+      refute has_element?(lv, "#note-form")
       assert [%{body: "v1"}] = FullCircle.Repo.all(FullCircle.Notes.NoteVersion)
+    end
+
+    test "editing again right after a save starts from the saved note",
+         %{conn: conn, admin: admin, comp: comp} do
+      note = note_fixture(comp, admin, %{"body" => "v1"})
+      {:ok, lv, _} = live(conn, edit_path(comp, note))
+      lv |> form("#note-form", %{"note" => %{"body" => "v2"}}) |> render_submit()
+
+      lv |> element("#edit-note") |> render_click()
+      assert has_element?(lv, "#note-form textarea", "v2")
+      lv |> form("#note-form", %{"note" => %{"body" => "v3"}}) |> render_submit()
+      assert has_element?(lv, "#note-post", "v3")
+      refute render(lv) =~ "someone else changed this note"
     end
 
     test "a stale save keeps the typed text and warns", %{conn: conn, admin: admin, comp: comp} do
@@ -428,7 +445,8 @@ defmodule FullCircleWeb.NoteLiveTest do
       {:ok, lv, _} = live(conn, edit_path(comp, note))
       {:ok, _} = FullCircle.Notes.update_note(note, %{"body" => "someone else"}, comp, admin)
 
-      html = lv |> form("#note-form", %{"note" => %{"body" => "my text"}}) |> render_submit()
+      lv |> form("#note-form", %{"note" => %{"body" => "my text"}}) |> render_submit()
+      html = render(lv)
       assert html =~ "someone else changed this note"
       assert html =~ "my text"
     end
@@ -464,16 +482,14 @@ defmodule FullCircleWeb.NoteLiveTest do
       html = lv |> element("#toggle-history") |> render_click()
       assert html =~ "v1"
 
-      html = lv |> element("#att-#{att.id} button") |> render_click()
+      html = lv |> element("#note-files #att-#{att.id} button") |> render_click()
       refute html =~ "cert.jpg"
     end
 
     test "a note can be written about this note from its page",
          %{conn: conn, admin: admin, comp: comp} do
       note = note_fixture(comp, admin, %{"body" => "Company closed down"})
-      {:ok, lv, _} = live(conn, edit_path(comp, note))
-
-      lv |> element("#notes-panel-new") |> render_click()
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{note.id}")
 
       _ =
         lv
@@ -481,6 +497,8 @@ defmodule FullCircleWeb.NoteLiveTest do
         |> render_submit()
 
       assert render(lv) =~ "confirmed with SSM search"
+      # The post's 💬 count follows the thread.
+      assert has_element?(lv, "#note-post .note-replies", "1")
 
       follow_up =
         FullCircle.Repo.get_by!(FullCircle.Notes.Note, body: "confirmed with SSM search")
@@ -531,10 +549,10 @@ defmodule FullCircleWeb.NoteLiveTest do
       {:ok, lv, html} = live(log_in_user(build_conn(), clerk), edit_path(comp, note))
 
       assert html =~ "admin wrote this"
-      assert has_element?(lv, "textarea[disabled]")
-      refute has_element?(lv, "#note-form button", "Save")
+      assert has_element?(lv, "#note-post", "admin wrote this")
+      refute has_element?(lv, "#note-form")
+      refute has_element?(lv, "#edit-note")
       refute has_element?(lv, "#delete-note")
-      refute has_element?(lv, "#open-picker")
     end
 
     test "a restricted note is not found for an outsider", %{admin: admin, comp: comp} do
@@ -547,11 +565,106 @@ defmodule FullCircleWeb.NoteLiveTest do
       assert to == "/companies/#{comp.id}/notes"
     end
 
-    test "the old /notes/:id address opens the same page", %{conn: conn, admin: admin, comp: comp} do
+    test "the /notes/:id address opens the post view", %{conn: conn, admin: admin, comp: comp} do
       note = note_fixture(comp, admin, %{"body" => "old link"})
       {:ok, lv, html} = live(conn, ~p"/companies/#{comp.id}/notes/#{note.id}")
       assert html =~ "old link"
-      assert has_element?(lv, "#note-form")
+      assert has_element?(lv, "#note-post")
+      refute has_element?(lv, "#note-form")
+    end
+
+    test "Edit turns the post into the write box; Cancel brings the post back",
+         %{conn: conn, admin: admin, comp: comp} do
+      note = note_fixture(comp, admin, %{"body" => "Any note"})
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{note.id}")
+      assert has_element?(lv, "#note-post", "Any note")
+
+      lv |> element("#edit-note") |> render_click()
+      assert has_element?(lv, "#note-form textarea", "Any note")
+      refute has_element?(lv, "#note-post")
+
+      lv |> element("#note-cancel") |> render_click()
+      assert has_element?(lv, "#note-post", "Any note")
+    end
+
+    test "a reader opening /edit gets the post view", %{admin: admin, comp: comp} do
+      note = note_fixture(comp, admin, %{"body" => "read me"})
+      clerk = user_with_role(comp, admin, "clerk")
+      {:ok, lv, _} = live(log_in_user(build_conn(), clerk), edit_path(comp, note))
+      assert has_element?(lv, "#note-post", "read me")
+      refute has_element?(lv, "#note-form")
+      refute has_element?(lv, "#delete-note")
+    end
+
+    test "pick goes to the edit box only, not the reply box",
+         %{conn: conn, admin: admin, comp: comp} do
+      mei = contact_fixture(comp, admin, %{"name" => "Kedai Mei"})
+      note = note_fixture(comp, admin, %{"body" => "b"})
+      {:ok, lv, _} = live(conn, edit_path(comp, note))
+      pick(lv, "Contact", "Mei", mei.id)
+      assert has_element?(lv, "#note-form", "Kedai Mei")
+      refute has_element?(lv, "#notes-panel-form", "Kedai Mei")
+    end
+
+    test "attachment_uploaded refreshes tiles in edit mode",
+         %{conn: conn, admin: admin, comp: comp} do
+      note = note_fixture(comp, admin, %{"body" => "files"})
+      {:ok, lv, _} = live(conn, edit_path(comp, note))
+      refute has_element?(lv, "#note-files", "late.jpg")
+
+      {:ok, _} =
+        FullCircle.Notes.Attachments.attach(
+          note,
+          %{path: jpeg_file(), file_name: "late.jpg"},
+          comp,
+          admin
+        )
+
+      render_hook(lv, "attachment_uploaded", %{})
+      assert has_element?(lv, "#note-files", "late.jpg")
+    end
+
+    test "a file refresh mid-edit keeps the typed text and the stale guard",
+         %{conn: conn, admin: admin, comp: comp} do
+      note = note_fixture(comp, admin, %{"body" => "v1"})
+      {:ok, lv, _} = live(conn, edit_path(comp, note))
+      lv |> form("#note-form", %{"note" => %{"body" => "my text"}}) |> render_change()
+
+      {:ok, _} = FullCircle.Notes.update_note(note, %{"body" => "someone else"}, comp, admin)
+      render_hook(lv, "attachment_uploaded", %{})
+      assert has_element?(lv, "#note-form textarea", "my text")
+
+      lv |> form("#note-form", %{"note" => %{"body" => "my text"}}) |> render_submit()
+      assert render(lv) =~ "someone else changed this note"
+      assert FullCircle.Repo.get!(FullCircle.Notes.Note, note.id).body == "someone else"
+    end
+
+    test "the post view shows every file, the full body and a History toggle",
+         %{conn: conn, admin: admin, comp: comp} do
+      note = note_fixture(comp, admin, %{"body" => "v1"})
+      {:ok, note} = FullCircle.Notes.update_note(note, %{"body" => "v2"}, comp, admin)
+
+      for n <- 1..5 do
+        {:ok, _} =
+          FullCircle.Notes.Attachments.attach(
+            note,
+            %{path: jpeg_file(), file_name: "#{n}.jpg"},
+            comp,
+            admin
+          )
+      end
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{note.id}")
+
+      assert lv
+             |> element("#note-post")
+             |> render()
+             |> LazyHTML.from_fragment()
+             |> LazyHTML.query(".note-thumb")
+             |> Enum.count() == 5
+
+      html = lv |> element("#toggle-history") |> render_click()
+      assert html =~ "v1"
     end
   end
 end
