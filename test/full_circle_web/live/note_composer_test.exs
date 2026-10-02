@@ -243,6 +243,29 @@ defmodule FullCircleWeb.NoteComposerTest do
       refute render(lv) =~ "Kedai Mei"
     end
 
+    test "a malformed link id is ignored", %{conn: conn, admin: admin, comp: comp} do
+      ali = contact_fixture(comp, admin, %{"name" => "Ali Welding"})
+      mei = contact_fixture(comp, admin, %{"name" => "Kedai Mei"})
+
+      note =
+        note_fixture(comp, admin, %{
+          "body" => "b",
+          "subject_type" => "Contact",
+          "subject_id" => ali.id
+        })
+
+      {:ok, _} = FullCircle.Notes.add_link(note, "Contact", mei.id, comp, admin)
+      lv = edit_host(conn, comp, admin, note)
+
+      [link] = FullCircle.Notes.list_links(note, comp, admin)
+
+      # the click value overrides phx-value-id, simulating a tampered client
+      lv |> element("#remove-link-#{link.link_id}") |> render_click(%{"id" => "x"})
+
+      assert render(lv) =~ "Kedai Mei"
+      assert [_] = FullCircle.Notes.list_links(note, comp, admin)
+    end
+
     test "linking a note to itself says why", %{conn: conn, admin: admin, comp: comp} do
       ali = contact_fixture(comp, admin, %{"name" => "Ali Welding"})
 

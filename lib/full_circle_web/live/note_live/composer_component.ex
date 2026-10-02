@@ -141,8 +141,16 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
 
   def handle_event("remove_link", %{"id" => link_id}, socket) do
     %{note: note, current_company: com, current_user: user} = socket.assigns
-    Notes.remove_link(note, link_id, com, user)
-    {:noreply, assign(socket, links: Notes.list_links(note, com, user))}
+
+    # A malformed id from the client must not reach the binary_id query.
+    case Ecto.UUID.cast(link_id) do
+      {:ok, uuid} ->
+        Notes.remove_link(note, uuid, com, user)
+        {:noreply, assign(socket, links: Notes.list_links(note, com, user))}
+
+      :error ->
+        {:noreply, socket}
+    end
   end
 
   def handle_event("cancel", _, socket) do
