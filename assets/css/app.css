@@ -357,6 +357,27 @@ div.SalaryType_Contribution input {
   animation: quick-pulse 0.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* The note a note page was opened on (ScrollToNote hook): 3s highlight. */
+.note-arrived {
+  --arrive-color: var(--color-amber-100);
+  animation: note-arrive 3s ease-out;
+}
+
+.dark .note-arrived {
+  --arrive-color: color-mix(in oklab, var(--color-amber-500) 30%, transparent);
+}
+
+@keyframes note-arrive {
+  0%, 60% {
+    background-color: var(--arrive-color);
+    box-shadow: inset 4px 0 0 var(--color-amber-400);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: inset 4px 0 0 transparent;
+  }
+}
+
 /* Chrome, Safari, Edge, Opera */
 input::-webkit-outer-spin-button,
 input::-webkit-inner-spin-button {

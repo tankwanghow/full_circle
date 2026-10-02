@@ -729,6 +729,21 @@ defmodule FullCircleWeb.NoteLiveTest do
       refute has_element?(lv, "#thread-after #thread-#{b.id}")
     end
 
+    test "a reply's page scrolls to and highlights the reply; a root's page does not",
+         %{conn: conn, admin: admin, comp: comp} do
+      root = note_fixture(comp, admin, %{"body" => "genset"})
+
+      {:ok, reply} =
+        FullCircle.Notes.create_note(%{"body" => "fixed", "reply_to_id" => root.id}, comp, admin)
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{reply.id}")
+      assert has_element?(lv, ~s(#focus-note[phx-hook="ScrollToNote"] #note-post))
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{root.id}")
+      assert has_element?(lv, "#note-post")
+      refute has_element?(lv, ~s([phx-hook="ScrollToNote"]))
+    end
+
     test "a reply that also links to its note shows once, in the thread",
          %{conn: conn, admin: admin, comp: comp} do
       root = note_fixture(comp, admin, %{"body" => "genset"})

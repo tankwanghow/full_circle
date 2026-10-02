@@ -406,69 +406,73 @@ defmodule FullCircleWeb.NoteLive.Form do
           />
         </div>
 
-        <.note_post
-          :if={!@editing}
-          id="note-post"
-          item={@item}
-          current_company={@current_company}
-          detail
-        >
-          <:actions>
-            <button
-              :if={@can_edit}
-              type="button"
-              id="edit-note"
-              phx-click="edit"
-              class="rounded-full border border-gray-300 px-3 py-0.5 text-sm hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
-            >
-              ✎ {gettext("Edit")}
-            </button>
-            <.attach_button :if={@can_edit} note_id={@note.id} current_company={@current_company} />
+        <%!-- A reply sits below its root and earlier replies: scroll to it and
+             flash it, so the note you opened is the one you see. --%>
+        <div id="focus-note" phx-hook={@root_state != :self && "ScrollToNote"}>
+          <.note_post
+            :if={!@editing}
+            id="note-post"
+            item={@item}
+            current_company={@current_company}
+            detail
+          >
+            <:actions>
+              <button
+                :if={@can_edit}
+                type="button"
+                id="edit-note"
+                phx-click="edit"
+                class="rounded-full border border-gray-300 px-3 py-0.5 text-sm hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
+              >
+                ✎ {gettext("Edit")}
+              </button>
+              <.attach_button :if={@can_edit} note_id={@note.id} current_company={@current_company} />
+              <button
+                type="button"
+                id="toggle-history"
+                phx-click="toggle_history"
+                class="text-xs text-gray-500 hover:underline dark:text-gray-400"
+              >
+                {gettext("History")} {if @show_history, do: "▾", else: "▸"}
+              </button>
+            </:actions>
+          </.note_post>
+
+          <div :if={@editing} class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+            <.live_component
+              module={ComposerComponent}
+              id="note"
+              mode={:edit}
+              note={@edit_note}
+              full
+              avatar
+              cancellable
+              submit_label={gettext("Save")}
+              current_company={@current_company}
+              current_user={@current_user}
+            />
+            <div id="note-files" class="mt-3">
+              <div class="mb-2 flex items-center">
+                <span class="text-sm font-semibold">📎 {gettext("Files")}</span>
+                <span class="ml-auto">
+                  <.attach_button note_id={@note.id} current_company={@current_company} />
+                </span>
+              </div>
+              <.attachment_tiles
+                attachments={@note.attachments}
+                current_company={@current_company}
+                can_edit
+              />
+            </div>
             <button
               type="button"
               id="toggle-history"
               phx-click="toggle_history"
-              class="text-xs text-gray-500 hover:underline dark:text-gray-400"
+              class="mt-2 text-xs text-gray-500 hover:underline dark:text-gray-400"
             >
               {gettext("History")} {if @show_history, do: "▾", else: "▸"}
             </button>
-          </:actions>
-        </.note_post>
-
-        <div :if={@editing} class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
-          <.live_component
-            module={ComposerComponent}
-            id="note"
-            mode={:edit}
-            note={@edit_note}
-            full
-            avatar
-            cancellable
-            submit_label={gettext("Save")}
-            current_company={@current_company}
-            current_user={@current_user}
-          />
-          <div id="note-files" class="mt-3">
-            <div class="mb-2 flex items-center">
-              <span class="text-sm font-semibold">📎 {gettext("Files")}</span>
-              <span class="ml-auto">
-                <.attach_button note_id={@note.id} current_company={@current_company} />
-              </span>
-            </div>
-            <.attachment_tiles
-              attachments={@note.attachments}
-              current_company={@current_company}
-              can_edit
-            />
           </div>
-          <button
-            type="button"
-            id="toggle-history"
-            phx-click="toggle_history"
-            class="mt-2 text-xs text-gray-500 hover:underline dark:text-gray-400"
-          >
-            {gettext("History")} {if @show_history, do: "▾", else: "▸"}
-          </button>
         </div>
 
         <.history_list

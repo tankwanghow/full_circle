@@ -136,6 +136,22 @@ Hooks.InfiniteScroll = {
   }
 }
 
+// Note page opened on a reply: bring the reply into view and flash it for 3s.
+// Two frames: after a live navigate, LiveView scrolls to the top in a frame
+// of its own — scrolling any sooner would be undone.
+Hooks.ScrollToNote = {
+  mounted() {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      this.el.scrollIntoView({ block: "center" })
+      this.el.classList.add("note-arrived")
+      this.timer = setTimeout(() => this.el.classList.remove("note-arrived"), 3000)
+    }))
+  },
+  destroyed() {
+    clearTimeout(this.timer)
+  }
+}
+
 // App-wide command palette (header search button) — search + actions + recents.
 // No global keyboard shortcut: it is opened only via the header button.
 Hooks.CommandPalette = {
