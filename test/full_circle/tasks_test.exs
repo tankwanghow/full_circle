@@ -1,5 +1,6 @@
 defmodule FullCircle.TasksTest do
-  use FullCircle.DataCase
+  # Not async: a test creates a trigger on notes (AccessExclusive lock).
+  use FullCircle.DataCase, async: false
 
   import FullCircle.BillingFixtures
   import FullCircle.NotesFixtures

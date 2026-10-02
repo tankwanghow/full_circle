@@ -23,6 +23,8 @@ current one). On write, `create_note/3` and `update_note/4` copy that task's
 The copy is read inside the note's transaction with `FOR SHARE` on the task
 row (`read_task_visibility/3`), keyed on the changeset's subject, so an edit
 that sends only a forged `visibility` is overridden (and is a no-op save).
+Lock order: task row, then its notes — in `update_note/4` the task read runs
+before `snapshot`'s note `FOR UPDATE` (see `.claude/skills/tasks.md`).
 The composer hides Everyone, Private and the role chips whenever the subject
 is a Task. Changing the task's visibility updates those notes. See
 `.claude/skills/tasks.md`.

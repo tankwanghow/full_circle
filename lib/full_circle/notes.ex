@@ -191,9 +191,13 @@ defmodule FullCircle.Notes do
           |> Ecto.Changeset.put_change(:updated_by_id, user.id)
           |> Ecto.Changeset.optimistic_lock(:lock_version)
 
+        # Lock order: task row, then its notes — the same order as
+        # Tasks.update_task/4 (task UPDATE, then its notes). Taking the note
+        # (snapshot's FOR UPDATE) first would deadlock against a concurrent
+        # visibility change of the note's task.
         Multi.new()
-        |> snapshot(current, user, note.lock_version)
         |> Multi.run(:task_visibility, fn repo, _ -> read_task_visibility(repo, changeset) end)
+        |> snapshot(current, user, note.lock_version)
         |> Multi.update(:note, &follow_task_visibility(changeset, &1.task_visibility))
         |> Repo.transaction()
         |> case do
@@ -322,7 +326,8 @@ defmodule FullCircle.Notes do
   # row. Tasks.update_task changes the task and syncs its notes in one
   # transaction whose UPDATE holds that row, so the two serialise: a note
   # written while the task narrows either waits and reads the new visibility,
-  # or commits first and is caught by the sync.
+  # or commits first and is caught by the sync. Lock order everywhere: task
+  # row, then its notes — so this step runs before any note row lock.
   defp read_task_visibility(repo, changeset, lock? \\ true) do
     with "Task" <- Ecto.Changeset.get_field(changeset, :subject_type),
          id when not is_nil(id) <- Ecto.Changeset.get_field(changeset, :subject_id),
