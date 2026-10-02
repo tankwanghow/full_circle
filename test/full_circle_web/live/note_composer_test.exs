@@ -325,4 +325,51 @@ defmodule FullCircleWeb.NoteComposerTest do
     refute has_element?(lv, "#c-roles-toggle")
   end
 
+  describe "reply mode" do
+    test "posts a reply to the root with no subject or visibility choices", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      root = note_fixture(comp, admin, %{"body" => "root", "visibility" => ["manager"]})
+      lv = host(conn, comp, admin, %{"reply_to" => root})
+
+      refute has_element?(lv, "#c-open-picker")
+      refute has_element?(lv, "#c-roles-toggle")
+      refute has_element?(lv, "label.role-chip")
+      assert has_element?(lv, "#c-reply-scope")
+
+      lv |> form("#c-form", %{"note" => %{"body" => "agreed"}}) |> render_submit()
+      reply = FullCircle.Repo.get_by!(Note, body: "agreed")
+      assert reply.reply_to_id == root.id
+      assert reply.visibility == ["manager"]
+    end
+
+    test "editing a reply hides subject and visibility; picks become links", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      mei = contact_fixture(comp, admin, %{"name" => "Kedai Mei"})
+      root = note_fixture(comp, admin, %{"body" => "root"})
+
+      {:ok, r} =
+        FullCircle.Notes.create_note(%{"body" => "r", "reply_to_id" => root.id}, comp, admin)
+
+      r = FullCircle.Notes.get_note(r.id, comp, admin)
+
+      lv = host(conn, comp, admin, %{"mode" => :edit, "note" => r, "full" => true})
+      refute has_element?(lv, "label.role-chip")
+      assert has_element?(lv, "#c-reply-scope")
+
+      lv |> element("#c-open-picker") |> render_click()
+      lv |> form("#c-picker form", %{"type" => "Contact", "terms" => "Mei"}) |> render_change()
+      lv |> element("#c-picker-pick-#{mei.id}") |> render_click()
+      render(lv)
+
+      assert [%{id: id}] = FullCircle.Notes.list_links(r, comp, admin)
+      assert id == mei.id
+      assert FullCircle.Repo.get!(Note, r.id).subject_id == nil
+    end
+  end
 end

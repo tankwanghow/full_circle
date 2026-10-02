@@ -31,7 +31,8 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
     cancellable: false,
     full_form_path: nil,
     class: nil,
-    notify: :liveview
+    notify: :liveview,
+    reply_to: nil
   ]
 
   # A pick from this box's picker (RecordPickerComponent notify).
@@ -105,6 +106,12 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
     do: Notes.list_links(n, a.current_company, a.current_user)
 
   defp initial_links(_socket), do: []
+
+  # A reply takes its root's subject (Notes enforces it): send none.
+  defp subject_attrs(%{reply_to: %Note{}}), do: %{}
+
+  defp subject_attrs(%{mode: :edit, note: %Note{reply_to_id: id}}) when not is_nil(id),
+    do: %{}
 
   defp subject_attrs(%{fixed_subject: {t, id}}), do: %{"subject_type" => t, "subject_id" => id}
 
@@ -184,6 +191,13 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
 
         _ ->
           links = Enum.map(socket.assigns.links, &%{"type" => &1.type, "id" => &1.id})
+
+          params =
+            case socket.assigns.reply_to do
+              %Note{id: id} -> Map.put(params, "reply_to_id", id)
+              nil -> params
+            end
+
           Notes.create_note(Map.put(params, "links", links), com, user)
       end
 
@@ -214,6 +228,13 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
     %{subject: subject, mode: mode, note: note} = socket.assigns
 
     cond do
+      # A reply's subject is its root's: every pick is a link.
+      replying?(socket.assigns) and mode == :edit ->
+        add_saved_link(socket, picked)
+
+      replying?(socket.assigns) ->
+        assign(socket, links: Enum.uniq_by(socket.assigns.links ++ [picked], &{&1.type, &1.id}))
+
       is_nil(subject) and mode == :edit and picked.type == "Note" and picked.id == note.id ->
         assign(socket, error: gettext("A note cannot be about itself."))
 
@@ -247,6 +268,12 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
     end
   end
 
+  # A reply takes its root's subject and visibility (Notes enforces it); the
+  # box offers neither, and every pick is a link.
+  defp replying?(%{reply_to: %Note{}}), do: true
+  defp replying?(%{mode: :edit, note: %Note{reply_to_id: id}}) when not is_nil(id), do: true
+  defp replying?(_), do: false
+
   # --- render ---------------------------------------------------------------
 
   defp task_subject?(%{type: "Task"}, _fixed), do: true
@@ -278,6 +305,8 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
 
   @impl true
   def render(assigns) do
+    assigns = assign(assigns, :replying, replying?(assigns))
+
     ~H"""
     <div id={"#{@id}-box"} class={["flex gap-3", @class]}>
       <.avatar :if={@avatar} email={@current_user.email} />
@@ -310,9 +339,16 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
           <p :if={@error} id={"#{@id}-error"} class="text-sm text-rose-700 dark:text-rose-300">
             {@error}
           </p>
+          <p
+            :if={@replying}
+            id={"#{@id}-reply-scope"}
+            class="pb-1 text-xs text-slate-500 dark:text-slate-400"
+          >
+            {gettext("Visible to the same people as the note it replies to.")}
+          </p>
 
           <div
-            :if={@show_roles and not task_subject?(@subject, @fixed_subject)}
+            :if={@show_roles and not @replying and not task_subject?(@subject, @fixed_subject)}
             class="flex flex-wrap items-center gap-1 pb-2 text-xs"
           >
             <.visibility_chips
@@ -323,7 +359,7 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
               private_title={@private_title}
             />
           </div>
-          <div :if={!@show_roles and not task_subject?(@subject, @fixed_subject)}>
+          <div :if={!@show_roles and not @replying and not task_subject?(@subject, @fixed_subject)}>
             <input type="hidden" name="note[visibility][]" value="" />
             <input
               :for={role <- roles_of(@form)}
@@ -333,7 +369,7 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
             />
           </div>
           <p
-            :if={@hint && not task_subject?(@subject, @fixed_subject)}
+            :if={@hint && not @replying && not task_subject?(@subject, @fixed_subject)}
             class="pb-1 text-xs text-slate-500 dark:text-slate-400"
           >
             {@hint}
@@ -341,7 +377,7 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
 
           <div class="flex flex-wrap items-center gap-1 border-t border-gray-200 pt-2 dark:border-gray-700">
             <.record_chip
-              :if={@subject && !@fixed_subject}
+              :if={@subject && !@fixed_subject && !@replying}
               type={@subject.type}
               target={chip_target(@subject, @current_company)}
               kind={:subject}
@@ -383,14 +419,17 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
               </button>
             </.record_chip>
             <button
-              :if={!@fixed_subject and (is_nil(@subject) or @full)}
+              :if={
+                !@fixed_subject and
+                  ((not @replying and (is_nil(@subject) or @full)) or (@replying and @full))
+              }
               id={"#{@id}-open-picker"}
               type="button"
               phx-click="toggle_picker"
               phx-target={@myself}
               class={[
                 "rounded-full border px-2 text-xs",
-                if(is_nil(@subject),
+                if(is_nil(@subject) and not @replying,
                   do:
                     "border-amber-400 bg-amber-50 text-amber-900 dark:border-amber-600 dark:bg-amber-950 dark:text-amber-100",
                   else:
@@ -398,10 +437,10 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
                 )
               ]}
             >
-              ＋ {if @subject, do: gettext("link a record"), else: gettext("about…")}
+              ＋ {if @subject || @replying, do: gettext("link a record"), else: gettext("about…")}
             </button>
             <button
-              :if={@compact or !@show_roles}
+              :if={(@compact or !@show_roles) and not @replying}
               id={"#{@id}-roles-toggle"}
               type="button"
               phx-click="toggle_roles"
@@ -443,7 +482,7 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
             id={"#{@id}-picker"}
             notify={{__MODULE__, @id}}
             label={
-              if @subject,
+              if @subject || @replying,
                 do: gettext("Link other records"),
                 else: gettext("What is this note about?")
             }
