@@ -566,6 +566,136 @@ defmodule FullCircle.TasksTest do
     end
   end
 
+  describe "final review fixes" do
+    setup %{company: company, admin: admin} do
+      task =
+        task_fixture(company, admin, %{
+          "due_date" => "2026-10-15",
+          "recur_unit" => "month",
+          "recur_every" => "1"
+        })
+
+      %{task: task}
+    end
+
+    defp open_cycles(series_id) do
+      from(t in CompanyTask,
+        where: t.series_id == ^series_id and t.status == "open" and is_nil(t.deleted_at),
+        select: t.due_date,
+        order_by: t.due_date
+      )
+      |> Repo.all()
+    end
+
+    # A cycle created long before the close that later reuses it.
+    defp backdate(%CompanyTask{id: id}) do
+      at = DateTime.add(DateTime.utc_now(:second), -3600)
+      Repo.update_all(from(t in CompanyTask, where: t.id == ^id), set: [inserted_at: at])
+    end
+
+    test "re-closing a reopened old cycle reuses the later open cycle (scenario A)", ctx do
+      %{company: company, admin: admin, task: task} = ctx
+      {:ok, %{closed: oct, next: nov}} = Tasks.close_task(task, :done, nil, company, admin)
+      {:ok, %{next: dec}} = Tasks.close_task(nov, :done, nil, company, admin)
+      assert dec.due_date == ~D[2026-12-15]
+
+      assert {:ok, %{reopened: oct, next_kept: true}} = Tasks.reopen_task(oct, company, admin)
+      assert {:ok, %{next: next}} = Tasks.close_task(oct, :done, nil, company, admin)
+
+      assert next.id == dec.id
+      assert open_cycles(task.series_id) == [~D[2026-12-15]]
+    end
+
+    test "re-closing with an edited due date reuses the kept next cycle (scenario B)", ctx do
+      %{company: company, admin: admin, task: task} = ctx
+      {:ok, %{closed: oct, next: nov}} = Tasks.close_task(task, :done, nil, company, admin)
+
+      note_fixture(company, admin, %{
+        "body" => "started",
+        "subject_type" => "Task",
+        "subject_id" => nov.id
+      })
+
+      assert {:ok, %{reopened: oct, next_kept: true}} = Tasks.reopen_task(oct, company, admin)
+      {:ok, oct} = Tasks.update_task(oct, %{"due_date" => "2026-10-20"}, company, admin)
+      assert {:ok, %{next: next}} = Tasks.close_task(oct, :done, nil, company, admin)
+
+      assert next.id == nov.id
+      assert open_cycles(task.series_id) == [~D[2026-11-15]]
+    end
+
+    test "a later closed cycle with no later open one spawns nothing", ctx do
+      %{company: company, admin: admin, task: task} = ctx
+      {:ok, %{closed: oct, next: nov}} = Tasks.close_task(task, :done, nil, company, admin)
+
+      note_fixture(company, admin, %{
+        "body" => "started",
+        "subject_type" => "Task",
+        "subject_id" => nov.id
+      })
+
+      {:ok, %{reopened: oct}} = Tasks.reopen_task(oct, company, admin)
+      # Nov is closed by hand without spawning (as if it were the last cycle)
+      {:ok, _} = nov |> CompanyTask.close_changeset(:done, admin) |> Repo.update()
+
+      assert {:ok, %{next: nil}} = Tasks.close_task(oct, :done, nil, company, admin)
+      assert open_cycles(task.series_id) == []
+    end
+
+    test "reopen after a reused cycle reports it kept and leaves it", ctx do
+      %{company: company, admin: admin, task: task} = ctx
+      {:ok, %{closed: oct, next: nov}} = Tasks.close_task(task, :done, nil, company, admin)
+
+      note_fixture(company, admin, %{
+        "body" => "started",
+        "subject_type" => "Task",
+        "subject_id" => nov.id
+      })
+
+      {:ok, %{reopened: oct, next_kept: true}} = Tasks.reopen_task(oct, company, admin)
+      backdate(nov)
+      {:ok, %{closed: oct, next: again}} = Tasks.close_task(oct, :done, nil, company, admin)
+      assert again.id == nov.id
+
+      assert {:ok, %{next_kept: true}} = Tasks.reopen_task(oct, company, admin)
+      assert Repo.get(CompanyTask, nov.id)
+    end
+
+    test "a reused cycle is never deleted on reopen, even when untouched", ctx do
+      %{company: company, admin: admin, task: task} = ctx
+      {:ok, %{closed: oct, next: nov}} = Tasks.close_task(task, :done, nil, company, admin)
+
+      note =
+        note_fixture(company, admin, %{
+          "body" => "started",
+          "subject_type" => "Task",
+          "subject_id" => nov.id
+        })
+
+      {:ok, %{reopened: oct, next_kept: true}} = Tasks.reopen_task(oct, company, admin)
+      backdate(nov)
+      {:ok, %{closed: oct, next: again}} = Tasks.close_task(oct, :done, nil, company, admin)
+      assert again.id == nov.id
+
+      # The only touch goes away: Nov is untouched again, but this close did not create it.
+      Repo.update_all(from(n in FullCircle.Notes.Note, where: n.id == ^note.id),
+        set: [deleted_at: DateTime.utc_now(:second)]
+      )
+
+      assert {:ok, %{next_kept: true}} = Tasks.reopen_task(oct, company, admin)
+      assert Repo.get(CompanyTask, nov.id)
+    end
+
+    test "a closed cycle cannot be deleted", ctx do
+      %{company: company, admin: admin, task: task} = ctx
+      {:ok, %{closed: oct, next: nov}} = Tasks.close_task(task, :done, nil, company, admin)
+
+      assert {:error, :closed} = Tasks.delete_task(oct, company, admin)
+      assert is_nil(Repo.get(CompanyTask, oct.id).deleted_at)
+      assert {:ok, _} = Tasks.delete_task(nov, company, admin)
+    end
+  end
+
   describe "group_of/2" do
     test "classifies by due date and reminder window" do
       today = ~D[2026-10-15]

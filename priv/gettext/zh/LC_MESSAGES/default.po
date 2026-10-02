@@ -2671,3 +2671,12 @@ msgstr "搜索"
 
 msgid "Title"
 msgstr "标题"
+
+msgid "This task is already open."
+msgstr "此任务已是打开状态。"
+
+msgid "Everyone who can see this task can read its notes."
+msgstr "能看到此任务的人都能阅读它的备注。"
+
+msgid "Closed"
+msgstr "已关闭"

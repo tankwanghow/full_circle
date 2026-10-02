@@ -3,7 +3,7 @@ defmodule FullCircleWeb.TaskComponents do
   use Phoenix.Component
   use Gettext, backend: FullCircleWeb.Gettext
 
-  alias FullCircleWeb.Helpers
+  alias FullCircleWeb.{Helpers, ListComponents}
 
   attr :task, :map, required: true
   attr :group, :atom, required: true
@@ -38,6 +38,32 @@ defmodule FullCircleWeb.TaskComponents do
   end
 
   defp due_text(%{due_date: d}, _group, _today), do: Helpers.format_date(d)
+
+  attr :task, :map, required: true
+  attr :company, :map, required: true
+
+  @doc "Done & skipped list: a Done / Skipped chip and the closed date (company timezone)."
+  def closed_cell(assigns) do
+    ~H"""
+    <div
+      class="flex w-44 shrink-0 items-center gap-2 whitespace-nowrap"
+      title={Helpers.format_datetime(@task.closed_at, @company)}
+    >
+      <span class={[
+        "rounded-full px-2 py-0.5 text-xs font-medium",
+        ListComponents.chip_class(if @task.status == "done", do: :ok, else: :muted)
+      ]}>
+        {if @task.status == "done", do: gettext("Done"), else: gettext("Skipped")}
+      </span>
+      <span class="tabular-nums">{closed_date(@task.closed_at, @company)}</span>
+    </div>
+    """
+  end
+
+  defp closed_date(nil, _company), do: nil
+
+  defp closed_date(at, company),
+    do: at |> Timex.to_datetime(company.timezone) |> Helpers.format_date()
 
   @doc "\"yearly\", \"every 3 months\"… or nil for a one-off."
   def repeat_label(%{recur_unit: nil}), do: nil

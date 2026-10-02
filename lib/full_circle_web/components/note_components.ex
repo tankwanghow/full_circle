@@ -74,6 +74,10 @@ defmodule FullCircleWeb.NoteComponents do
   attr :field_name, :string, default: "note[visibility][]"
   attr :private_title, :any, default: nil
 
+  attr :roles, :boolean,
+    default: true,
+    doc: "false shows only Everyone and Private (a task's notes: the task rule overrides roles)"
+
   @doc """
   Everyone · 🔒 Private · manager · supervisor · cashier · clerk · auditor.
 
@@ -87,7 +91,14 @@ defmodule FullCircleWeb.NoteComponents do
   def visibility_chips(assigns) do
     roles = assigns.visibility || []
     private = roles == Note.private_visibility()
-    assigns = assign(assigns, roles: roles, private: private, everyone: roles == [])
+
+    assigns =
+      assign(assigns,
+        selected_roles: roles,
+        show_roles: assigns.roles,
+        private: private,
+        everyone: roles == []
+      )
 
     ~H"""
     <button
@@ -128,9 +139,9 @@ defmodule FullCircleWeb.NoteComponents do
     <input type="hidden" name={@field_name} value="" />
     <input :if={@private} type="hidden" name={@field_name} value="admin" />
     <.role_chip
-      :for={role <- Note.choosable_roles()}
+      :for={role <- if(@show_roles, do: Note.choosable_roles(), else: [])}
       role={role}
-      selected={role in @roles}
+      selected={role in @selected_roles}
       disabled={@disabled}
       field_name={@field_name}
     />

@@ -166,7 +166,8 @@ defmodule FullCircle.Tasks do
 
   def delete_task(%CompanyTask{} = task, company, user) do
     with %CompanyTask{} = current <- get_task(task.id, company, user) || {:error, :not_found},
-         true <- may_edit?(current, user, rights(company, user)) || :not_authorise do
+         true <- may_edit?(current, user, rights(company, user)) || :not_authorise,
+         true <- current.status == "open" || {:error, :closed} do
       current
       |> Ecto.Changeset.change(deleted_at: DateTime.utc_now(:second), deleted_by_id: user.id)
       |> Repo.update()
@@ -310,7 +311,40 @@ defmodule FullCircle.Tasks do
 
   defp spawn_next(_repo, %CompanyTask{recur_unit: nil}, _user), do: {:ok, nil}
 
+  # A series never gets a second open cycle: when any later cycle exists
+  # (a reopened old cycle being closed again), reuse the earliest later open
+  # one, or spawn nothing if every later cycle is closed. Only the latest
+  # cycle's close inserts a new one.
   defp spawn_next(repo, %CompanyTask{} = t, user) do
+    case later_cycle(repo, t, open_first: true) do
+      nil -> insert_next(repo, t, user)
+      %CompanyTask{status: "open"} = existing -> {:ok, existing}
+      %CompanyTask{} -> {:ok, nil}
+    end
+  end
+
+  # The series' cycles due after `t`, earliest first (open ones first when
+  # asked), deterministic on ties.
+  defp later_cycle(repo, %CompanyTask{} = t, opts) do
+    q =
+      from(e in CompanyTask,
+        where:
+          e.company_id == ^t.company_id and e.series_id == ^t.series_id and e.id != ^t.id and
+            is_nil(e.deleted_at) and e.due_date > ^t.due_date,
+        limit: 1
+      )
+
+    q =
+      if opts[:open_first],
+        do: from(e in q, order_by: [desc: fragment("? = 'open'", e.status)]),
+        else: q
+
+    q = from(e in q, order_by: [asc: e.due_date, asc: e.inserted_at, asc: e.id])
+    q = if opts[:lock], do: from(e in q, lock: "FOR UPDATE"), else: q
+    repo.one(q)
+  end
+
+  defp insert_next(repo, t, user) do
     next = %CompanyTask{
       company_id: t.company_id,
       series_id: t.series_id,
@@ -326,20 +360,6 @@ defmodule FullCircle.Tasks do
       creator_id: t.creator_id
     }
 
-    existing =
-      repo.one(
-        from(e in CompanyTask,
-          where:
-            e.company_id == ^t.company_id and e.series_id == ^t.series_id and e.id != ^t.id and
-              e.status == "open" and is_nil(e.deleted_at) and e.due_date == ^next.due_date,
-          limit: 1
-        )
-      )
-
-    if existing, do: {:ok, existing}, else: insert_next(repo, t, next, user)
-  end
-
-  defp insert_next(repo, t, next, user) do
     with {:ok, n} <- repo.insert(next) do
       now = n.inserted_at
 
@@ -390,7 +410,7 @@ defmodule FullCircle.Tasks do
             {:ok, {nil, false}}
 
           next ->
-            if untouched?(repo, next) do
+            if created_by_close?(next, locked) and untouched?(repo, next) do
               repo.delete_all(
                 from(l in RecordLink,
                   where:
@@ -429,24 +449,17 @@ defmodule FullCircle.Tasks do
     end
   end
 
-  # The cycle this task's close inserted: same series, the stepped due date,
-  # created no earlier than the close. Locked so a concurrent edit waits.
+  # The cycle that follows this one in the series: the earliest later cycle,
+  # whatever its status — the one this close inserted, or the one it reused,
+  # or a closed later cycle (then it stays: `next_kept`). Locked so a
+  # concurrent edit waits.
   defp spawned_next(_repo, %CompanyTask{recur_unit: nil}), do: nil
+  defp spawned_next(repo, %CompanyTask{} = current), do: later_cycle(repo, current, lock: true)
 
-  defp spawned_next(repo, %CompanyTask{} = current) do
-    due = next_due_date(current.due_date, current.recur_unit, current.recur_every)
-
-    repo.one(
-      from(t in CompanyTask,
-        where:
-          t.company_id == ^current.company_id and t.series_id == ^current.series_id and
-            t.id != ^current.id and t.due_date == ^due and is_nil(t.deleted_at) and
-            t.inserted_at >= ^current.closed_at,
-        limit: 1,
-        lock: "FOR UPDATE"
-      )
-    )
-  end
+  # Only a cycle created at/after this close can be one it inserted; a reused
+  # older cycle is never deleted by the reopen.
+  defp created_by_close?(%CompanyTask{inserted_at: at}, %CompanyTask{closed_at: closed_at}),
+    do: DateTime.compare(at, closed_at) != :lt
 
   # add_link does not bump lock_version, so a link added after the cycle was
   # spawned (inserted_at strictly later) also counts as a touch.
@@ -546,7 +559,10 @@ defmodule FullCircle.Tasks do
   end
 
   defp state(q, "closed", _today) do
-    from(t in q, where: t.status != "open", order_by: [desc: t.closed_at, asc: t.title])
+    from(t in q,
+      where: t.status != "open",
+      order_by: [desc: t.closed_at, asc: t.title, asc: t.id]
+    )
   end
 
   # The SQL twin of group_of/2: 0 overdue, 1 due soon, 2 upcoming, 3 someday.

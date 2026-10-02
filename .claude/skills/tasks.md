@@ -18,18 +18,24 @@ Spec: `docs/superpowers/specs/2026-10-01-tasks-design.md`.
 
 ## Progress notes
 Notes with `subject_type "Task"`. `Notes.visible_to/3` lets anyone who can see the task read them. `list_versions/3` applies the task rule **per version**, using each version's own `subject_type`/`subject_id` (not the note's current subject), so re-pointing a restricted note at a task never exposes its old text. The notes panel defaults to Private on a task (= the task's people). Closing notes are Private.
+On a task the panel's quick-add shows **only Everyone and 🔒 Private** (`visibility_chips roles={false}`) plus the hint "Everyone who can see this task can read its notes." — role chips would imply a narrowing the task rule overrides. Other record types keep the role chips (default `roles: true`).
 
 ## Close / reopen
-- `close_task/5` locks the row (`FOR UPDATE`), adds the closing note, stamps, and inserts the next cycle with copied fields and record_links. Second close → `{:error, :already_closed}`. If an open, non-deleted cycle with the stepped due date already exists in the same series, it is reused instead of inserting a duplicate.
+- `close_task/5` locks the row (`FOR UPDATE`), adds the closing note, stamps, and picks the next cycle. Second close → `{:error, :already_closed}`.
+- **Spawn/reuse rule** (`spawn_next`, via `later_cycle/3`): if the series already has any other non-deleted cycle due **after** the closed one, nothing is inserted — the earliest later **open** cycle is reused and returned as `next`; if every later cycle is closed, `next` is nil. Only when no later cycle exists is a new one inserted (copied fields + record_links). So re-closing a reopened old cycle, even after editing its due date, never yields a second open cycle in the series.
 - `next_due_date/3` steps from the old due date; months clamp and **month-end stays month-end**; years keep the day (29 Feb → 28 Feb).
-- `reopen_task/3` runs in one transaction with `FOR UPDATE` on the task and on the next cycle. It deletes the spawned next cycle only if untouched: open, `lock_version` 0, no notes, AND no record_links added after the cycle was created (copied links are stamped with the cycle's own `inserted_at`; `add_link` does not bump `lock_version`). Otherwise it keeps it (`next_kept: true`). Reopening an open task → `{:error, :open}`.
-- Closed tasks cannot be edited (`{:error, :closed}`); `add_link/5` and `remove_link/4` also return `{:error, :closed}` on a closed task.
+- `reopen_task/3` runs in one transaction with `FOR UPDATE` on the task and on the next cycle. The next cycle (`spawned_next`) is the series' earliest non-deleted cycle due after the task, **whatever its status** (ordered due_date, inserted_at, id). It is deleted only when it was **created by this close** (`inserted_at >= closed_at` of the locked row — a reused older cycle never qualifies) AND untouched: open, `lock_version` 0, no notes, no record_links added after the cycle was created (copied links are stamped with the cycle's own `inserted_at`; `add_link` does not bump `lock_version`). Otherwise it stays and the result says `next_kept: true` — also when it is a reused cycle or a later closed one. No later cycle → `next_kept: false`. Reopening an open task → `{:error, :open}` (the page flashes "This task is already open." and reloads).
+- Closed tasks cannot be edited or deleted (`{:error, :closed}` from `update_task`, `delete_task`); `add_link/5` and `remove_link/4` also return `{:error, :closed}` on a closed task. The page hides Delete on a closed task; a stale page gets a flash and reloads.
+- After close/reopen the page reloads through `get_task`; a nil (deleted / no longer visible) leaves for the list with "Task not found." instead of crashing.
+- The assignee select always keeps the task's current assignee as an option, even when they can no longer be assigned (demoted), so a save never silently unassigns them (`validate_assignee` only checks a *changed* assignee).
 - `TaskLive.Index` and `TaskLive.Form` ignore a `confirm_close` event when no dialog is open (double submit).
 
 ## Lists and badge
 - Groups: overdue (`< today`), due soon (`= today` or within `reminder_before_days`), upcoming, someday; `group_of/2` and the SQL CASE in `state/3` must stay twins.
 - "Mine" = assigned to me, or unassigned and created by me. Badge = mine ∧ open ∧ (overdue ∨ due soon). "Today" = `Tasks.today(company)` (company timezone).
 - List rows carry the latest visible note and note count — one query each per page.
+- "Done & skipped" rows replace the due cell with a Done/Skipped chip and the closed date (company timezone); ordered `closed_at desc, title, id`.
+- The task page's "Other cycles" shows 📝 n per cycle from one `Notes.count_by_records/4` call.
 
 ## Nav badge
 Root layout is not re-rendered on live navigation, so the badge is a sticky nested LiveView (`TaskLive.NavBadge`) subscribed to `Tasks.topic(company_id)`; every write broadcasts `{:tasks_changed, company_id}`. `live_render` from a conn ignores `:id` (the container gets a generated id); stickiness still holds because the root layout is not re-rendered. Tests assert the link id `full_circle_tasks` and use `live_isolated/3`.

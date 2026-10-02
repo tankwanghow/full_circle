@@ -190,6 +190,7 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
             visibility={Ecto.Changeset.get_field(@form.source, :visibility)}
             id_prefix={"#{@id}-visibility"}
             target={@myself}
+            roles={@record_type != "Task"}
             private_title={
               @record_type == "Task" &&
                 gettext("Only the people who can see this task (and admins) can read it.")
@@ -212,6 +213,9 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
             </button>
           </span>
         </div>
+        <p :if={@record_type == "Task"} class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          {gettext("Everyone who can see this task can read its notes.")}
+        </p>
       </.form>
 
       <.note_post

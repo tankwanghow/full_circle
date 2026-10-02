@@ -172,7 +172,8 @@ defmodule FullCircleWeb.TaskLive.Index do
 
       <.list_table>
         <:head>
-          <div class="w-24 shrink-0">{gettext("Due")}</div>
+          <div :if={@search["state"] == "closed"} class="w-44 shrink-0">{gettext("Closed")}</div>
+          <div :if={@search["state"] != "closed"} class="w-24 shrink-0">{gettext("Due")}</div>
           <div class="w-[28%] shrink-0">{gettext("Task")}</div>
           <div class="w-28 shrink-0">{gettext("Repeats")}</div>
           <div class="w-40 shrink-0">{gettext("Assignee")}</div>
@@ -190,7 +191,17 @@ defmodule FullCircleWeb.TaskLive.Index do
             <% else %>
               <div id={dom_id} class={row_class()}>
                 <div class={line_class()}>
-                  <.due_cell task={item.task} group={item.group} today={@today} />
+                  <.closed_cell
+                    :if={item.group == :closed}
+                    task={item.task}
+                    company={@current_company}
+                  />
+                  <.due_cell
+                    :if={item.group != :closed}
+                    task={item.task}
+                    group={item.group}
+                    today={@today}
+                  />
                   <.link
                     navigate={~p"/companies/#{@current_company.id}/tasks/#{item.task.id}"}
                     class="w-[28%] shrink-0 truncate font-medium hover:underline"

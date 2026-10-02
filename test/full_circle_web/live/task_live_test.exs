@@ -245,6 +245,116 @@ defmodule FullCircleWeb.TaskLiveTest do
     end
   end
 
+  describe "final review fixes" do
+    defp monthly(comp, admin, title) do
+      task_fixture(comp, admin, %{
+        "title" => title,
+        "due_date" => "2026-10-15",
+        "recur_unit" => "month",
+        "recur_every" => "1"
+      })
+    end
+
+    test "task notes panel offers Everyone and Private only, with a hint", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      t = task_fixture(comp, admin)
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/#{t.id}")
+      lv |> element("#task-notes-new") |> render_click()
+
+      assert has_element?(lv, "#task-notes-visibility-everyone")
+      assert has_element?(lv, "#task-notes-visibility-private")
+      refute has_element?(lv, "#task-notes-form input[value=manager]")
+
+      assert has_element?(
+               lv,
+               "#task-notes-form",
+               "Everyone who can see this task can read its notes."
+             )
+    end
+
+    test "other cycles show their note count", %{conn: conn, admin: admin, comp: comp} do
+      t = monthly(comp, admin, "SOCSO")
+      {:ok, %{next: next}} = Tasks.close_task(t, :done, "paid", comp, admin)
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/#{next.id}")
+      assert has_element?(lv, "#cycle-#{t.id}", "📝 1")
+    end
+
+    test "Done & skipped rows show Done/Skipped and the closed date", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      done = task_fixture(comp, admin, %{"title" => "Paid EPF"})
+      skipped = task_fixture(comp, admin, %{"title" => "No SST"})
+      {:ok, _} = Tasks.close_task(done, :done, nil, comp, admin)
+      {:ok, _} = Tasks.close_task(skipped, :skipped, nil, comp, admin)
+      today = comp |> Tasks.today() |> FullCircleWeb.Helpers.format_date()
+
+      {:ok, lv, _} =
+        live(conn, ~p"/companies/#{comp.id}/tasks?search[scope]=all&search[state]=closed")
+
+      assert has_element?(lv, "#tasks-#{done.id}", "Done")
+      assert has_element?(lv, "#tasks-#{done.id}", today)
+      assert has_element?(lv, "#tasks-#{skipped.id}", "Skipped")
+      assert has_element?(lv, "#tasks-#{skipped.id}", today)
+    end
+
+    test "a demoted assignee stays assigned when the task is saved", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      clerk = user_with_role(comp, admin, "clerk")
+      t = task_fixture(comp, admin, %{"title" => "Genset", "assignee_id" => clerk.id})
+
+      FullCircle.Repo.get_by!(FullCircle.Sys.CompanyUser, company_id: comp.id, user_id: clerk.id)
+      |> Ecto.Changeset.change(role: "auditor")
+      |> FullCircle.Repo.update!()
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/#{t.id}")
+      assert has_element?(lv, "#task-form option[value='#{clerk.id}'][selected]")
+
+      lv |> form("#task-form", %{"task" => %{"title" => "Genset service"}}) |> render_submit()
+
+      t = Tasks.get_task(t.id, comp, admin)
+      assert t.title == "Genset service"
+      assert t.assignee_id == clerk.id
+    end
+
+    test "deleting a task someone closed meanwhile is refused", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      t = task_fixture(comp, admin, %{"title" => "Once"})
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/#{t.id}")
+      {:ok, _} = Tasks.close_task(t, :done, nil, comp, admin)
+
+      html = lv |> element("#delete-task") |> render_click()
+      assert html =~ "A closed task cannot be edited"
+      assert Tasks.get_task(t.id, comp, admin)
+    end
+
+    test "reopening a task someone reopened meanwhile says so and reloads", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      t = task_fixture(comp, admin, %{"title" => "Once"})
+      {:ok, %{closed: closed}} = Tasks.close_task(t, :done, nil, comp, admin)
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/#{t.id}")
+      {:ok, _} = Tasks.reopen_task(closed, comp, admin)
+
+      html = lv |> element("#reopen-task") |> render_click()
+      assert html =~ "This task is already open."
+      assert has_element?(lv, "#done-task")
+    end
+  end
+
   describe "nav badge" do
     test "the nav carries the badge link for users who can view tasks", %{
       conn: conn,

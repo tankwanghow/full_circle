@@ -52,6 +52,14 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
     assert {note.subject_type, note.subject_id} == {"Contact", c.id}
   end
 
+  test "a contact's quick-add still offers the role chips", %{conn: conn, comp: comp, contact: c} do
+    {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
+    lv |> element("#notes-panel-new") |> render_click()
+
+    assert has_element?(lv, "#notes-panel-form input[value=manager]")
+    refute has_element?(lv, "#notes-panel-form", "Everyone who can see this task")
+  end
+
   test "a note opened from a record's panel opens in a new tab",
        %{conn: conn, admin: admin, comp: comp, contact: c} do
     note =

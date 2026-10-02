@@ -9,7 +9,7 @@ defmodule FullCircleWeb.TaskLive.Form do
   import FullCircleWeb.NoteComponents
   import FullCircleWeb.TaskComponents, only: [close_dialog: 1]
 
-  alias FullCircle.{Linkable, Tasks}
+  alias FullCircle.{Linkable, Notes, Tasks}
   alias FullCircle.Tasks.CompanyTask
   alias FullCircleWeb.NoteLive.RecordPickerComponent
 
@@ -52,6 +52,7 @@ defmodule FullCircleWeb.TaskLive.Form do
       task: %CompanyTask{},
       links: [],
       cycles: [],
+      cycle_counts: %{},
       can_edit: true,
       can_close: false,
       can_reopen: false,
@@ -62,18 +63,31 @@ defmodule FullCircleWeb.TaskLive.Form do
   defp assign_task(socket, task) do
     %{current_company: com, current_user: user, rights: r} = socket.assigns
     open? = task.status == "open"
+    cycles = Tasks.series_cycles(task, com, user)
 
     assign(socket,
       page_title: task.title,
       task: task,
       params: %{},
       links: Tasks.list_links(task, com, user),
-      cycles: Tasks.series_cycles(task, com, user),
+      cycles: cycles,
+      cycle_counts: Notes.count_by_records(com, user, "Task", Enum.map(cycles, & &1.id)),
       can_edit: open? and Tasks.may_edit?(task, user, r),
       can_close: open? and Tasks.may_close?(task, user, r),
       can_reopen: not open? and Tasks.may_reopen?(task, user, r),
       form: to_form(Tasks.change_task(task), as: :task)
     )
+  end
+
+  # After a close/reopen the task may have vanished (deleted meanwhile, or no
+  # longer visible): leave for the list instead of crashing on nil.
+  defp reload(socket, id) do
+    %{current_company: com, current_user: user} = socket.assigns
+
+    case Tasks.get_task(id, com, user) do
+      %CompanyTask{} = task -> assign_task(socket, task)
+      nil -> deny(socket, gettext("Task not found."))
+    end
   end
 
   defp change(socket, params) do
@@ -155,6 +169,12 @@ defmodule FullCircleWeb.TaskLive.Form do
          |> put_flash(:info, gettext("Task deleted."))
          |> push_navigate(to: ~p"/companies/#{com.id}/tasks")}
 
+      {:error, :closed} ->
+        {:noreply,
+         socket
+         |> reload(task.id)
+         |> put_flash(:warn, gettext("A closed task cannot be edited — reopen it first."))}
+
       _ ->
         {:noreply, put_flash(socket, :warn, gettext("Not Authorise."))}
     end
@@ -189,15 +209,12 @@ defmodule FullCircleWeb.TaskLive.Form do
          |> push_navigate(to: ~p"/companies/#{com.id}/tasks/#{next.id}")}
 
       {:ok, %{closed: closed}} ->
-        {:noreply,
-         socket
-         |> assign_task(Tasks.get_task(closed.id, com, user))
-         |> put_flash(:info, gettext("Task closed."))}
+        {:noreply, socket |> reload(closed.id) |> put_flash(:info, gettext("Task closed."))}
 
       {:error, :already_closed} ->
         {:noreply,
          socket
-         |> assign_task(Tasks.get_task(task.id, com, user))
+         |> reload(task.id)
          |> put_flash(:warn, gettext("Someone already closed this task."))}
 
       _ ->
@@ -216,6 +233,10 @@ defmodule FullCircleWeb.TaskLive.Form do
             else: gettext("Task reopened.")
 
         {:noreply, socket |> assign_task(r) |> put_flash(:info, msg)}
+
+      {:error, :open} ->
+        {:noreply,
+         socket |> reload(task.id) |> put_flash(:warn, gettext("This task is already open."))}
 
       _ ->
         {:noreply, put_flash(socket, :warn, gettext("Not Authorise."))}
@@ -287,6 +308,22 @@ defmodule FullCircleWeb.TaskLive.Form do
 
   defp selected_roles(form), do: Ecto.Changeset.get_field(form.source, :visibility) || []
 
+  # A demoted assignee is no longer assignable, but must stay selected: an
+  # option missing from the list would silently unassign them on save.
+  defp assignee_options(users, %CompanyTask{assignee: %{id: id, email: email}}) do
+    options = Enum.map(users, &{&1.email, &1.id})
+    if Enum.any?(users, &(&1.id == id)), do: options, else: options ++ [{email, id}]
+  end
+
+  defp assignee_options(users, _task), do: Enum.map(users, &{&1.email, &1.id})
+
+  defp cycle_notes(counts, id) do
+    case Map.get(counts, id, 0) do
+      0 -> nil
+      n -> "📝 #{n}"
+    end
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -348,7 +385,7 @@ defmodule FullCircleWeb.TaskLive.Form do
               field={@form[:assignee_id]}
               type="select"
               prompt={gettext("Unassigned")}
-              options={Enum.map(@users, &{&1.email, &1.id})}
+              options={assignee_options(@users, @task)}
               label={gettext("Assignee")}
               disabled={!@can_edit}
             />
@@ -497,6 +534,7 @@ defmodule FullCircleWeb.TaskLive.Form do
         <h2 class="mb-1 font-semibold">🕘 {gettext("Other cycles")}</h2>
         <.link
           :for={c <- @cycles}
+          id={"cycle-#{c.id}"}
           navigate={~p"/companies/#{@current_company.id}/tasks/#{c.id}"}
           class="flex gap-3 border-b border-slate-200 py-1 last:border-0 hover:bg-sky-50/70 dark:border-gray-700 dark:hover:bg-gray-800/70"
         >
@@ -508,9 +546,12 @@ defmodule FullCircleWeb.TaskLive.Form do
               _ -> gettext("Open")
             end}
           </span>
-          <span class="flex-1 truncate text-slate-500">
+          <span class="flex-1 truncate text-slate-500 dark:text-slate-400">
             {c.closed_by && c.closed_by.email}
             {c.closed_at && FullCircleWeb.Helpers.format_datetime(c.closed_at, @current_company)}
+          </span>
+          <span class="w-12 shrink-0 text-right tabular-nums text-xs text-slate-500 dark:text-slate-400">
+            {cycle_notes(@cycle_counts, c.id)}
           </span>
         </.link>
       </section>
