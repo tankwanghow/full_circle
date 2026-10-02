@@ -1,7 +1,9 @@
 defmodule FullCircleWeb.NoteLive.RecordPickerComponent do
   @moduledoc """
   Pick one record of any Linkable type: a type select plus a search box.
-  Sends `{:record_picked, id, %{type:, id:, title:}}` to the parent LiveView.
+  Sends `{:record_picked, id, picked}` to the parent LiveView, or — with
+  `notify: {module, id}` — `send_update`s that component with
+  `picked: {picker_id, picked}`.
   """
   use FullCircleWeb, :live_component
 
@@ -17,6 +19,7 @@ defmodule FullCircleWeb.NoteLive.RecordPickerComponent do
      socket
      |> assign(assigns)
      |> assign(types: types)
+     |> assign_new(:notify, fn -> nil end)
      |> assign_new(:type, fn -> hd(types) end)
      |> assign_new(:terms, fn -> "" end)
      |> assign_new(:results, fn -> [] end)
@@ -39,10 +42,19 @@ defmodule FullCircleWeb.NoteLive.RecordPickerComponent do
         {:noreply, socket}
 
       r ->
-        send(
-          self(),
-          {:record_picked, socket.assigns.id, %{type: r.type, id: r.id, title: r.title}}
-        )
+        case socket.assigns.notify do
+          {module, component_id} ->
+            send_update(module,
+              id: component_id,
+              picked: {socket.assigns.id, %{type: r.type, id: r.id, title: r.title}}
+            )
+
+          nil ->
+            send(
+              self(),
+              {:record_picked, socket.assigns.id, %{type: r.type, id: r.id, title: r.title}}
+            )
+        end
 
         {:noreply, assign(socket, terms: "", results: [])}
     end
