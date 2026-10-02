@@ -90,7 +90,7 @@ defmodule FullCircleWeb.NoteLiveTest do
       c = contact_fixture(comp, admin, %{"name" => "Kedai Mei"})
       {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes")
 
-      lv |> element("#compose-about") |> render_click()
+      lv |> element("#compose-open-picker") |> render_click()
 
       lv
       |> form("#compose-picker form", %{"type" => "Contact", "terms" => "Mei"})

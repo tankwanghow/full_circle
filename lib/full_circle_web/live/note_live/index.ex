@@ -9,8 +9,6 @@ defmodule FullCircleWeb.NoteLive.Index do
   import FullCircleWeb.NoteComponents
 
   alias FullCircle.{Linkable, Notes, Repo}
-  alias FullCircle.Notes.Note
-  alias FullCircleWeb.NoteLive.RecordPickerComponent
 
   @per_page 30
 
@@ -24,12 +22,8 @@ defmodule FullCircleWeb.NoteLive.Index do
        |> assign(
          page_title: gettext("Notes"),
          can_create: FullCircle.Authorization.can?(user, :create_note, com),
-         compose_subject: nil,
-         compose_picker: false,
-         compose_roles: false,
          show_dates: false
-       )
-       |> reset_compose()}
+       )}
     else
       {:ok,
        socket
@@ -75,81 +69,19 @@ defmodule FullCircleWeb.NoteLive.Index do
 
   # --- post box ----------------------------------------------------------------
 
-  def handle_event("compose_validate", %{"note" => params}, socket),
-    do: {:noreply, compose_change(socket, params)}
-
-  # The post box's Everyone / Private chips (visibility_chips/1).
-  def handle_event("visibility_everyone", _, socket),
-    do:
-      {:noreply,
-       compose_change(socket, Map.put(socket.assigns.compose_params, "visibility", [""]))}
-
-  def handle_event("visibility_private", _, socket) do
-    params = Map.put(socket.assigns.compose_params, "visibility", Note.private_visibility())
-    {:noreply, compose_change(socket, params)}
-  end
-
-  def handle_event("compose_toggle_roles", _, socket),
-    do: {:noreply, assign(socket, compose_roles: !socket.assigns.compose_roles)}
-
-  def handle_event("compose_toggle_picker", _, socket),
-    do: {:noreply, assign(socket, compose_picker: !socket.assigns.compose_picker)}
-
-  def handle_event("compose_clear_subject", _, socket),
-    do: {:noreply, assign(socket, compose_subject: nil)}
-
-  def handle_event("compose_post", %{"note" => params}, socket) do
-    %{current_company: com, current_user: user, compose_subject: subject} = socket.assigns
-
-    params =
-      if subject,
-        do: Map.merge(params, %{"subject_type" => subject.type, "subject_id" => subject.id}),
-        else: params
-
-    case Notes.create_note(params, com, user) do
-      {:ok, note} ->
-        note = Repo.preload(note, [:author, :attachments], force: true)
-
-        {:noreply,
-         socket
-         |> stream_insert(:notes, feed_item(note, Notes.feed_details([note], com, user)), at: 0)
-         |> assign(compose_subject: nil, compose_roles: false, empty?: false)
-         |> reset_compose()}
-
-      {:error, %Ecto.Changeset{} = cs} ->
-        {:noreply, assign(socket, compose_form: compose_form(cs))}
-
-      _ ->
-        {:noreply, put_flash(socket, :warn, gettext("Not Authorise."))}
-    end
-  end
-
+  # The post box (ComposerComponent) saved a note: it goes on top of the feed.
   @impl true
-  def handle_info({:record_picked, "compose-picker", picked}, socket) do
-    {:noreply, assign(socket, compose_subject: picked, compose_picker: false)}
+  def handle_info({:composer, "compose", {:saved, :new, note}}, socket) do
+    %{current_company: com, current_user: user} = socket.assigns
+    note = Repo.preload(note, [:author, :attachments], force: true)
+
+    {:noreply,
+     socket
+     |> stream_insert(:notes, feed_item(note, Notes.feed_details([note], com, user)), at: 0)
+     |> assign(empty?: false)}
   end
 
-  # The box has its own input ids: two note forms on one page must not share
-  # note_body. `compose_rev` also forces a fresh textarea after a post, which
-  # clears it even though the browser still holds what was typed.
-  defp reset_compose(socket) do
-    rev = (socket.assigns[:compose_rev] || 0) + 1
-
-    assign(socket,
-      compose_rev: rev,
-      compose_params: %{},
-      compose_form: compose_form(Notes.change_note(%Note{}))
-    )
-  end
-
-  defp compose_form(cs), do: to_form(cs, id: "compose_note")
-
-  defp compose_change(socket, params) do
-    cs = %Note{} |> Notes.change_note(params) |> Map.put(:action, :validate)
-    assign(socket, compose_form: compose_form(cs), compose_params: params)
-  end
-
-  defp compose_roles(form), do: Ecto.Changeset.get_field(form.source, :visibility) || []
+  def handle_info({:composer, _id, _event}, socket), do: {:noreply, socket}
 
   # --- data ------------------------------------------------------------------
 
@@ -213,115 +145,15 @@ defmodule FullCircleWeb.NoteLive.Index do
         </button>
       </div>
 
-      <div
-        :if={@can_create}
-        class="flex gap-3 border-b border-gray-200 px-4 py-3 dark:border-gray-700"
-      >
-        <.avatar email={@current_user.email} />
-        <div class="min-w-0 flex-1">
-          <.form
-            for={@compose_form}
-            id="compose-form"
-            phx-change="compose_validate"
-            phx-submit="compose_post"
-          >
-            <textarea
-              id={"compose_note_body_#{@compose_rev}"}
-              name="note[body]"
-              rows="2"
-              placeholder={gettext("Write a note…")}
-              class="w-full resize-y border-0 bg-transparent p-1 text-lg placeholder-gray-500 focus:ring-0"
-            >{Phoenix.HTML.Form.normalize_value("textarea", @compose_form[:body].value)}</textarea>
-            <.error :for={
-              msg <-
-                Enum.map(
-                  @compose_form[:body].errors ++ @compose_form[:subject_id].errors,
-                  &translate_error/1
-                )
-            }>
-              {msg}
-            </.error>
-
-            <div :if={@compose_roles} class="flex flex-wrap gap-1 pb-2">
-              <.visibility_chips
-                visibility={compose_roles(@compose_form)}
-                id_prefix="compose-visibility"
-              />
-            </div>
-            <%!-- keep the chosen roles when the chips are folded away --%>
-            <div :if={!@compose_roles}>
-              <input type="hidden" name="note[visibility][]" value="" />
-              <input
-                :for={role <- compose_roles(@compose_form)}
-                type="hidden"
-                name="note[visibility][]"
-                value={role}
-              />
-            </div>
-
-            <div class="flex flex-wrap items-center gap-1 border-t border-gray-200 pt-2 dark:border-gray-700">
-              <.record_chip
-                :if={@compose_subject}
-                target={{:ok, %{title: @compose_subject.title, url: nil}}}
-                type={@compose_subject.type}
-                kind={:subject}
-              />
-              <button
-                :if={@compose_subject}
-                type="button"
-                phx-click="compose_clear_subject"
-                class="text-xs text-gray-500"
-                title={gettext("Clear")}
-              >
-                ✕
-              </button>
-              <button
-                :if={!@compose_subject}
-                id="compose-about"
-                type="button"
-                phx-click="compose_toggle_picker"
-                class="rounded-full border border-amber-400 bg-amber-50 px-2 text-xs text-amber-900 dark:border-amber-600 dark:bg-amber-950 dark:text-amber-100"
-              >
-                ＋ {gettext("about…")}
-              </button>
-              <button
-                type="button"
-                phx-click="compose_toggle_roles"
-                class="rounded-full border border-gray-300 px-2 text-xs text-gray-600 dark:border-gray-600 dark:text-gray-300"
-              >
-                <%= cond do %>
-                  <% compose_roles(@compose_form) == [] -> %>
-                    👥 {gettext("Everyone")} ▾
-                  <% compose_roles(@compose_form) == Note.private_visibility() -> %>
-                    🔒 {gettext("Private")} ▾
-                  <% true -> %>
-                    🔒 {Enum.join(compose_roles(@compose_form), ", ")} ▾
-                <% end %>
-              </button>
-              <.link
-                navigate={~p"/companies/#{@current_company.id}/notes/new"}
-                class="ml-auto text-xs text-gray-500 hover:underline"
-              >
-                {gettext("Full form")}
-              </.link>
-              <button
-                type="submit"
-                class="rounded-full bg-sky-500 px-4 py-1 text-sm font-bold text-white hover:bg-sky-600"
-              >
-                {gettext("Post")}
-              </button>
-            </div>
-          </.form>
-          <div :if={@compose_picker} class="mt-2">
-            <.live_component
-              module={RecordPickerComponent}
-              id="compose-picker"
-              label={gettext("What is this note about?")}
-              current_company={@current_company}
-              current_user={@current_user}
-            />
-          </div>
-        </div>
+      <div :if={@can_create} class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+        <.live_component
+          module={FullCircleWeb.NoteLive.ComposerComponent}
+          id="compose"
+          avatar
+          full_form_path={~p"/companies/#{@current_company.id}/notes/new"}
+          current_company={@current_company}
+          current_user={@current_user}
+        />
       </div>
 
       <div class="border-b border-gray-200 px-4 py-2 dark:border-gray-700">
