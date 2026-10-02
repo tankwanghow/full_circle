@@ -5,6 +5,7 @@ defmodule FullCircleWeb.NoteComposerTest do
   import FullCircle.SysFixtures
   import FullCircle.UserAccountsFixtures
   import FullCircle.BillingFixtures
+  import FullCircle.NotesFixtures
 
   alias FullCircle.Notes.Note
 
@@ -13,6 +14,9 @@ defmodule FullCircleWeb.NoteComposerTest do
     use FullCircleWeb, :live_view
 
     def mount(_params, session, socket) do
+      # opts keys go through String.to_existing_atom; load the module so its atoms exist
+      Code.ensure_loaded!(FullCircleWeb.NoteLive.ComposerComponent)
+
       {:ok,
        assign(socket,
          current_company: FullCircle.Repo.get!(FullCircle.Sys.Company, session["company_id"]),
@@ -152,5 +156,128 @@ defmodule FullCircleWeb.NoteComposerTest do
     assert has_element?(lv, "#c-visibility-private[data-selected]")
     refute has_element?(lv, "label.role-chip", "manager")
     assert render(lv) =~ "Everyone who can see this task can read its notes."
+  end
+
+  describe "edit mode" do
+    defp edit_host(conn, comp, admin, note) do
+      note = FullCircle.Notes.get_note(note.id, comp, admin)
+
+      host(conn, comp, admin, %{
+        "mode" => :edit,
+        "note" => note,
+        "full" => true,
+        "cancellable" => true
+      })
+    end
+
+    test "prefills and saves, writing one version", %{conn: conn, admin: admin, comp: comp} do
+      c = contact_fixture(comp, admin, %{"name" => "Ah Seng"})
+
+      note =
+        note_fixture(comp, admin, %{
+          "title" => "T",
+          "body" => "v1",
+          "subject_type" => "Contact",
+          "subject_id" => c.id,
+          "visibility" => ["manager"]
+        })
+
+      lv = edit_host(conn, comp, admin, note)
+      assert has_element?(lv, "#c-form textarea", "v1")
+      assert has_element?(lv, ~s{#c_title[value="T"]})
+      assert render(lv) =~ "Ah Seng"
+      assert has_element?(lv, "label.role-chip[data-selected]", "manager")
+
+      lv |> form("#c-form", %{"note" => %{"body" => "v2"}}) |> render_submit()
+      assert render(lv) =~ "{:saved, :edit"
+      assert FullCircle.Repo.get!(Note, note.id).body == "v2"
+      assert [%{body: "v1"}] = FullCircle.Repo.all(FullCircle.Notes.NoteVersion)
+    end
+
+    test "a stale save keeps the typed text and warns", %{conn: conn, admin: admin, comp: comp} do
+      note = note_fixture(comp, admin, %{"body" => "v1"})
+      lv = edit_host(conn, comp, admin, note)
+      {:ok, _} = FullCircle.Notes.update_note(note, %{"body" => "someone else"}, comp, admin)
+
+      html =
+        lv
+        |> form("#c-form", %{"note" => %{"title" => "my title", "body" => "my text"}})
+        |> render_submit()
+
+      assert html =~ "someone else changed this note"
+      assert has_element?(lv, "#c-form textarea", "my text")
+      assert has_element?(lv, ~s{#c_title[value="my title"]})
+    end
+
+    test "cancel tells the host and saves nothing", %{conn: conn, admin: admin, comp: comp} do
+      note = note_fixture(comp, admin, %{"body" => "v1"})
+      lv = edit_host(conn, comp, admin, note)
+      lv |> form("#c-form", %{"note" => %{"body" => "draft"}}) |> render_change()
+      lv |> element("#c-cancel") |> render_click()
+      assert render(lv) =~ ":cancelled"
+      assert FullCircle.Repo.get!(Note, note.id).body == "v1"
+    end
+
+    test "links on a saved note apply straight away", %{conn: conn, admin: admin, comp: comp} do
+      ali = contact_fixture(comp, admin, %{"name" => "Ali Welding"})
+      mei = contact_fixture(comp, admin, %{"name" => "Kedai Mei"})
+
+      note =
+        note_fixture(comp, admin, %{
+          "body" => "b",
+          "subject_type" => "Contact",
+          "subject_id" => ali.id
+        })
+
+      lv = edit_host(conn, comp, admin, note)
+      lv |> element("#c-open-picker") |> render_click()
+      lv |> form("#c-picker form", %{"type" => "Contact", "terms" => "Mei"}) |> render_change()
+      lv |> element("#c-picker-pick-#{mei.id}") |> render_click()
+
+      # render first: the pick arrives via send_update, so wait for it
+      assert render(lv) =~ "Kedai Mei"
+      assert [link] = FullCircle.Notes.list_links(note, comp, admin)
+
+      lv |> element("#remove-link-#{link.link_id}") |> render_click()
+      assert FullCircle.Notes.list_links(note, comp, admin) == []
+      refute render(lv) =~ "Kedai Mei"
+    end
+
+    test "linking a note to itself says why", %{conn: conn, admin: admin, comp: comp} do
+      ali = contact_fixture(comp, admin, %{"name" => "Ali Welding"})
+
+      note =
+        note_fixture(comp, admin, %{
+          "body" => "self",
+          "subject_type" => "Contact",
+          "subject_id" => ali.id
+        })
+
+      lv = edit_host(conn, comp, admin, note)
+      lv |> element("#c-open-picker") |> render_click()
+      lv |> form("#c-picker form", %{"type" => "Note", "terms" => "self"}) |> render_change()
+      lv |> element("#c-picker-pick-#{note.id}") |> render_click()
+      assert render(lv) =~ "cannot link to itself"
+    end
+
+    test "clearing the subject saves the note about nothing", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      ali = contact_fixture(comp, admin)
+
+      note =
+        note_fixture(comp, admin, %{
+          "body" => "b",
+          "subject_type" => "Contact",
+          "subject_id" => ali.id
+        })
+
+      lv = edit_host(conn, comp, admin, note)
+      lv |> element("#c-clear-subject") |> render_click()
+      lv |> form("#c-form", %{"note" => %{"body" => "b2"}}) |> render_submit()
+      assert FullCircle.Repo.get!(Note, note.id).subject_id == nil
+    end
   end
 end

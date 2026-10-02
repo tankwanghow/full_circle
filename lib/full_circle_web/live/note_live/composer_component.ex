@@ -139,6 +139,12 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
   def handle_event("remove_queued_link", %{"id" => id}, socket),
     do: {:noreply, assign(socket, links: Enum.reject(socket.assigns.links, &(&1.id == id)))}
 
+  def handle_event("remove_link", %{"id" => link_id}, socket) do
+    %{note: note, current_company: com, current_user: user} = socket.assigns
+    Notes.remove_link(note, link_id, com, user)
+    {:noreply, assign(socket, links: Notes.list_links(note, com, user))}
+  end
+
   def handle_event("cancel", _, socket) do
     notify(socket, :cancelled)
     {:noreply, reset(socket)}
@@ -202,8 +208,21 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
     end
   end
 
-  # Task 2 fills this in (links on a saved note apply immediately).
-  defp add_saved_link(socket, _picked), do: socket
+  defp add_saved_link(socket, picked) do
+    %{note: note, current_company: com, current_user: user} = socket.assigns
+
+    case Notes.add_link(note, picked.type, picked.id, com, user) do
+      {:ok, _} ->
+        assign(socket, links: Notes.list_links(note, com, user), error: nil)
+
+      # The changeset names the rule ("cannot link to itself", "already linked").
+      {:error, %Ecto.Changeset{errors: [{_field, error} | _]}} ->
+        assign(socket, error: FullCircleWeb.CoreComponents.translate_error(error))
+
+      _ ->
+        assign(socket, error: gettext("Could not link that record."))
+    end
+  end
 
   # --- render ---------------------------------------------------------------
 
