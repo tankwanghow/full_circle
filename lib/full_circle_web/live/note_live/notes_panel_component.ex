@@ -33,7 +33,6 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
       |> assign(assigns)
       |> assign_new(:notify_parent, fn -> false end)
       |> assign_new(:class, fn -> nil end)
-      |> assign_new(:layout, fn -> :card end)
       |> assign_new(:adding, fn -> false end)
       |> assign_new(:heading, fn -> nil end)
 
@@ -78,19 +77,12 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
     ~H"""
     <section
       id={@id}
-      class={
-        if @layout == :card,
-          do: [
-            "overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900",
-            @class
-          ],
-          else: ["bg-white dark:bg-gray-900", @class]
-      }
+      class={[
+        "overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900",
+        @class
+      ]}
     >
-      <div
-        :if={@layout == :card}
-        class="flex items-center gap-2 border-b border-gray-200 px-4 py-2 dark:border-gray-700"
-      >
+      <div class="flex items-center gap-2 border-b border-gray-200 px-4 py-2 dark:border-gray-700">
         <span class="font-semibold">{@heading || "📝 #{gettext("Notes")}"}</span>
         <span class="text-sm text-gray-500">{length(@items)}</span>
         <.link
@@ -116,7 +108,7 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
       </div>
 
       <div
-        :if={(@adding or @layout == :thread) and @can_create}
+        :if={@adding and @can_create}
         class="border-b border-gray-200 px-4 py-3 dark:border-gray-700"
       >
         <.live_component
@@ -124,12 +116,9 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
           id={@id}
           notify={{__MODULE__, @id}}
           fixed_subject={{@record_type, @record_id}}
-          roles_open={@layout == :card and @record_type != "Task"}
+          roles_open={@record_type != "Task"}
           roles={@record_type != "Task"}
-          avatar={@layout == :thread}
-          cancellable={@layout == :card}
-          placeholder={if @layout == :thread, do: gettext("Post your reply…")}
-          submit_label={if @layout == :thread, do: gettext("Reply"), else: gettext("Post")}
+          cancellable
           current_company={@current_company}
           current_user={@current_user}
         />
@@ -146,7 +135,7 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
         new_tab
         compact
       />
-      <p :if={@items == [] and @layout == :card} class="px-4 py-3 text-sm text-gray-500">
+      <p :if={@items == []} class="px-4 py-3 text-sm text-gray-500">
         {gettext("No notes yet.")}
       </p>
     </section>

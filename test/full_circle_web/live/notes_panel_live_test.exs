@@ -413,55 +413,6 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
   end
 
   describe "panel composer" do
-    defmodule ThreadHost do
-      use FullCircleWeb, :live_view
-
-      def mount(_p, session, socket) do
-        {:ok,
-         assign(socket,
-           current_company: FullCircle.Repo.get!(FullCircle.Sys.Company, session["company_id"]),
-           current_user: FullCircle.Repo.get!(FullCircle.UserAccounts.User, session["user_id"]),
-           record_id: session["record_id"]
-         ), layout: false}
-      end
-
-      def render(assigns) do
-        ~H"""
-        <.live_component
-          module={FullCircleWeb.NoteLive.NotesPanelComponent}
-          id="thread"
-          layout={:thread}
-          record_type="Note"
-          record_id={@record_id}
-          current_company={@current_company}
-          current_user={@current_user}
-        />
-        """
-      end
-    end
-
-    test "thread layout: reply box always open, reply is about the note", %{
-      conn: conn,
-      admin: admin,
-      comp: comp
-    } do
-      parent = note_fixture(comp, admin, %{"body" => "Genset broke down"})
-
-      {:ok, lv, html} =
-        live_isolated(conn, ThreadHost,
-          session: %{"company_id" => comp.id, "user_id" => admin.id, "record_id" => parent.id}
-        )
-
-      assert html =~ "Post your reply…"
-      refute has_element?(lv, "#thread-new")
-
-      lv |> form("#thread-form", %{"note" => %{"body" => "Technician Monday"}}) |> render_submit()
-      assert render(lv) =~ "Technician Monday"
-
-      reply = FullCircle.Repo.get_by!(FullCircle.Notes.Note, body: "Technician Monday")
-      assert {reply.subject_type, reply.subject_id} == {"Note", parent.id}
-    end
-
     test "card layout: Cancel closes the quick-add", %{conn: conn, comp: comp, contact: c} do
       {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
       lv |> element("#notes-panel-new") |> render_click()

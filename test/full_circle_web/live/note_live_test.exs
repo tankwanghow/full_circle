@@ -2,6 +2,7 @@ defmodule FullCircleWeb.NoteLiveTest do
   use FullCircleWeb.ConnCase
 
   import Phoenix.LiveViewTest
+  import Ecto.Query
   import FullCircle.SysFixtures
   import FullCircle.UserAccountsFixtures
   import FullCircle.BillingFixtures
@@ -507,6 +508,7 @@ defmodule FullCircleWeb.NoteLiveTest do
       assert html =~ "v2"
       assert html =~ "Ah Seng"
       assert html =~ "points here"
+      assert has_element?(lv, "#linked-from", "points here")
       assert html =~ "cert.jpg"
 
       html = lv |> element("#toggle-history") |> render_click()
@@ -516,25 +518,24 @@ defmodule FullCircleWeb.NoteLiveTest do
       refute html =~ "cert.jpg"
     end
 
-    @tag skip: "rewritten in Task 5 of the note-replies plan (reply box on the note page)"
-    test "a note can be written about this note from its page",
+    test "replying from a note's page adds to its thread",
          %{conn: conn, admin: admin, comp: comp} do
       note = note_fixture(comp, admin, %{"body" => "Company closed down"})
       {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{note.id}")
 
-      _ =
-        lv
-        |> form("#notes-panel-form", %{"note" => %{"body" => "confirmed with SSM search"}})
-        |> render_submit()
+      lv
+      |> form("#reply-form", %{"note" => %{"body" => "confirmed with SSM search"}})
+      |> render_submit()
 
       assert render(lv) =~ "confirmed with SSM search"
+      assert has_element?(lv, "#thread-after", "confirmed with SSM search")
       # The post's 💬 count follows the thread.
       assert has_element?(lv, "#note-post .note-replies", "1")
 
       follow_up =
         FullCircle.Repo.get_by!(FullCircle.Notes.Note, body: "confirmed with SSM search")
 
-      assert {follow_up.subject_type, follow_up.subject_id} == {"Note", note.id}
+      assert follow_up.reply_to_id == note.id
     end
 
     test "the note page shows a thumbnail tile for every file", %{
@@ -696,6 +697,95 @@ defmodule FullCircleWeb.NoteLiveTest do
 
       html = lv |> element("#toggle-history") |> render_click()
       assert html =~ "v1"
+    end
+
+    test "a reply's page shows the root, earlier replies, the reply, later replies",
+         %{conn: conn, admin: admin, comp: comp} do
+      root = note_fixture(comp, admin, %{"title" => "Genset", "body" => "broke down"})
+
+      {:ok, a} =
+        FullCircle.Notes.create_note(%{"body" => "first", "reply_to_id" => root.id}, comp, admin)
+
+      FullCircle.Repo.update_all(from(n in FullCircle.Notes.Note, where: n.id == ^a.id),
+        set: [inserted_at: ~U[2020-01-01 00:00:00Z]]
+      )
+
+      {:ok, b} =
+        FullCircle.Notes.create_note(%{"body" => "second", "reply_to_id" => root.id}, comp, admin)
+
+      {:ok, c} =
+        FullCircle.Notes.create_note(%{"body" => "third", "reply_to_id" => root.id}, comp, admin)
+
+      FullCircle.Repo.update_all(from(n in FullCircle.Notes.Note, where: n.id == ^c.id),
+        set: [inserted_at: ~U[2099-01-01 00:00:00Z]]
+      )
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{b.id}")
+      assert has_element?(lv, "#replying-to-post", "broke down")
+      assert has_element?(lv, "#thread-before #thread-#{a.id}")
+      assert has_element?(lv, "#note-post", "second")
+      assert has_element?(lv, "#thread-after #thread-#{c.id}")
+      refute has_element?(lv, "#thread-before #thread-#{b.id}")
+      refute has_element?(lv, "#thread-after #thread-#{b.id}")
+    end
+
+    test "editing a reply keeps the root card and earlier replies; root history toggles without losing text",
+         %{conn: conn, admin: admin, comp: comp} do
+      root = note_fixture(comp, admin, %{"body" => "v1"})
+      {:ok, root} = FullCircle.Notes.update_note(root, %{"body" => "v2"}, comp, admin)
+
+      {:ok, r} =
+        FullCircle.Notes.create_note(
+          %{"body" => "my reply", "reply_to_id" => root.id},
+          comp,
+          admin
+        )
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{r.id}/edit")
+      assert has_element?(lv, "#note-form")
+      assert has_element?(lv, "#replying-to-post", "v2")
+
+      lv |> form("#note-form", %{"note" => %{"body" => "half typed"}}) |> render_change()
+      html = lv |> element("#toggle-root-history") |> render_click()
+      assert html =~ "v1"
+      assert has_element?(lv, "#note-form textarea", "half typed")
+    end
+
+    test "a reply whose root was deleted says so and offers no reply box",
+         %{conn: conn, admin: admin, comp: comp} do
+      root = note_fixture(comp, admin, %{"body" => "root"})
+
+      {:ok, r} =
+        FullCircle.Notes.create_note(%{"body" => "orphan", "reply_to_id" => root.id}, comp, admin)
+
+      {:ok, _} = FullCircle.Notes.delete_note(root, comp, admin)
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{r.id}")
+      assert has_element?(lv, "#replying-to-gone", "deleted")
+      assert has_element?(lv, "#note-post", "orphan")
+      refute has_element?(lv, "#reply-form")
+    end
+
+    test "the reply's author who lost the root sees the reply, not the root",
+         %{admin: admin, comp: comp} do
+      clerk = user_with_role(comp, admin, "clerk")
+      root = note_fixture(comp, admin, %{"body" => "secret root"})
+
+      {:ok, r} =
+        FullCircle.Notes.create_note(
+          %{"body" => "clerk reply", "reply_to_id" => root.id},
+          comp,
+          clerk
+        )
+
+      {:ok, _} = FullCircle.Notes.update_note(root, %{"visibility" => ["manager"]}, comp, admin)
+
+      {:ok, lv, html} =
+        live(log_in_user(build_conn(), clerk), ~p"/companies/#{comp.id}/notes/#{r.id}")
+
+      assert has_element?(lv, "#note-post", "clerk reply")
+      assert has_element?(lv, "#replying-to-gone")
+      refute html =~ "secret root"
     end
   end
 end

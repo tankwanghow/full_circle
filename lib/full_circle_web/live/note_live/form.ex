@@ -10,14 +10,23 @@ defmodule FullCircleWeb.NoteLive.Form do
 
   import FullCircleWeb.NoteComponents
 
-  alias FullCircle.{Linkable, Notes}
+  alias FullCircle.{Linkable, Notes, Repo}
   alias FullCircle.Notes.{Attachments, Note}
-  alias FullCircleWeb.NoteLive.{ComposerComponent, NotesPanelComponent}
+  alias FullCircleWeb.NoteLive.ComposerComponent
 
   @impl true
   def mount(params, _session, socket) do
     %{current_company: com, current_user: user} = socket.assigns
-    socket = assign(socket, show_history: false, history: [], editing: false, edit_note: nil)
+
+    socket =
+      assign(socket,
+        show_history: false,
+        history: [],
+        show_root_history: false,
+        root_history: [],
+        editing: false,
+        edit_note: nil
+      )
 
     case socket.assigns.live_action do
       :new ->
@@ -65,7 +74,14 @@ defmodule FullCircleWeb.NoteLive.Form do
       item: nil,
       subject: subject,
       can_edit: false,
-      can_delete: false
+      can_delete: false,
+      root: nil,
+      root_state: :self,
+      root_item: nil,
+      thread_before: [],
+      thread_after: [],
+      backlinks: [],
+      can_reply: false
     )
   end
 
@@ -85,7 +101,58 @@ defmodule FullCircleWeb.NoteLive.Form do
         d: Map.fetch!(Notes.feed_details([note], com, user), note.id)
       }
     )
+    |> assign_thread()
     |> assign_history()
+  end
+
+  # The conversation around the note: its root (itself, for a root), the
+  # replies before and after it, and notes that only link here.
+  defp assign_thread(socket) do
+    %{note: note, current_company: com, current_user: user} = socket.assigns
+
+    {root, root_state} =
+      case Notes.root_of(note, com, user) do
+        :self -> {note, :self}
+        {:root, r} -> {Repo.preload(r, [:author, :updated_by, :attachments]), :ok}
+        {state, nil} -> {nil, state}
+      end
+
+    thread = if root, do: Notes.thread(root, com, user), else: []
+
+    {before, after_} =
+      if root_state == :self do
+        {[], thread}
+      else
+        {b, rest} = Enum.split_while(thread, &(&1.id != note.id))
+        {b, Enum.drop(rest, 1)}
+      end
+
+    root_item =
+      if root && root_state == :ok,
+        do: %{
+          id: root.id,
+          note: root,
+          d: Map.fetch!(Notes.feed_details([root], com, user), root.id)
+        }
+
+    backlinks =
+      note
+      |> Notes.list_backlinks(com, user)
+      |> Repo.preload([:author, :attachments])
+      |> then(fn notes ->
+        d = Notes.feed_details(notes, com, user)
+        Enum.map(notes, &%{id: &1.id, note: &1, d: Map.fetch!(d, &1.id)})
+      end)
+
+    assign(socket,
+      root: root,
+      root_state: root_state,
+      root_item: root_item,
+      thread_before: before,
+      thread_after: after_,
+      backlinks: backlinks,
+      can_reply: FullCircle.Authorization.can?(user, :create_note, com) and root != nil
+    )
   end
 
   # The write box edits the note as it was when Edit was pressed: refreshing
@@ -122,12 +189,25 @@ defmodule FullCircleWeb.NoteLive.Form do
 
   # /notes/new has no saved note yet; these events only exist on a note's page.
   def handle_event(event, _, %{assigns: %{note: nil}} = socket)
-      when event in ~w(delete toggle_history attachment_uploaded remove_attachment),
+      when event in ~w(delete toggle_history toggle_root_history attachment_uploaded remove_attachment),
       do: {:noreply, socket}
 
   def handle_event("toggle_history", _, socket),
     do:
       {:noreply, socket |> assign(show_history: !socket.assigns.show_history) |> assign_history()}
+
+  def handle_event("toggle_root_history", _, %{assigns: %{root_item: nil}} = socket),
+    do: {:noreply, socket}
+
+  def handle_event("toggle_root_history", _, socket) do
+    %{root: root, current_company: com, current_user: user} = socket.assigns
+    open? = !socket.assigns.show_root_history
+
+    history =
+      if open?, do: Notes.version_changes(Notes.list_versions(root, com, user), root), else: []
+
+    {:noreply, assign(socket, show_root_history: open?, root_history: history)}
+  end
 
   def handle_event("attachment_uploaded", _, socket), do: {:noreply, reload(socket)}
 
@@ -173,12 +253,48 @@ defmodule FullCircleWeb.NoteLive.Form do
   def handle_info({:composer, "note", :cancelled}, socket),
     do: {:noreply, socket |> stop_edit() |> reload()}
 
-  # A reply was posted in the thread: refresh the post's 💬 count.
-  def handle_info({:notes_changed, "Note", _id}, socket), do: {:noreply, reload(socket)}
+  # A reply was posted in the thread: refresh the thread and the 💬 count.
+  def handle_info({:composer, "reply", {:saved, :new, _}}, socket), do: {:noreply, reload(socket)}
 
   def handle_info(_msg, socket), do: {:noreply, socket}
 
   defp edited?(%Note{} = note), do: note.updated_at != note.inserted_at
+
+  attr :id, :string, required: true
+  attr :note, Note, required: true
+  attr :history, :list, required: true
+  attr :current_company, :map, required: true
+
+  # A note's edit history (per-version filtered by Notes.list_versions/3); used
+  # for the page's note and for the "Replying to" root.
+  defp history_list(assigns) do
+    ~H"""
+    <div id={@id} class="border-b border-gray-200 px-4 py-2 text-sm dark:border-gray-700">
+      <p :if={edited?(@note)} class="text-xs text-gray-500 dark:text-gray-400">
+        {gettext("edited by")} {@note.updated_by && @note.updated_by.email} · {FullCircleWeb.Helpers.format_datetime(
+          @note.updated_at,
+          @current_company
+        )}
+      </p>
+      <div :for={h <- @history} class="my-1 rounded border border-gray-200 p-2 dark:border-gray-700">
+        <div class="text-xs text-gray-500 dark:text-gray-400">
+          {gettext("Version")} {h.version.version} · {gettext("replaced by")} {h.version.edited_by.email}
+          {FullCircleWeb.Helpers.format_datetime(h.version.inserted_at, @current_company)}
+        </div>
+        <div :for={{field, old, new} <- h.changes}>
+          <span class="font-semibold">{field}</span>: <span
+            phx-no-format
+            class="whitespace-pre-wrap bg-rose-100 line-through dark:bg-rose-900"
+          >{show_value(old)}</span> →
+          <span class="whitespace-pre-wrap bg-green-100 dark:bg-green-900">{show_value(new)}</span>
+        </div>
+      </div>
+      <p :if={@history == []} class="text-gray-500 dark:text-gray-400">
+        {gettext("Never edited.")}
+      </p>
+    </div>
+    """
+  end
 
   defp show_value(nil), do: "—"
   defp show_value(list) when is_list(list), do: Enum.join(list, ", ")
@@ -232,6 +348,60 @@ defmodule FullCircleWeb.NoteLive.Form do
       </div>
 
       <%= if @note do %>
+        <section
+          :if={@root_state != :self}
+          id="replying-to"
+          class="border-b border-gray-200 bg-slate-50/70 dark:border-gray-700 dark:bg-gray-800/40"
+        >
+          <p class="px-4 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            {gettext("Replying to")}
+          </p>
+          <div :if={@root_item} id="replying-to-post">
+            <.note_post
+              id="replying-to-root"
+              item={@root_item}
+              current_company={@current_company}
+              host={{"Note", @note.id}}
+            />
+            <div class="px-4 pb-2">
+              <button
+                type="button"
+                id="toggle-root-history"
+                phx-click="toggle_root_history"
+                class="text-xs text-gray-500 hover:underline dark:text-gray-400"
+              >
+                {gettext("History")} {if @show_root_history, do: "▾", else: "▸"}
+              </button>
+            </div>
+            <.history_list
+              :if={@show_root_history}
+              id="root-history"
+              note={@root}
+              history={@root_history}
+              current_company={@current_company}
+            />
+          </div>
+          <p
+            :if={is_nil(@root_item)}
+            id="replying-to-gone"
+            class="px-4 pb-2 text-sm text-slate-500 dark:text-slate-400"
+          >
+            {if @root_state == :deleted,
+              do: gettext("Replying to a deleted note"),
+              else: gettext("Replying to a note you can't see")}
+          </p>
+        </section>
+
+        <div :if={@thread_before != []} id="thread-before">
+          <.note_post
+            :for={i <- @thread_before}
+            id={"thread-#{i.id}"}
+            item={i}
+            current_company={@current_company}
+            host={{"Note", @root.id}}
+          />
+        </div>
+
         <.note_post
           :if={!@editing}
           id="note-post"
@@ -297,48 +467,57 @@ defmodule FullCircleWeb.NoteLive.Form do
           </button>
         </div>
 
-        <div
+        <.history_list
           :if={@show_history}
           id="note-history"
-          class="border-b border-gray-200 px-4 py-2 text-sm dark:border-gray-700"
-        >
-          <p :if={edited?(@note)} class="text-xs text-gray-500 dark:text-gray-400">
-            {gettext("edited by")} {@note.updated_by && @note.updated_by.email} · {FullCircleWeb.Helpers.format_datetime(
-              @note.updated_at,
-              @current_company
-            )}
-          </p>
-          <div
-            :for={h <- @history}
-            class="my-1 rounded border border-gray-200 p-2 dark:border-gray-700"
-          >
-            <div class="text-xs text-gray-500 dark:text-gray-400">
-              {gettext("Version")} {h.version.version} · {gettext("replaced by")} {h.version.edited_by.email}
-              {FullCircleWeb.Helpers.format_datetime(h.version.inserted_at, @current_company)}
-            </div>
-            <div :for={{field, old, new} <- h.changes}>
-              <span class="font-semibold">{field}</span>: <span
-                phx-no-format
-                class="whitespace-pre-wrap bg-rose-100 line-through dark:bg-rose-900"
-              >{show_value(old)}</span> →
-              <span class="whitespace-pre-wrap bg-green-100 dark:bg-green-900">{show_value(new)}</span>
-            </div>
-          </div>
-          <p :if={@history == []} class="text-gray-500 dark:text-gray-400">
-            {gettext("Never edited.")}
-          </p>
+          note={@note}
+          history={@history}
+          current_company={@current_company}
+        />
+
+        <div id="thread-after">
+          <.note_post
+            :for={i <- @thread_after}
+            id={"thread-#{i.id}"}
+            item={i}
+            current_company={@current_company}
+            host={{"Note", @root && @root.id}}
+          />
         </div>
 
-        <.live_component
-          module={NotesPanelComponent}
-          id="notes-panel"
-          layout={:thread}
-          record_type="Note"
-          record_id={@note.id}
-          notify_parent
-          current_company={@current_company}
-          current_user={@current_user}
-        />
+        <div
+          :if={@can_reply}
+          class="border-b border-gray-200 px-4 py-3 dark:border-gray-700"
+        >
+          <.live_component
+            module={ComposerComponent}
+            id="reply"
+            reply_to={@root}
+            avatar
+            placeholder={gettext("Post your reply…")}
+            submit_label={gettext("Reply")}
+            current_company={@current_company}
+            current_user={@current_user}
+          />
+        </div>
+
+        <section
+          :if={@backlinks != []}
+          id="linked-from"
+          class="border-t border-gray-200 dark:border-gray-700"
+        >
+          <p class="px-4 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            {gettext("Linked from")}
+          </p>
+          <.note_post
+            :for={i <- @backlinks}
+            id={"linked-#{i.id}"}
+            item={i}
+            current_company={@current_company}
+            host={{"Note", @note.id}}
+            relation={:linked}
+          />
+        </section>
       <% end %>
     </div>
     """
