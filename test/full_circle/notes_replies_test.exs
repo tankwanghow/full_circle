@@ -96,6 +96,69 @@ defmodule FullCircle.NotesRepliesTest do
     end
   end
 
+  describe "final review fixes" do
+    test "the root's author reads replies to their own Private note, versions too", %{
+      company: company,
+      admin: admin
+    } do
+      clerk = user_with_role(company, admin, "clerk")
+      other = user_with_role(company, admin, "clerk")
+
+      {:ok, root} =
+        Notes.create_note(%{"body" => "question", "visibility" => ["admin"]}, company, clerk)
+
+      {:ok, r} = reply(company, admin, root, %{"body" => "answer v1"})
+      {:ok, r} = Notes.update_note(r, %{"body" => "answer v2"}, company, admin)
+
+      assert Notes.can_read?(r, company, clerk)
+      assert [%{id: id}] = Notes.thread(root, company, clerk)
+      assert id == r.id
+      assert [%NoteVersion{body: "answer v1"}] = Notes.list_versions(r, company, clerk)
+
+      refute Notes.can_read?(r, company, other)
+      assert Notes.thread(root, company, other) == []
+    end
+
+    test "a reply is accepted when the root's subject is gone", %{
+      company: company,
+      admin: admin
+    } do
+      task = task_fixture(company, admin)
+
+      root =
+        note_fixture(company, admin, %{
+          "body" => "progress",
+          "subject_type" => "Task",
+          "subject_id" => task.id
+        })
+
+      {:ok, _} = FullCircle.Tasks.delete_task(task, company, admin)
+
+      assert {:ok, r} = reply(company, admin, root)
+      assert {r.subject_type, r.subject_id} == {"Task", task.id}
+    end
+
+    test "a note about a note shows in that note's backlinks", %{
+      company: company,
+      admin: admin
+    } do
+      target = note_fixture(company, admin, %{"body" => "target"})
+
+      about =
+        note_fixture(company, admin, %{
+          "body" => "about it",
+          "subject_type" => "Note",
+          "subject_id" => target.id
+        })
+
+      linking = note_fixture(company, admin, %{"body" => "links it"})
+      {:ok, _} = Notes.add_link(linking, "Note", target.id, company, admin)
+
+      ids = Notes.list_backlinks(target, company, admin) |> Enum.map(& &1.id) |> Enum.sort()
+      assert ids == Enum.sort([about.id, linking.id])
+    end
+  end
+
   describe "editing" do
     test "a reply's subject, visibility and reply_to cannot be changed", %{
       company: company,

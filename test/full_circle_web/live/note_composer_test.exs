@@ -345,6 +345,16 @@ defmodule FullCircleWeb.NoteComposerTest do
       assert reply.visibility == ["manager"]
     end
 
+    test "a refused reply says why", %{conn: conn, admin: admin, comp: comp} do
+      root = note_fixture(comp, admin, %{"body" => "root"})
+      lv = host(conn, comp, admin, %{"reply_to" => root})
+      {:ok, _} = FullCircle.Notes.delete_note(root, comp, admin)
+
+      html = lv |> form("#c-form", %{"note" => %{"body" => "too late"}}) |> render_submit()
+      assert html =~ "can&#39;t be replied to"
+      refute FullCircle.Repo.get_by(Note, body: "too late")
+    end
+
     test "editing a reply hides subject and visibility; picks become links", %{
       conn: conn,
       admin: admin,

@@ -33,17 +33,24 @@ defmodule FullCircle.Notes do
         # A note about a task is also readable by whoever can see that task,
         # so "Private" on a task means "the people on this task".
         task_ids = from(t in FullCircle.Tasks.visible_to(company, user), select: t.id)
+        # Replies to a note follow its visibility; whoever wrote the note still
+        # reads the answers, even when the note is Private or not for their role.
+        own_roots = own_root_ids(company, user)
 
         from(n in base,
           where:
             is_nil(n.visibility) or ^role in n.visibility or n.author_id == ^user.id or
-              (n.subject_type == "Task" and n.subject_id in subquery(task_ids))
+              (n.subject_type == "Task" and n.subject_id in subquery(task_ids)) or
+              n.reply_to_id in subquery(own_roots)
         )
       end
     else
       from(n in query, where: false)
     end
   end
+
+  defp own_root_ids(company, user),
+    do: from(r in Note, where: r.company_id == ^company.id and r.author_id == ^user.id, select: r.id)
 
   def can_read?(%Note{id: id}, company, user) do
     Repo.exists?(from(n in visible_to(company, user), where: n.id == ^id))
@@ -108,8 +115,8 @@ defmodule FullCircle.Notes do
   @doc """
   Past versions of a note, newest first — each one only if the user could have
   read it *as it was*. A note once restricted to managers and later made public
-  must not show clerks what it said while restricted. Admin and the note's
-  author see every version.
+  must not show clerks what it said while restricted. Admin, the note's author
+  and, for a reply, its root's author see every version.
   """
   def list_versions(%Note{} = note, company, user) do
     if can_read?(note, company, user) do
@@ -117,7 +124,7 @@ defmodule FullCircle.Notes do
       query = from(v in NoteVersion, where: v.note_id == ^note.id, order_by: [desc: v.version])
 
       query =
-        if role == "admin" or note.author_id == user.id do
+        if role == "admin" or note.author_id == user.id or own_root?(note, company, user) do
           query
         else
           # Per version: a version about a task is readable by that task's
@@ -137,6 +144,11 @@ defmodule FullCircle.Notes do
     end
   end
 
+  defp own_root?(%Note{reply_to_id: nil}, _company, _user), do: false
+
+  defp own_root?(%Note{reply_to_id: root_id}, company, user),
+    do: Repo.exists?(from(r in own_root_ids(company, user), where: r.id == ^root_id))
+
   # --- write ----------------------------------------------------------------
 
   def change_note(%Note{} = note, attrs \\ %{}) do
@@ -154,10 +166,12 @@ defmodule FullCircle.Notes do
         {:ok, root} ->
           attrs = reply_attrs(attrs, root)
 
+          # A reply's subject is its root's, already checked when the root was
+          # saved; it may since be deleted or out of the replier's sight.
           changeset =
             %Note{company_id: company.id, author_id: user.id, updated_by_id: user.id}
             |> Note.changeset(Map.delete(attrs, "links"))
-            |> validate_subject(company, user)
+            |> then(&if(root, do: &1, else: validate_subject(&1, company, user)))
 
           # Lock order: task row, then the root note, then (on update) the note.
           Multi.new()
@@ -557,11 +571,22 @@ defmodule FullCircle.Notes do
     end
   end
 
+  @doc """
+  Notes that link to `note`, or are about it without being a reply (the
+  about… picker still offers notes as subjects). Replies are its thread.
+  """
   def list_backlinks(%Note{} = note, company, user) do
+    linking =
+      from(l in RecordLink,
+        where: l.company_id == ^company.id and l.from_type == "Note",
+        where: l.to_type == "Note" and l.to_id == ^note.id,
+        select: l.from_id
+      )
+
     from(n in visible_to(company, user),
-      join: l in RecordLink,
-      on: l.from_type == "Note" and l.from_id == n.id,
-      where: l.company_id == ^company.id and l.to_type == "Note" and l.to_id == ^note.id,
+      where:
+        (n.subject_type == "Note" and n.subject_id == ^note.id) or
+          n.id in subquery(linking),
       order_by: [desc: n.inserted_at]
     )
     |> Repo.all()

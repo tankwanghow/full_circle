@@ -298,7 +298,8 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
   defp errors(form) do
     Enum.map(
       form[:body].errors ++
-        form[:subject_id].errors ++ form[:subject_type].errors ++ form[:visibility].errors,
+        form[:subject_id].errors ++ form[:subject_type].errors ++ form[:visibility].errors ++
+        form[:reply_to_id].errors,
       &FullCircleWeb.CoreComponents.translate_error/1
     )
   end

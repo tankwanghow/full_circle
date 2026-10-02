@@ -177,7 +177,21 @@ Spec: `docs/superpowers/specs/2026-10-02-note-replies-design.md`.
   `{:hidden, nil}`), `feed_details/3` `reply_to:` `%{id, title, state}` for
   the "↩ reply to …" tag in `note_post/1` (hidden when `host` is the root).
 - A refused target (unknown, unreadable, deleted, other company, malformed)
-  is a changeset error, never a crash.
+  is a changeset error, never a crash; the composer shows it
+  (`errors/1` includes `reply_to_id`).
+- **The root's author reads its replies** (third rule in `visible_to/3`:
+  `reply_to_id IN (notes I wrote)`), and every version of them in
+  `list_versions/3`. Without it, a clerk's Private question answered by an
+  admin would hide the answer from the asker.
+- Creating a reply skips `validate_subject/3`: the subject is the root's,
+  checked when the root was saved, and may since be deleted or out of the
+  replier's sight. Re-checking it refused replies on notes about deleted
+  tasks/documents.
+- The root→reply sync (`sync_replies/3`, and a task's sync) is an
+  `update_all`: replies get no `note_versions` row for the inherited change.
+- A non-reply note whose subject is a note (the about… picker still offers
+  notes) is not in the thread; `list_backlinks/3` returns it with notes that
+  link to the note, under "Linked from".
 - `FullCircle.Notes.ReplyBackfill.run/1` converted old note-on-note rows
   (subject = a note) in the `add_reply_to_to_notes` migration: true root via
   a recursive CTE with a cycle guard, a `note_versions` snapshot first.

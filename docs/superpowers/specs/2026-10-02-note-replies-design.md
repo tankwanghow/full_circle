@@ -72,8 +72,9 @@ Invariants (in `Note.changeset` + `Notes`):
   readable on their own pages and on the record's page (they are about the record), and
   their "↩ reply to" tag reads "↩ reply to a deleted note". Nothing new can reply to a
   deleted root.
-- **Reads** — unchanged gate: `Notes.visible_to/3`. Since a reply's stored visibility
-  equals its root's, no new rule is needed.
+- **Reads** — gate `Notes.visible_to/3`. A reply's stored visibility equals its root's,
+  plus one rule (final review, 2026-10-02): the root's author reads its replies and their
+  versions, so whoever asked a Private or role-restricted question sees the answer.
 - **Counts / thread** —
   - `💬 n` on a post = live replies (`reply_to_id = note.id`), visibility applied; a new
     grouped query in `feed_details/3` replaces `count_by_records(…, "Note", ids)` for
