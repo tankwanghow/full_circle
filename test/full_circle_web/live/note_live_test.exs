@@ -470,12 +470,12 @@ defmodule FullCircleWeb.NoteLiveTest do
 
       lv |> element("#notes-panel-new") |> render_click()
 
-      html =
+      _ =
         lv
         |> form("#notes-panel-form", %{"note" => %{"body" => "confirmed with SSM search"}})
         |> render_submit()
 
-      assert html =~ "confirmed with SSM search"
+      assert render(lv) =~ "confirmed with SSM search"
 
       follow_up =
         FullCircle.Repo.get_by!(FullCircle.Notes.Note, body: "confirmed with SSM search")

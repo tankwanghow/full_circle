@@ -10,50 +10,40 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
   alias FullCircle.Notes
   alias FullCircle.Notes.Note
 
+  # The quick-add composer saved (or was cancelled).
+  @impl true
+  def update(%{composer: {_cid, event}}, socket) do
+    %{record_type: t, record_id: id} = socket.assigns
+
+    case event do
+      {:saved, _mode, _note} ->
+        if socket.assigns.notify_parent, do: send(self(), {:notes_changed, t, id})
+        {:ok, socket |> assign(adding: false) |> load()}
+
+      :cancelled ->
+        {:ok, assign(socket, adding: false)}
+    end
+  end
+
   # The host form re-renders on every keystroke (phx-change="validate"), which
   # calls update/2 each time. Only (re)load when the record changes, or the
-  # panel would query per keystroke and wipe a half-typed quick-add.
-  @impl true
+  # panel would query per keystroke.
   def update(assigns, socket) do
     socket =
       socket
       |> assign(assigns)
       |> assign_new(:notify_parent, fn -> false end)
       |> assign_new(:class, fn -> nil end)
+      |> assign_new(:layout, fn -> :card end)
       |> assign_new(:adding, fn -> false end)
-      |> assign_new(:params, fn -> %{} end)
 
     key = {socket.assigns.record_type, socket.assigns.record_id}
 
     if socket.assigns[:loaded_for] == key do
       {:ok, socket}
     else
-      {:ok,
-       socket
-       |> assign(
-         loaded_for: key,
-         adding: false,
-         form: panel_form(socket, Notes.change_note(blank_note(socket)))
-       )
-       |> load()}
+      {:ok, socket |> assign(loaded_for: key, adding: false) |> load()}
     end
-  end
-
-  # Input ids are prefixed with the component id: the panel can sit on a page
-  # that has its own note form (the note page itself), and two `note_body`
-  # inputs would make the browser patch and focus the wrong textarea.
-  # On a task, Private means "the people who can see this task" (Notes'
-  # task rule), which is what a progress note almost always wants.
-  defp blank_note(%{assigns: %{record_type: "Task"}}),
-    do: %Note{visibility: Note.private_visibility()}
-
-  defp blank_note(_socket), do: %Note{}
-
-  defp panel_form(socket, cs), do: to_form(cs, id: "#{socket.assigns.id}_note")
-
-  defp panel_change(socket, params) do
-    cs = blank_note(socket) |> Notes.change_note(params) |> Map.put(:action, :validate)
-    assign(socket, form: panel_form(socket, cs), params: params)
   end
 
   defp load(socket) do
@@ -81,42 +71,6 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
   def handle_event("new", _, socket), do: {:noreply, assign(socket, adding: true)}
   def handle_event("cancel", _, socket), do: {:noreply, assign(socket, adding: false)}
 
-  def handle_event("validate", %{"note" => params}, socket),
-    do: {:noreply, panel_change(socket, params)}
-
-  def handle_event("visibility_everyone", _, socket),
-    do: {:noreply, panel_change(socket, Map.put(socket.assigns.params, "visibility", [""]))}
-
-  def handle_event("visibility_private", _, socket) do
-    params = Map.put(socket.assigns.params, "visibility", Note.private_visibility())
-    {:noreply, panel_change(socket, params)}
-  end
-
-  def handle_event("save", %{"note" => params}, socket) do
-    %{record_type: t, record_id: id, current_company: com, current_user: user} = socket.assigns
-    attrs = Map.merge(params, %{"subject_type" => t, "subject_id" => id})
-
-    case Notes.create_note(attrs, com, user) do
-      {:ok, _note} ->
-        if socket.assigns.notify_parent, do: send(self(), {:notes_changed, t, id})
-
-        {:noreply,
-         socket
-         |> assign(
-           adding: false,
-           params: %{},
-           form: panel_form(socket, Notes.change_note(blank_note(socket)))
-         )
-         |> load()}
-
-      {:error, %Ecto.Changeset{} = cs} ->
-        {:noreply, assign(socket, form: panel_form(socket, cs))}
-
-      _ ->
-        {:noreply, socket}
-    end
-  end
-
   def handle_event("attachment_uploaded", _, socket), do: {:noreply, load(socket)}
 
   @impl true
@@ -125,16 +79,21 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
     <section
       id={@id}
       class={
-        [
-          "mx-auto mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900",
-          @class,
-          # Posts are short text + a thumbnail row: a readable column, even under
-          # a wide invoice card (w-11/12), keeps the eye from travelling.
-          "max-w-2xl"
-        ]
+        if @layout == :card,
+          do: [
+            "mx-auto mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900",
+            @class,
+            # Posts are short text + a thumbnail row: a readable column, even under
+            # a wide invoice card (w-11/12), keeps the eye from travelling.
+            "max-w-2xl"
+          ],
+          else: ["bg-white dark:bg-gray-900", @class]
       }
     >
-      <div class="flex items-center gap-2 border-b border-gray-200 px-4 py-2 dark:border-gray-700">
+      <div
+        :if={@layout == :card}
+        class="flex items-center gap-2 border-b border-gray-200 px-4 py-2 dark:border-gray-700"
+      >
         <span class="font-semibold">📝 {gettext("Notes")}</span>
         <span class="text-sm text-gray-500">{length(@items)}</span>
         <.link
@@ -159,64 +118,34 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
         </button>
       </div>
 
-      <.form
-        :if={@adding}
-        for={@form}
-        id={"#{@id}-form"}
-        phx-change="validate"
-        phx-submit="save"
-        phx-target={@myself}
+      <div
+        :if={(@adding or @layout == :thread) and @can_create}
         class="border-b border-gray-200 px-4 py-3 dark:border-gray-700"
       >
-        <.input
-          field={@form[:body]}
-          type="textarea"
-          rows="3"
-          placeholder={gettext("Write a note…")}
+        <.live_component
+          module={FullCircleWeb.NoteLive.ComposerComponent}
+          id={@id}
+          notify={{__MODULE__, @id}}
+          fixed_subject={{@record_type, @record_id}}
+          roles_open={@layout == :card}
+          roles={@record_type != "Task"}
+          default_visibility={if @record_type == "Task", do: Note.private_visibility()}
+          private_title={
+            if @record_type == "Task",
+              do: gettext("Only the people who can see this task (and admins) can read it.")
+          }
+          hint={
+            if @record_type == "Task",
+              do: gettext("Everyone who can see this task can read its notes.")
+          }
+          avatar={@layout == :thread}
+          cancellable={@layout == :card}
+          placeholder={if @layout == :thread, do: gettext("Post your reply…")}
+          submit_label={if @layout == :thread, do: gettext("Reply"), else: gettext("Post")}
+          current_company={@current_company}
+          current_user={@current_user}
         />
-        <%!-- The subject is fixed to this record and has no input of its own;
-             without this line a subject error would make Save silently do nothing. --%>
-        <.error :for={
-          msg <-
-            Enum.map(
-              @form[:subject_id].errors ++ @form[:subject_type].errors ++ @form[:visibility].errors,
-              &translate_error/1
-            )
-        }>
-          {msg}
-        </.error>
-        <div class="mt-2 flex flex-wrap items-center gap-1 text-xs">
-          <.visibility_chips
-            visibility={Ecto.Changeset.get_field(@form.source, :visibility)}
-            id_prefix={"#{@id}-visibility"}
-            target={@myself}
-            roles={@record_type != "Task"}
-            private_title={
-              @record_type == "Task" &&
-                gettext("Only the people who can see this task (and admins) can read it.")
-            }
-          />
-          <span class="ml-auto flex items-center gap-2">
-            <button
-              type="button"
-              phx-click="cancel"
-              phx-target={@myself}
-              class="text-sm text-gray-500 hover:underline"
-            >
-              {gettext("Cancel")}
-            </button>
-            <button
-              type="submit"
-              class="rounded-full bg-sky-500 px-4 py-1 text-sm font-bold text-white hover:bg-sky-600"
-            >
-              {gettext("Post")}
-            </button>
-          </span>
-        </div>
-        <p :if={@record_type == "Task"} class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          {gettext("Everyone who can see this task can read its notes.")}
-        </p>
-      </.form>
+      </div>
 
       <.note_post
         :for={item <- @items}
@@ -229,7 +158,9 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
         new_tab
         compact
       />
-      <p :if={@items == []} class="px-4 py-3 text-sm text-gray-500">{gettext("No notes yet.")}</p>
+      <p :if={@items == [] and @layout == :card} class="px-4 py-3 text-sm text-gray-500">
+        {gettext("No notes yet.")}
+      </p>
     </section>
     """
   end
