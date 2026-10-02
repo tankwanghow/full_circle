@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.EmployeeLive.Form do
   use FullCircleWeb, :live_view
 
+  on_mount {FullCircleWeb.RecordAside, :refresh_tasks_panel}
+
   import Ecto.Query, warn: false
 
   alias FullCircle.Authorization

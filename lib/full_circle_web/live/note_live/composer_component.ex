@@ -74,6 +74,8 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
       error: nil,
       picker_open: false,
       show_roles: roles_open?(socket.assigns),
+      # A box that starts with the chips folded keeps its pill as the toggle.
+      compact: not roles_open?(socket.assigns),
       subject: initial_subject(socket),
       links: initial_links(socket)
     )
@@ -399,13 +401,14 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
               ＋ {if @subject, do: gettext("link a record"), else: gettext("about…")}
             </button>
             <button
-              :if={!@show_roles}
+              :if={@compact or !@show_roles}
+              id={"#{@id}-roles-toggle"}
               type="button"
               phx-click="toggle_roles"
               phx-target={@myself}
               class="rounded-full border border-gray-300 px-2 text-xs text-gray-600 dark:border-gray-600 dark:text-gray-300"
             >
-              {visibility_label(roles_of(@form))} ▾
+              {visibility_label(roles_of(@form))} {if @show_roles, do: "▴", else: "▾"}
             </button>
             <span class="ml-auto flex items-center gap-2">
               <.link

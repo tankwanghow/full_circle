@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.DebitNoteLive.Form do
   use FullCircleWeb, :live_view
 
+  on_mount {FullCircleWeb.RecordAside, :refresh_tasks_panel}
+
   alias FullCircle.{Accounting, DebCre}
   alias FullCircle.DebCre.{DebitNote}
 

@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.FixedAssetLive.Form do
   use FullCircleWeb, :live_view
 
+  on_mount {FullCircleWeb.RecordAside, :refresh_tasks_panel}
+
   alias FullCircle.Accounting.FixedAsset
   alias FullCircle.Accounting
   alias FullCircle.StdInterface

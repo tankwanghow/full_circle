@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.ChequeLive.ReturnChequeForm do
   use FullCircleWeb, :live_view
 
+  on_mount {FullCircleWeb.RecordAside, :refresh_tasks_panel}
+
   alias FullCircle.{Cheque, Reporting}
   alias FullCircle.Cheque.ReturnCheque
 

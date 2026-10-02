@@ -195,17 +195,28 @@ defmodule FullCircleWeb.TaskLive.Form do
   def handle_event("remove_link", %{"id" => link_id}, socket) do
     %{task: task, current_company: com, current_user: user} = socket.assigns
 
-    socket =
-      case Tasks.remove_link(task, link_id, com, user) do
-        {:error, :closed} ->
-          put_flash(socket, :warn, gettext("A closed task cannot be edited — reopen it first."))
+    # A malformed id from the client must not reach the binary_id query.
+    case Ecto.UUID.cast(link_id) do
+      {:ok, uuid} ->
+        socket =
+          case Tasks.remove_link(task, uuid, com, user) do
+            {:error, :closed} ->
+              put_flash(
+                socket,
+                :warn,
+                gettext("A closed task cannot be edited — reopen it first.")
+              )
 
-        _ ->
-          socket
-      end
+            _ ->
+              socket
+          end
 
-    links = Tasks.list_links(task, com, user)
-    {:noreply, assign(socket, links: links, link_count: length(links))}
+        links = Tasks.list_links(task, com, user)
+        {:noreply, assign(socket, links: links, link_count: length(links))}
+
+      :error ->
+        {:noreply, socket}
+    end
   end
 
   def handle_event("save", %{"task" => params}, socket) do
@@ -411,7 +422,7 @@ defmodule FullCircleWeb.TaskLive.Form do
   end
 
   defp pill_color("gray"),
-    do: "border-gray-300 hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
+    do: "border-gray-300 hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-700/60"
 
   defp pill_color("zinc"),
     do: "border-zinc-400 text-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800"
@@ -528,7 +539,10 @@ defmodule FullCircleWeb.TaskLive.Form do
           ✎ {gettext("Edit")}
         </button>
       </div>
-      <div :if={not @editing and (@can_close or @can_reopen)} class="flex flex-wrap items-center gap-2">
+      <div
+        :if={not @editing and (@can_close or @can_reopen)}
+        class="flex flex-wrap items-center gap-2"
+      >
         <button
           :if={@can_close}
           type="button"
@@ -572,7 +586,7 @@ defmodule FullCircleWeb.TaskLive.Form do
         <.link
           id="back-to-tasks"
           navigate={~p"/companies/#{@current_company.id}/tasks"}
-          class="rounded-full px-2 text-xl hover:bg-gray-100 dark:hover:bg-gray-800"
+          class="rounded-full px-2 text-xl hover:bg-gray-100 dark:hover:bg-gray-700/60"
           title={gettext("Back")}
         >
           ←
@@ -863,7 +877,7 @@ defmodule FullCircleWeb.TaskLive.Form do
           :for={c <- @cycles}
           id={"cycle-#{c.id}"}
           navigate={~p"/companies/#{@current_company.id}/tasks/#{c.id}"}
-          class="flex gap-3 border-b border-slate-200 py-1 last:border-0 hover:bg-sky-50/70 dark:border-gray-700 dark:hover:bg-gray-800/70"
+          class="flex gap-3 border-b border-slate-200 py-1 last:border-0 hover:bg-sky-50/70 dark:border-gray-700 dark:hover:bg-gray-700/60"
         >
           <span class="w-24 tabular-nums">{c.due_date && FullCircleWeb.Helpers.format_date(c.due_date)}</span>
           <span class="w-20">

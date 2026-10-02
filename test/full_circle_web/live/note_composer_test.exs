@@ -303,4 +303,26 @@ defmodule FullCircleWeb.NoteComposerTest do
       assert FullCircle.Repo.get!(Note, note.id).subject_id == nil
     end
   end
+
+  test "compact box: the visibility pill stays while the chips are open and folds them",
+       %{conn: conn, comp: comp, admin: admin} do
+    lv = host(conn, comp, admin)
+    assert has_element?(lv, "#c-roles-toggle", "Everyone")
+    refute has_element?(lv, "#c-visibility-everyone")
+
+    lv |> element("#c-roles-toggle") |> render_click()
+    assert has_element?(lv, "#c-visibility-everyone")
+    assert has_element?(lv, "#c-roles-toggle", "Everyone")
+
+    lv |> element("#c-roles-toggle") |> render_click()
+    refute has_element?(lv, "#c-visibility-everyone")
+  end
+
+  test "a box that opens with the chips shown has no pill",
+       %{conn: conn, comp: comp, admin: admin} do
+    lv = host(conn, comp, admin, %{"roles_open" => true})
+    assert has_element?(lv, "#c-visibility-everyone")
+    refute has_element?(lv, "#c-roles-toggle")
+  end
+
 end

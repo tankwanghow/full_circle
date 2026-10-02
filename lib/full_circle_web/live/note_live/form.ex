@@ -120,6 +120,11 @@ defmodule FullCircleWeb.NoteLive.Form do
       else: {:noreply, socket}
   end
 
+  # /notes/new has no saved note yet; these events only exist on a note's page.
+  def handle_event(event, _, %{assigns: %{note: nil}} = socket)
+      when event in ~w(delete toggle_history attachment_uploaded remove_attachment),
+      do: {:noreply, socket}
+
   def handle_event("toggle_history", _, socket),
     do:
       {:noreply, socket |> assign(show_history: !socket.assigns.show_history) |> assign_history()}

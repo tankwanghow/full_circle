@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.GoodLive.Form do
   use FullCircleWeb, :live_view
 
+  on_mount {FullCircleWeb.RecordAside, :refresh_tasks_panel}
+
   alias FullCircle.Product.{Good}
   alias FullCircle.Product
   alias FullCircle.StdInterface

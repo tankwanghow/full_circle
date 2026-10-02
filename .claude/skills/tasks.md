@@ -18,7 +18,8 @@ Spec: `docs/superpowers/specs/2026-10-01-tasks-design.md`.
 
 ## Progress notes
 Notes with `subject_type "Task"`. `Notes.visible_to/3` lets anyone who can see the task read them. `list_versions/3` applies the task rule **per version**, using each version's own `subject_type`/`subject_id` (not the note's current subject), so re-pointing a restricted note at a task never exposes its old text.
-A task note does not ask for a visibility role. `Notes.create_note/3` and `update_note/4` copy the task's `visibility` onto the note (`follow_task_visibility/3`), including a closing note. Changing the task's visibility updates those notes (`sync_task_note_visibility/2`, no new note version). Any composer whose subject is a Task hides the chips, including the task panel and the full note form. Other record types keep Everyone, Private and the role chips.
+A task note does not ask for a visibility role. `Notes.create_note/3` and `update_note/4` copy the task's `visibility` onto the note (`follow_task_visibility/2`), including a closing note; any `visibility` the client sends is overridden. Changing the task's visibility updates those notes (`sync_task_note_visibility/3`, no new note version) — only the task's own live notes in its company.
+**No race, no partial write:** `update_task/4` runs the task UPDATE and the note sync in one `Multi` (a failed sync rolls the task back; `{:error, :stale}` still comes from the `StaleEntryError` rescue). The note write reads the task's visibility inside its own transaction with `FOR SHARE`, which conflicts with the task UPDATE's row lock, so a note written while the task narrows either waits and copies the new value or commits first and is caught by the sync. Any composer whose subject is a Task hides the chips, including the task panel and the full note form. Other record types keep Everyone, Private and the role chips.
 
 ## Close / reopen
 - `close_task/5` locks the row (`FOR UPDATE`), adds the closing note, stamps, and picks the next cycle. Second close → `{:error, :already_closed}`.
@@ -58,6 +59,18 @@ only link is this record (title only). "Full form" opens
 `/tasks/new?link_type=&link_id=` in a new tab; `TaskLive.Form` turns those
 params into the starting link chip. A bad id is ignored. The task page
 itself does not show this panel.
+
+**Live refresh.** Every host that renders `record_aside/1` declares
+`on_mount {FullCircleWeb.RecordAside, :refresh_tasks_panel}`. That hook
+subscribes the page to `Tasks.topic/1` and attaches a `:handle_info` hook that
+turns `{:tasks_changed, _}` into `send_update(TasksPanelComponent, id:
+"tasks-panel", refresh: true)` and halts, so a task made in another tab or by
+another user appears without a reload, and the host needs no `handle_info`
+clause. A component cannot subscribe for itself (it shares the host process)
+and a global live_session hook would steal the message from pages that handle
+it (`TaskLive.Index`). So it is opt-in per host. **A new host must add the
+`on_mount` line.** With no panel rendered (`:new`), the `send_update` is a
+logged no-op.
 
 ## Copy
 `/tasks/:task_id/copy` (`TaskLive.Form`, `:copy`) is the `:new` path pre-filled by `copy_of/2` (title, descriptions, due date kept as-is, repeat, reminder, documents, assignee, visibility). Links, notes, cycles, series and status are NOT copied: a copy is its own series (`create_task/3`), made for per-item duties (road tax per lorry). The `#copy-task` button shows on the post (`:edit`, not while `@editing`) for anyone with `:create_task`, for open and closed cycles. An assignee who is no longer assignable is dropped on copy (the "keep demoted assignee" option rule is `:edit` only, since `assignee_options/2` keys on a loaded `task.assignee`).

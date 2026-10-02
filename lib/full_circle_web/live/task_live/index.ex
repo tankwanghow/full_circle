@@ -125,6 +125,9 @@ defmodule FullCircleWeb.TaskLive.Index do
          |> put_flash(:info, gettext("Task saved."))
          |> load(true, 1)}
 
+      {:error, %Ecto.Changeset{errors: [{_field, err} | _]}} ->
+        {:noreply, put_flash(socket, :warn, FullCircleWeb.CoreComponents.translate_error(err))}
+
       _ ->
         {:noreply, put_flash(socket, :warn, gettext("Could not save the task."))}
     end
@@ -220,7 +223,7 @@ defmodule FullCircleWeb.TaskLive.Index do
           phx-click="scope"
           phx-value-scope={scope}
           class={[
-            "flex-1 py-3 text-sm font-bold hover:bg-gray-50 dark:hover:bg-gray-800",
+            "flex-1 py-3 text-sm font-bold hover:bg-gray-50 dark:hover:bg-gray-700/60",
             if(@search["scope"] == scope,
               do: "text-gray-900 shadow-[inset_0_-3px_0_#f59e0b] dark:text-gray-100",
               else: "text-gray-500"
@@ -346,7 +349,7 @@ defmodule FullCircleWeb.TaskLive.Index do
           <% else %>
             <article
               id={dom_id}
-              class="flex gap-3 border-b border-gray-200 px-4 py-3 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800/60"
+              class="flex gap-3 border-b border-gray-200 px-4 py-3 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/60"
             >
               <.due_tile
                 task={item.task}

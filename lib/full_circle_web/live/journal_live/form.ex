@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.JournalLive.Form do
   use FullCircleWeb, :live_view
 
+  on_mount {FullCircleWeb.RecordAside, :refresh_tasks_panel}
+
   alias FullCircle.JournalEntry
   alias FullCircle.Accounting.{Journal}
   alias FullCircle.StdInterface

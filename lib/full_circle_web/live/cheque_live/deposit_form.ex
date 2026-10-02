@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.ChequeLive.DepositForm do
   use FullCircleWeb, :live_view
 
+  on_mount {FullCircleWeb.RecordAside, :refresh_tasks_panel}
+
   alias FullCircle.{Cheque, Reporting}
   alias FullCircle.Cheque.Deposit
 

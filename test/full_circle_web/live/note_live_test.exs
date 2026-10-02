@@ -212,6 +212,19 @@ defmodule FullCircleWeb.NoteLiveTest do
 
     defp edit_path(comp, note), do: ~p"/companies/#{comp.id}/notes/#{note.id}/edit"
 
+    test "forged note-only events on /notes/new are ignored", %{conn: conn, comp: comp} do
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/new")
+
+      for {event, params} <- [
+            {"delete", %{}},
+            {"toggle_history", %{}},
+            {"attachment_uploaded", %{}},
+            {"remove_attachment", %{"id" => Ecto.UUID.generate()}}
+          ] do
+        assert render_hook(lv, event, params) =~ "note-form"
+      end
+    end
+
     test "new note: first pick sets the subject, later picks queue links",
          %{conn: conn, admin: admin, comp: comp} do
       ali = contact_fixture(comp, admin, %{"name" => "Ali Welding"})

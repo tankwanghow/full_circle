@@ -131,6 +131,18 @@ defmodule FullCircleWeb.TaskLiveTest do
                Tasks.list_tasks(comp, admin, %{"scope" => "mine"}, page: 1, per_page: 10)
     end
 
+    test "quick-add shows the changeset's error", %{conn: conn, comp: comp} do
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks")
+
+      html =
+        lv
+        |> form("#task-compose", %{"compose" => %{"title" => String.duplicate("x", 121)}})
+        |> render_submit()
+
+      assert html =~ "should be at most 120 character"
+      refute html =~ "Could not save the task."
+    end
+
     test "guest is turned away", %{admin: admin, comp: comp} do
       guest = user_with_role(comp, admin, "guest")
 
@@ -167,6 +179,15 @@ defmodule FullCircleWeb.TaskLiveTest do
       assert task.title == "Permit – Rahim"
       assert task.visibility == nil
       assert task.assignee_id == clerk.id
+    end
+
+    test "a malformed remove_link id is ignored", %{conn: conn, admin: admin, comp: comp} do
+      contact = contact_fixture(comp, admin)
+      task = task_fixture(comp, admin, %{"links" => [%{"type" => "Contact", "id" => contact.id}]})
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/#{task.id}")
+
+      assert render_hook(lv, "remove_link", %{"id" => "not-a-uuid"}) =~ "task-post"
+      assert [_] = Tasks.list_links(task, comp, admin)
     end
 
     test "Done and Skip sit apart from Save, Copy, Back and Delete", %{

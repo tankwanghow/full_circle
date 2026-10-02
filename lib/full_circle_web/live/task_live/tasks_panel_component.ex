@@ -11,6 +11,10 @@ defmodule FullCircleWeb.TaskLive.TasksPanelComponent do
   alias FullCircle.Tasks
 
   @impl true
+  # From RecordAside's :refresh_tasks_panel hook: a task changed somewhere.
+  def update(%{refresh: true}, socket),
+    do: {:ok, if(socket.assigns[:loaded_for], do: load(socket), else: socket)}
+
   def update(assigns, socket) do
     socket =
       socket
@@ -141,7 +145,7 @@ defmodule FullCircleWeb.TaskLive.TasksPanelComponent do
         id={"#{@id}-task-#{row.task.id}"}
         href={~p"/companies/#{@current_company.id}/tasks/#{row.task.id}"}
         target="_blank"
-        class="flex items-center gap-2 border-b border-gray-200 px-4 py-2 text-sm last:border-0 hover:bg-sky-50/70 dark:border-gray-700 dark:hover:bg-gray-800/70"
+        class="flex items-center gap-2 border-b border-gray-200 px-4 py-2 text-sm last:border-0 hover:bg-sky-50/70 dark:border-gray-700 dark:hover:bg-gray-700/60"
       >
         <span class="min-w-0 flex-1 truncate font-medium">{row.task.title}</span>
         <.due_cell :if={row.task.status == "open"} task={row.task} group={row.group} today={@today} />

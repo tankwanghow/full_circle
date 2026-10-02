@@ -62,6 +62,27 @@ defmodule FullCircleWeb.TasksPanelLiveTest do
     assert id == c.id
   end
 
+  test "a task created elsewhere appears without a reload", %{
+    conn: conn,
+    admin: admin,
+    comp: comp,
+    contact: c
+  } do
+    {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
+    refute has_element?(lv, "#tasks-panel", "Made in another tab")
+
+    # Another tab or user: create_task broadcasts {:tasks_changed, company_id}.
+    task_fixture(comp, admin, %{
+      "title" => "Made in another tab",
+      "links" => [%{"type" => "Contact", "id" => c.id}]
+    })
+
+    # The host's handle_info sends the panel an update; a first render lets
+    # the broadcast through, so the update is queued ahead of the second.
+    render(lv)
+    assert has_element?(lv, "#tasks-panel", "Made in another tab")
+  end
+
   test "the full form opens with this record already linked", %{
     conn: conn,
     comp: comp,

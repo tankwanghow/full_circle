@@ -1,6 +1,8 @@
 defmodule FullCircleWeb.InvoiceLive.Form do
   use FullCircleWeb, :live_view
 
+  on_mount {FullCircleWeb.RecordAside, :refresh_tasks_panel}
+
   alias FullCircle.Billing
   alias FullCircle.Billing.{Invoice}
 

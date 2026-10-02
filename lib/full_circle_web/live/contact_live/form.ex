@@ -1,5 +1,8 @@
 defmodule FullCircleWeb.ContactLive.Form do
   use FullCircleWeb, :live_view
+
+  on_mount {FullCircleWeb.RecordAside, :refresh_tasks_panel}
+
   alias FullCircle.StdInterface
   alias FullCircle.Accounting.Contact
 

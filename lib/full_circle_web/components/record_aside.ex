@@ -6,6 +6,35 @@ defmodule FullCircleWeb.RecordAside do
   """
   use FullCircleWeb, :html
 
+  alias FullCircleWeb.TaskLive.TasksPanelComponent
+
+  @doc """
+  `on_mount {FullCircleWeb.RecordAside, :refresh_tasks_panel}` in every page
+  that renders `record_aside/1`. A task saved elsewhere (the full form in a new
+  tab, another user) broadcasts `{:tasks_changed, company_id}` on
+  `Tasks.topic/1`; this subscribes the page and hands that message to the
+  tasks panel, so the host LiveView needs no handle_info of its own.
+  """
+  def on_mount(:refresh_tasks_panel, _params, _session, socket) do
+    company = socket.assigns[:current_company]
+
+    if company && Phoenix.LiveView.connected?(socket) do
+      Phoenix.PubSub.subscribe(FullCircle.PubSub, FullCircle.Tasks.topic(company.id))
+
+      {:cont,
+       Phoenix.LiveView.attach_hook(socket, :refresh_tasks_panel, :handle_info, &refresh/2)}
+    else
+      {:cont, socket}
+    end
+  end
+
+  defp refresh({:tasks_changed, _company_id}, socket) do
+    Phoenix.LiveView.send_update(TasksPanelComponent, id: "tasks-panel", refresh: true)
+    {:halt, socket}
+  end
+
+  defp refresh(_msg, socket), do: {:cont, socket}
+
   attr :record_type, :string, required: true
   attr :record_id, :string, required: true
   attr :class, :any, default: nil

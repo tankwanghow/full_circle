@@ -1,8 +1,11 @@
 defmodule FullCircleWeb.NoteLive.Index do
   @moduledoc """
-  The notes feed: newest first, like a social timeline. A post box at the top
-  does a quick-add (body, optional subject, who can read it); the note's own
-  page (the edit page) is where a title, links and files are added.
+  The notes feed: newest first, like a social timeline. The write box at the
+  top is the shared `NoteLive.ComposerComponent` (`id="compose"`), the same box
+  the note page and every notes panel use: body, optional subject, links and
+  who can read it. Each post is `note_post/1`; it opens the note's post page
+  (`NoteLive.Form`), where the note is edited in place, files are attached and
+  replies are threaded. Contract: `.claude/skills/notes.md`.
   """
   use FullCircleWeb, :live_view
 
