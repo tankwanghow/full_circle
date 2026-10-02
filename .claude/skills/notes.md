@@ -191,7 +191,9 @@ Spec: `docs/superpowers/specs/2026-10-02-note-replies-design.md`.
   `update_all`: replies get no `note_versions` row for the inherited change.
 - A non-reply note whose subject is a note (the about… picker still offers
   notes) is not in the thread; `list_backlinks/3` returns it with notes that
-  link to the note, under "Linked from".
+  link to the note, under "Linked from". It can also return a reply that
+  links to its own root; the note page (`NoteLive.Form.assign_thread/1`)
+  drops anything already in the conversation, so it shows once.
 - `FullCircle.Notes.ReplyBackfill.run/1` converted old note-on-note rows
   (subject = a note) in the `add_reply_to_to_notes` migration: true root via
   a recursive CTE with a cycle guard, a `note_versions` snapshot first.
