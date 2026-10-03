@@ -160,10 +160,10 @@ defmodule FullCircleWeb.TradingLocationLive.Form do
         class="p-4 border rounded space-y-2"
       >
         <div class="flex gap-2">
-          <div class="w-1/2">
+          <div class="w-5/12">
             <.input field={@form[:name]} label={gettext("Name")} />
           </div>
-          <div class="w-1/4">
+          <div class="w-2/12">
             <.input
               field={@form[:kind]}
               type="select"
@@ -171,7 +171,7 @@ defmodule FullCircleWeb.TradingLocationLive.Form do
               options={Enum.map(Location.kinds(), &{&1, &1})}
             />
           </div>
-          <div class="w-1/4">
+          <div class="w-5/12">
             <.input
               field={@form[:contact_name]}
               label={gettext("Contact (supplier/customer)")}
