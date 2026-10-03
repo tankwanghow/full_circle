@@ -206,13 +206,44 @@ looks the same everywhere. Options:
 - `relation: :linked` — adds the "↩ linked" tag (note links here, is about
   something else).
 - `new_tab` — body and counts open the note in a new tab (panels).
-- `compact` — one row of 16×16 thumbnails, names in the tooltip (panels);
-  without it, the feed's large X-style grid.
-- `can_attach` — shows 📎 Attach beside the counts (use `Notes.may_edit?/3`).
+- Progress: a note whose subject is a Task gets `.note-progress` (amber
+  `#f59e0b` inset bar, amber tint) and a ✅ tick (tooltip "Progress") in `post_header`
+  (`progress` attr), except where `host` is that task. Edit headers pass it too.
+- Files: the feed, panels and the note page all draw `file_grid/1` (the large
+  X-style grid). Feed and panels show the first 4, then "+ N more files"; the
+  note page (`detail`) shows all. There is no small-thumbnail panel mode.
 - `detail` — the note's own page: larger body, no line-clamp, every file,
-  full timestamp, counts not wrapped in a link, and an `actions` slot.
+  full timestamp, counts not wrapped in a link.
   The root element's id is the `id` attr. Feed and panels leave it off.
+- `actions` slot — controls right-aligned at the end of the counts row. The
+  note page puts ✎ Edit, 📎 Attach and History there; a panel puts ✎ Edit and
+  📎 Attach on notes the viewer may edit (`Notes.may_edit?/3`, the item's
+  `can_attach`).
 Items are `%{id, note, d}` with `d` from `Notes.feed_details/3`.
+
+### Panel create in place
+＋ Note (`#{panel}-new`) opens the full write box in the panel (`full`,
+`avatar`, `fixed_subject` = the panel's record): title, body, and
+"+ link a record". There is no "Full form" link to `/notes/new`. With a fixed
+subject every pick is a link (a pick of the record itself is ignored), the
+button and picker read "link a record" / "Link other records", never
+"about…". A Task subject hides the roles pill as well as the chips (task notes
+take the task's visibility). Files attach after the first save, through ✎ Edit.
+Every Linkable type hosts this one panel (records, the 9 documents, Task, and
+the list pages' 📝 modal), so create/edit in place covers them all.
+
+### Panel edit in place
+A panel post's ✎ Edit (`#{panel}-edit-#{note_id}`) swaps that post for the
+composer (`id` `#{panel}-edit`, `layout: :post`) inside `#{panel}-editing`,
+like the note page. The panel keeps the note as it was when Edit was pressed
+(`edit_note`), so a reload after an upload cannot hand the box a newer
+`lock_version`. A note *about* the panel's record gets that record as
+`fixed_subject`: there is no chip to clear (the post shows none either), but
+"+ link a record" stays, since the composer allows links in `:edit` even with
+a fixed subject. A note that only links here keeps its own subject. The files
+(`#{panel}-files`) ✕ carries `target={@myself}`, because the panel's host
+page has no `remove_attachment` handler. Save, Cancel and uploads all reload
+the panel. Save also sends `{:notes_changed, type, id}` when `notify_parent`.
 
 ## Feed (`/notes`)
 The index is an x.com-style feed (`NoteLive.Index` + `note_post/1`). Per-post
@@ -224,8 +255,8 @@ note goes in with `stream_insert(..., at: 0)` built from
 
 ## Record chips (About & links)
 One component, `record_chip/1` in `NoteComponents`, renders every subject/link
-chip — feed posts, the note page and the task page. It is capped at 20rem
-(`max-w-xs`): the "Type · title" text truncates with an ellipsis and the full
+chip — feed posts, the note page and the task page. It is capped at 10rem
+(`max-w-40`): the "Type · title" text truncates with an ellipsis and the full
 text is the chip's `title` tooltip. Remove buttons (✕) go in its inner block
 with `shrink-0`, outside the truncated text, so they always show. Pages build
 the `target` with a local `chip_target/2`: saved links already carry a resolved
@@ -278,7 +309,8 @@ would otherwise show the pre-save text and `lock_version`.
 | `roles` | `false` hides the role chips. A Task subject hides them either way (`task_subject?/2`) |
 | `placeholder`, `submit_label` | "Write a note…" / "Post your reply…"; "Post" / "Reply" / "Save" |
 | `cancellable` | shows Cancel |
-| `notify` | `:liveview` (default) sends `{:composer, id, event}` to the host LiveView. `{module, id}` does `send_update(module, id: id, composer: {composer_id, event})`. Events are `{:saved, mode, note}` or `:cancelled`. |
+| `notify` | `:liveview` (default) sends `{:composer, id, event}` to the host LiveView. `{module, id}` does `send_update(module, id: id, composer: {composer_id, event})`. Events are `{:saved, mode, note}`, `:cancelled`, or `:attachment_uploaded` (post layout: the 📎 button inside the box finished an upload) |
+| `layout` | `:box` (default): the write box. `:post`: edit in place (note page and panels), laid out like `note_post` — author avatar, `:header` slot (`post_header`; the slot's `:let` is whether the role chips show, and `show_visibility={!roles_editable}` keeps the 🔒 tag when they do not: task notes, replies), record chips (a reply shows its subject chip without ✕), bordered title (text-xl) and body (text-lg), `:files` slot (`file_grid removable`), visibility chips, then the counts row: `:footer` slot left, `:actions` slot + Cancel/Save right. The chips and picker sit above the `<form>`, so `#note-form` holds only the fields |
 
 A pick reaches the box through `RecordPickerComponent`'s `notify`:
 `send_update(ComposerComponent, id: …, picked: {picker_id, picked})`.
@@ -291,16 +323,23 @@ A pick reaches the box through `RecordPickerComponent`'s `notify`:
 - `/notes/:id` is the post view: `note_post` with `detail`.
 - `/notes/:id/edit` opens edit mode only when `can_edit?`. A reader gets the
   post view, with no Edit and no Delete.
-- ✎ Edit (`#edit-note`) swaps the post for the composer in place. The box is
+- ✎ Edit (`#edit-note`) swaps the post for the composer (`layout={:post}`) in
+  place, so every part stays where the post had it. The box is
   pinned to the note as it was when Edit was pressed (`edit_note`). A
   mid-edit reload — a file just uploaded — must not hand the box a newer
   `lock_version`, or the save would silently overwrite someone else's edit
   instead of coming back `:stale`.
 - Delete lives in the `⋯` menu (`#delete-note`) when `can_delete?`.
-- Files: the grid is in the post. Edit mode shows tiles and remove under
-  `#note-files`. Attach still goes through `attach_button` and the HTTP
-  upload; the button sits in this LiveView, so `attachment_uploaded` is
-  handled here.
+- Files: the post and edit mode share `file_grid/1`. Edit mode passes
+  `removable` (`#note-files`, `#att-<id>`: a ✕ and the file name on each).
+  Attach goes through `attach_button` and the HTTP upload. In the post view
+  the button sits in this LiveView, which handles `attachment_uploaded`. In
+  edit mode it sits inside the composer, and a hook pushes to the component
+  it sits in (`closestComponentID`), so the composer forwards it as
+  `{:composer, "note", :attachment_uploaded}`. LiveViewTest does not mimic
+  that: `element(...) |> render_hook` goes to the element's `phx-target`
+  (else the LiveView). Test it with `with_target("#note-box")`. The ✕ has no `phx-target`
+  and reaches this LiveView's `remove_attachment` directly.
 - History (`#toggle-history`, `#note-history`) lists versions with the same
   per-version filter as `list_versions/3`.
 - Thread, top to bottom: `#replying-to` (reply pages only: the root as a

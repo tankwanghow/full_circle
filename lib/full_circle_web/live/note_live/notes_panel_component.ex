@@ -8,19 +8,25 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
   import FullCircleWeb.NoteComponents
 
   alias FullCircle.Notes
+  alias FullCircle.Notes.Attachments
+  alias FullCircleWeb.NoteLive.ComposerComponent
 
-  # The quick-add composer saved (or was cancelled).
+  # A composer finished: the quick-add box (`id`) or a note edited in place
+  # (`id-edit`). Links on a saved note apply at once, so any edit reloads.
   @impl true
-  def update(%{composer: {_cid, event}}, socket) do
-    %{record_type: t, record_id: id} = socket.assigns
+  def update(%{composer: {cid, event}}, socket) do
+    editor? = cid == edit_id(socket.assigns.id)
 
     case event do
       {:saved, _mode, _note} ->
-        if socket.assigns.notify_parent, do: send(self(), {:notes_changed, t, id})
-        {:ok, socket |> assign(adding: false) |> load()}
+        notify_parent(socket)
+        {:ok, socket |> stop(editor?) |> load()}
 
       :cancelled ->
-        {:ok, assign(socket, adding: false)}
+        {:ok, if(editor?, do: socket |> stop(true) |> load(), else: stop(socket, false))}
+
+      :attachment_uploaded ->
+        {:ok, load(socket)}
     end
   end
 
@@ -33,7 +39,9 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
       |> assign(assigns)
       |> assign_new(:notify_parent, fn -> false end)
       |> assign_new(:class, fn -> nil end)
+      |> assign_new(:flush, fn -> false end)
       |> assign_new(:adding, fn -> false end)
+      |> assign_new(:edit_note, fn -> nil end)
       |> assign_new(:heading, fn -> nil end)
 
     key = {socket.assigns.record_type, socket.assigns.record_id}
@@ -66,47 +74,91 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
     assign(socket, items: items, can_create: rights.create)
   end
 
+  defp edit_id(id), do: "#{id}-edit"
+
+  defp stop(socket, true = _editor?), do: assign(socket, edit_note: nil)
+  defp stop(socket, false), do: assign(socket, adding: false)
+
+  defp notify_parent(%{assigns: %{notify_parent: true, record_type: t, record_id: id}}),
+    do: send(self(), {:notes_changed, t, id})
+
+  defp notify_parent(_socket), do: :ok
+
   @impl true
   def handle_event("new", _, socket), do: {:noreply, assign(socket, adding: true)}
   def handle_event("cancel", _, socket), do: {:noreply, assign(socket, adding: false)}
 
   def handle_event("attachment_uploaded", _, socket), do: {:noreply, load(socket)}
 
+  # The box edits the note as it was when Edit was pressed: a later reload (a
+  # file just uploaded) must not hand it a newer lock_version, or a save would
+  # overwrite someone else's edit instead of coming back stale.
+  def handle_event("edit_note", %{"id" => id}, socket) do
+    case Enum.find(socket.assigns.items, &(&1.id == id and &1.can_attach)) do
+      nil -> {:noreply, socket}
+      item -> {:noreply, assign(socket, edit_note: item.note)}
+    end
+  end
+
+  def handle_event("remove_attachment", %{"id" => id}, socket) do
+    %{items: items, current_company: com, current_user: user} = socket.assigns
+
+    att =
+      for(i <- items, i.can_attach, a <- i.note.attachments, a.id == id, do: a)
+      |> List.first()
+
+    if att, do: Attachments.remove(att, com, user)
+    {:noreply, load(socket)}
+  end
+
+  # A note about this record keeps it: no chip to clear, as the post shows none.
+  # A note that only links here keeps its own subject, editable as anywhere.
+  defp host_subject(%{subject_type: t, subject_id: id}, t, id), do: {t, id}
+  defp host_subject(_note, _type, _id), do: nil
+
+  defp editing?(%{id: id}, %{id: id}), do: true
+  defp editing?(_item, _edit_note), do: false
+
+  # On a task its notes read as "Progress" (UI wording only; they are Notes).
+  defp label("Task", :heading), do: gettext("Progress")
+  defp label("Task", :add), do: gettext("Progress")
+  defp label("Task", :empty), do: gettext("No progress yet.")
+  defp label("Task", :placeholder), do: gettext("Write progress…")
+  defp label(_type, :heading), do: gettext("Notes")
+  defp label(_type, :add), do: gettext("Note")
+  defp label(_type, :empty), do: gettext("No notes yet.")
+  defp label(_type, :placeholder), do: nil
+
   @impl true
   def render(assigns) do
     ~H"""
+    <%!-- flush: a section of a page whose neighbours already draw the lines
+         (the task page), not a card beside a form. --%>
     <section
       id={@id}
       class={[
-        "overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900",
+        "overflow-hidden border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900",
+        !@flush && "rounded-xl border",
         @class
       ]}
     >
       <div class="flex items-center gap-2 border-b border-gray-200 px-4 py-2 dark:border-gray-700">
-        <span class="font-semibold">{@heading || "📝 #{gettext("Notes")}"}</span>
+        <span class="font-semibold">{@heading || "📝 #{label(@record_type, :heading)}"}</span>
         <span class="text-sm text-gray-500">{length(@items)}</span>
-        <.link
-          :if={@can_create}
-          navigate={"/companies/#{@current_company.id}/notes/new?subject_type=#{@record_type}&subject_id=#{@record_id}"}
-          class="ml-auto text-xs text-gray-500 hover:underline dark:text-gray-400"
-        >
-          {gettext("Full form")}
-        </.link>
         <button
           :if={@can_create and !@adding}
           id={"#{@id}-new"}
           type="button"
           phx-click="new"
           phx-target={@myself}
-          class={[
-            "rounded-full bg-sky-500 px-3 py-0.5 text-sm font-bold text-white hover:bg-sky-600",
-            !@can_create && "ml-auto"
-          ]}
+          class="ml-auto rounded-full bg-sky-500 px-3 py-0.5 text-sm font-bold text-white hover:bg-sky-600"
         >
-          ＋ {gettext("Note")}
+          ＋ {label(@record_type, :add)}
         </button>
       </div>
 
+      <%!-- ＋ Note opens the full write box here (title, links), so the panel
+           needs no "Full form" link to /notes/new. Files attach after saving. --%>
       <div
         :if={@adding and @can_create}
         class="border-b border-gray-200 px-4 py-3 dark:border-gray-700"
@@ -114,7 +166,10 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
         <.live_component
           module={FullCircleWeb.NoteLive.ComposerComponent}
           id={@id}
+          placeholder={label(@record_type, :placeholder)}
           notify={{__MODULE__, @id}}
+          full
+          avatar
           fixed_subject={{@record_type, @record_id}}
           roles_open={@record_type != "Task"}
           roles={@record_type != "Task"}
@@ -124,19 +179,82 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
         />
       </div>
 
-      <.note_post
-        :for={item <- @items}
-        id={"#{@id}-note-#{item.id}"}
-        item={item}
-        current_company={@current_company}
-        host={{@record_type, @record_id}}
-        relation={item.relation}
-        can_attach={item.can_attach}
-        new_tab
-        compact
-      />
+      <%= for item <- @items do %>
+        <%!-- Edit in place, laid out like the post it replaces (layout :post). --%>
+        <div
+          :if={editing?(item, @edit_note)}
+          id={"#{@id}-editing"}
+          class="border-b border-gray-200 px-4 py-3 dark:border-gray-700"
+        >
+          <.live_component
+            module={ComposerComponent}
+            id={edit_id(@id)}
+            placeholder={label(@record_type, :placeholder)}
+            notify={{__MODULE__, @id}}
+            mode={:edit}
+            layout={:post}
+            note={@edit_note}
+            fixed_subject={host_subject(item.note, @record_type, @record_id)}
+            full
+            cancellable
+            submit_label={gettext("Save")}
+            current_company={@current_company}
+            current_user={@current_user}
+          >
+            <:header :let={roles_editable}>
+              <.post_header
+                note={item.note}
+                progress={item.note.subject_type == "Task" and @record_type != "Task"}
+                reply_to={item.d[:reply_to]}
+                relation={item.relation}
+                show_visibility={!roles_editable}
+                current_company={@current_company}
+              />
+            </:header>
+            <:files>
+              <.file_grid
+                id={"#{@id}-files"}
+                attachments={item.note.attachments}
+                removable
+                target={@myself}
+              />
+            </:files>
+            <:footer>
+              <span title={gettext("Replies")}>💬 {item.d.replies}</span>
+              <span title={gettext("Links")}>🔗 {length(item.d.links)}</span>
+              <span title={gettext("Files")}>📎 {length(item.note.attachments)}</span>
+            </:footer>
+            <:actions>
+              <.attach_button note_id={item.id} current_company={@current_company} />
+            </:actions>
+          </.live_component>
+        </div>
+        <.note_post
+          :if={!editing?(item, @edit_note)}
+          id={"#{@id}-note-#{item.id}"}
+          item={item}
+          current_company={@current_company}
+          host={{@record_type, @record_id}}
+          relation={item.relation}
+          new_tab
+        >
+          <:actions :if={item.can_attach}>
+            <button
+              type="button"
+              id={"#{@id}-edit-#{item.id}"}
+              phx-click="edit_note"
+              phx-value-id={item.id}
+              phx-target={@myself}
+              class="rounded-full border border-gray-300 px-3 py-0.5 text-sm hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
+            >
+              ✎ {gettext("Edit")}
+            </button>
+            <.attach_button note_id={item.id} current_company={@current_company} />
+          </:actions>
+        </.note_post>
+      <% end %>
       <p :if={@items == []} class="px-4 py-3 text-sm text-gray-500">
-        {gettext("No notes yet.")}
+        {label(@record_type, :empty)}
       </p>
     </section>
     """

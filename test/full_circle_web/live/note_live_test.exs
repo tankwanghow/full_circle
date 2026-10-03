@@ -219,6 +219,27 @@ defmodule FullCircleWeb.NoteLiveTest do
   end
 
   # /notes/:id is the post view; /notes/:id/edit opens it in edit mode.
+  test "progress on a task wears the Tasks amber in the feed, not on its own task",
+       %{conn: conn, admin: admin, comp: comp} do
+    task = FullCircle.TasksFixtures.task_fixture(comp, admin, %{"title" => "EPF September"})
+
+    {:ok, progress} =
+      FullCircle.Notes.create_note(
+        %{"body" => "paid at bank", "subject_type" => "Task", "subject_id" => task.id},
+        comp,
+        admin
+      )
+
+    plain = note_fixture(comp, admin, %{"body" => "just a note"})
+
+    {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes")
+    assert has_element?(lv, ~s(#notes-#{progress.id}.note-progress [title="Progress"]), "✅")
+    refute has_element?(lv, "#notes-#{plain.id}.note-progress")
+
+    {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/#{task.id}")
+    refute has_element?(lv, "#task-notes .note-progress")
+  end
+
   describe "note page" do
     defp pick(lv, type, terms, id) do
       lv |> element("#note-open-picker") |> render_click()
@@ -300,7 +321,7 @@ defmodule FullCircleWeb.NoteLiveTest do
       assert [] = FullCircle.Notes.list_links(note, comp, admin)
     end
 
-    test "about & link chips are capped at 20rem with the full title on hover",
+    test "about & link chips are capped at 10rem with the full title on hover",
          %{conn: conn, admin: admin, comp: comp} do
       long =
         "Stainless steel Waste water screen might need to align correctly in order to be effective."
@@ -319,14 +340,14 @@ defmodule FullCircleWeb.NoteLiveTest do
       {:ok, lv, _} = live(conn, edit_path(comp, note))
 
       # subject chip: capped, full text in the tooltip, remove button outside the cut text
-      assert has_element?(lv, ~s{span.max-w-xs[title="Note · #{long}"]})
-      assert has_element?(lv, ~s{span.max-w-xs[title="Note · #{long}"] #note-clear-subject})
+      assert has_element?(lv, ~s{span.max-w-40[title="Note · #{long}"]})
+      assert has_element?(lv, ~s{span.max-w-40[title="Note · #{long}"] #note-clear-subject})
       # link chip uses the same capped chip
       [link] = FullCircle.Notes.list_links(note, comp, admin)
 
       assert has_element?(
                lv,
-               ~s{span.max-w-xs[title="Contact · Kedai Mei"] #remove-link-#{link.link_id}}
+               ~s{span.max-w-40[title="Contact · Kedai Mei"] #remove-link-#{link.link_id}}
              )
     end
 
@@ -558,10 +579,13 @@ defmodule FullCircleWeb.NoteLiveTest do
 
       {:ok, _lv, html} = live(conn, edit_path(comp, note))
       doc = LazyHTML.from_document(html)
-      assert doc |> LazyHTML.query(".att-tile") |> Enum.count() == 5
+      assert doc |> LazyHTML.query("#note-files .note-thumb") |> Enum.count() == 5
       # Images preview themselves; PDFs preview their rendered first page.
-      assert doc |> LazyHTML.query(".att-tile img") |> Enum.count() == 5
-      assert doc |> LazyHTML.query(~s(.att-tile img[src$="?variant=thumb"])) |> Enum.count() == 2
+      assert doc |> LazyHTML.query("#note-files .note-thumb img") |> Enum.count() == 5
+
+      assert doc
+             |> LazyHTML.query(~s(#note-files .note-thumb img[src$="?variant=thumb"]))
+             |> Enum.count() == 2
     end
 
     test "delete returns to the index", %{conn: conn, admin: admin, comp: comp} do
@@ -634,7 +658,7 @@ defmodule FullCircleWeb.NoteLiveTest do
       note = note_fixture(comp, admin, %{"body" => "b"})
       {:ok, lv, _} = live(conn, edit_path(comp, note))
       pick(lv, "Contact", "Mei", mei.id)
-      assert has_element?(lv, "#note-form", "Kedai Mei")
+      assert has_element?(lv, "#note-box", "Kedai Mei")
       refute has_element?(lv, "#notes-panel-form", "Kedai Mei")
     end
 
@@ -654,6 +678,26 @@ defmodule FullCircleWeb.NoteLiveTest do
 
       render_hook(lv, "attachment_uploaded", %{})
       assert has_element?(lv, "#note-files", "late.jpg")
+    end
+
+    test "an upload from the edit box's 📎 button reaches the page",
+         %{conn: conn, admin: admin, comp: comp} do
+      note = note_fixture(comp, admin, %{"body" => "files"})
+      {:ok, lv, _} = live(conn, edit_path(comp, note))
+      lv |> form("#note-form", %{"note" => %{"body" => "half typed"}}) |> render_change()
+
+      {:ok, _} =
+        FullCircle.Notes.Attachments.attach(
+          note,
+          %{path: jpeg_file(), file_name: "from-box.jpg"},
+          comp,
+          admin
+        )
+
+      # In the browser the 📎 hook pushes to the component it sits in: the box.
+      lv |> with_target("#note-box") |> render_hook("attachment_uploaded", %{})
+      assert has_element?(lv, "#note-files", "from-box.jpg")
+      assert has_element?(lv, "#note-form textarea", "half typed")
     end
 
     test "a file refresh mid-edit keeps the typed text and the stale guard",

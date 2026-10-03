@@ -52,6 +52,35 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
     assert {note.subject_type, note.subject_id} == {"Contact", c.id}
   end
 
+  test "＋ Note is the full form in place: title, and picks become links",
+       %{conn: conn, admin: admin, comp: comp, contact: c} do
+    mei = contact_fixture(comp, admin, %{"name" => "Kedai Mei"})
+    {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
+    refute has_element?(lv, "#notes-panel a", "Full form")
+
+    lv |> element("#notes-panel-new") |> render_click()
+    assert has_element?(lv, "#notes-panel-form input[name='note[title]']")
+
+    lv |> element("#notes-panel-open-picker") |> render_click()
+
+    lv
+    |> form("#notes-panel-picker form", %{"type" => "Contact", "terms" => "Mei"})
+    |> render_change()
+
+    lv |> element("#notes-panel-picker-pick-#{mei.id}") |> render_click()
+    assert has_element?(lv, "#notes-panel-box", "Kedai Mei")
+
+    lv
+    |> form("#notes-panel-form", %{"note" => %{"title" => "Terms", "body" => "60 days"}})
+    |> render_submit()
+
+    [note] = FullCircle.Repo.all(FullCircle.Notes.Note)
+    assert {note.title, note.subject_type, note.subject_id} == {"Terms", "Contact", c.id}
+
+    assert [%{type: "Contact", id: id}] = FullCircle.Notes.list_links(note, comp, admin)
+    assert id == mei.id
+  end
+
   test "a contact's quick-add still offers the role chips", %{conn: conn, comp: comp, contact: c} do
     {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
     lv |> element("#notes-panel-new") |> render_click()
@@ -162,6 +191,102 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
 
       assert has_element?(lv, "#notes-panel-note-#{mine.id} [phx-hook=NoteAttach]")
       refute has_element?(lv, "#notes-panel-note-#{theirs.id} [phx-hook=NoteAttach]")
+    end
+  end
+
+  describe "edit in place" do
+    setup %{admin: admin, comp: comp, contact: c} do
+      note =
+        note_fixture(comp, admin, %{
+          "body" => "pays late",
+          "subject_type" => "Contact",
+          "subject_id" => c.id
+        })
+
+      %{note: note, path: ~p"/companies/#{comp.id}/contacts/#{c.id}/edit"}
+    end
+
+    test "✎ Edit swaps the post for the box; Save keeps it on the page",
+         %{conn: conn, note: note, path: path} do
+      {:ok, lv, _} = live(conn, path)
+      lv |> element("#notes-panel-edit-#{note.id}") |> render_click()
+
+      assert has_element?(lv, "#notes-panel-editing #notes-panel-edit-form textarea", "pays late")
+      refute has_element?(lv, "#notes-panel-note-#{note.id}")
+
+      lv
+      |> form("#notes-panel-edit-form", %{"note" => %{"body" => "pays on the 15th"}})
+      |> render_submit()
+
+      refute has_element?(lv, "#notes-panel-editing")
+      assert has_element?(lv, "#notes-panel-note-#{note.id}", "pays on the 15th")
+      assert FullCircle.Repo.get!(FullCircle.Notes.Note, note.id).body == "pays on the 15th"
+    end
+
+    test "Cancel brings the post back unchanged", %{conn: conn, note: note, path: path} do
+      {:ok, lv, _} = live(conn, path)
+      lv |> element("#notes-panel-edit-#{note.id}") |> render_click()
+      lv |> element("#notes-panel-edit-cancel") |> render_click()
+
+      refute has_element?(lv, "#notes-panel-editing")
+      assert has_element?(lv, "#notes-panel-note-#{note.id}", "pays late")
+    end
+
+    test "an upload mid-edit shows the file and keeps the typed text",
+         %{conn: conn, admin: admin, comp: comp, note: note, path: path} do
+      {:ok, lv, _} = live(conn, path)
+      lv |> element("#notes-panel-edit-#{note.id}") |> render_click()
+
+      lv
+      |> form("#notes-panel-edit-form", %{"note" => %{"body" => "half typed"}})
+      |> render_change()
+
+      {:ok, _} =
+        FullCircle.Notes.Attachments.attach(
+          note,
+          %{path: jpeg_file(), file_name: "receipt.jpg"},
+          comp,
+          admin
+        )
+
+      # In the browser the 📎 hook pushes to the component it sits in: the box.
+      lv |> with_target("#notes-panel-edit-box") |> render_hook("attachment_uploaded", %{})
+      assert has_element?(lv, "#notes-panel-files", "receipt.jpg")
+      assert has_element?(lv, "#notes-panel-edit-form textarea", "half typed")
+    end
+
+    test "a file's ✕ in the box removes it", %{
+      conn: conn,
+      admin: admin,
+      comp: comp,
+      note: note,
+      path: path
+    } do
+      {:ok, att} =
+        FullCircle.Notes.Attachments.attach(
+          note,
+          %{path: jpeg_file(), file_name: "old.jpg"},
+          comp,
+          admin
+        )
+
+      {:ok, lv, _} = live(conn, path)
+      lv |> element("#notes-panel-edit-#{note.id}") |> render_click()
+      lv |> element("#notes-panel-files #att-#{att.id} button") |> render_click()
+
+      refute has_element?(lv, "#notes-panel-files")
+      assert FullCircle.Repo.get!(FullCircle.Notes.NoteAttachment, att.id).removed_at
+    end
+
+    test "no ✎ Edit on a note the viewer cannot edit",
+         %{admin: admin, comp: comp, note: note, path: path} do
+      clerk = user_with_role(comp, admin, "clerk")
+      {:ok, lv, _} = live(log_in_user(build_conn(), clerk), path)
+
+      assert has_element?(lv, "#notes-panel-note-#{note.id}", "pays late")
+      refute has_element?(lv, "#notes-panel-edit-#{note.id}")
+      lv |> with_target("#notes-panel") |> render_click("edit_note", %{"id" => note.id})
+      refute has_element?(lv, "#notes-panel-editing")
     end
   end
 

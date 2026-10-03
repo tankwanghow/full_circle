@@ -2522,14 +2522,14 @@ msgstr "标记完成"
 msgid "Skip this time"
 msgstr "本次跳过"
 
-msgid "This task expects:"
-msgstr "此任务需要："
+msgid "Task expects:"
+msgstr "任务需要："
 
 msgid "Next cycle due"
 msgstr "下一期到期日"
 
-msgid "Closing note (optional) — add files on the task page after"
-msgstr "结束备注（可选）— 之后可在任务页添加文件"
+msgid "Progress (optional) — add files on the task page after"
+msgstr "进度（可选）— 之后可在任务页添加文件"
 
 msgid "Done"
 msgstr "完成"
@@ -2609,16 +2609,16 @@ msgstr "暂无内容。"
 msgid "title, description or assignee…"
 msgstr "标题、描述或负责人…"
 
-msgid "Due date"
-msgstr "到期日"
+msgid "Repeat"
+msgstr "重复"
 
 msgid "Repeats every"
 msgstr "重复周期"
 
-msgid "Every"
+msgid "every"
 msgstr "每"
 
-msgid "Does not repeat"
+msgid "never"
 msgstr "不重复"
 
 msgid "days"
@@ -2726,8 +2726,8 @@ msgstr "指派给"
 msgid "reminder %{n} days"
 msgstr "提前 %{n} 天提醒"
 
-msgid "Progress notes"
-msgstr "进度备注"
+msgid "Progress"
+msgstr "进度"
 
 msgid "Visible to the same people as the note it replies to."
 msgstr "可见范围与所回复的备注相同。"
@@ -2752,3 +2752,9 @@ msgstr "回复给你无法查看的备注"
 
 msgid "Linked from"
 msgstr "被以下备注关联"
+
+msgid "No progress yet."
+msgstr "暂无进度。"
+
+msgid "Write progress…"
+msgstr "填写进度…"

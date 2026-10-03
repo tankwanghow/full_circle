@@ -32,7 +32,12 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
     full_form_path: nil,
     class: nil,
     notify: :liveview,
-    reply_to: nil
+    reply_to: nil,
+    layout: :box,
+    header: [],
+    files: [],
+    footer: [],
+    actions: []
   ]
 
   # A pick from this box's picker (RecordPickerComponent notify).
@@ -175,6 +180,13 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
     end
   end
 
+  # The post layout carries the page's 📎 Attach button; its hook pushes to the
+  # component it sits in, so pass the upload on to the host.
+  def handle_event("attachment_uploaded", _, socket) do
+    notify(socket, :attachment_uploaded)
+    {:noreply, socket}
+  end
+
   def handle_event("cancel", _, socket) do
     notify(socket, :cancelled)
     {:noreply, reset(socket)}
@@ -228,6 +240,13 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
     %{subject: subject, mode: mode, note: note} = socket.assigns
 
     cond do
+      # A fixed subject (a record's notes panel) is set: every pick is a link.
+      fixed_subject?(socket.assigns, picked) ->
+        socket
+
+      socket.assigns.fixed_subject && mode != :edit ->
+        assign(socket, links: Enum.uniq_by(socket.assigns.links ++ [picked], &{&1.type, &1.id}))
+
       # A reply's subject is its root's: every pick is a link.
       replying?(socket.assigns) and mode == :edit ->
         add_saved_link(socket, picked)
@@ -251,6 +270,9 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
         assign(socket, links: Enum.uniq_by(socket.assigns.links ++ [picked], &{&1.type, &1.id}))
     end
   end
+
+  defp fixed_subject?(%{fixed_subject: {t, id}}, %{type: t, id: id}), do: true
+  defp fixed_subject?(_assigns, _picked), do: false
 
   defp add_saved_link(socket, picked) do
     %{note: note, current_company: com, current_user: user} = socket.assigns
@@ -298,13 +320,78 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
   defp errors(form) do
     Enum.map(
       form[:body].errors ++
-        form[:subject_id].errors ++ form[:subject_type].errors ++ form[:visibility].errors ++
+        form[:subject_id].errors ++
+        form[:subject_type].errors ++
+        form[:visibility].errors ++
         form[:reply_to_id].errors,
       &FullCircleWeb.CoreComponents.translate_error/1
     )
   end
 
+  # The edit box shows the note's author, like the post it replaces.
+  defp author_email(%{mode: :edit, note: %Note{author: %{email: email}}}), do: email
+  defp author_email(%{current_user: user}), do: user.email
+
   @impl true
+  def render(%{layout: :post} = assigns) do
+    assigns = assign(assigns, :replying, replying?(assigns))
+
+    ~H"""
+    <div id={"#{@id}-box"} class={["flex gap-3", @class]}>
+      <.avatar email={author_email(assigns)} />
+      <div class="min-w-0 flex-1">
+        <%!-- The header hides its 🔒 tag only while the role chips below say it. --%>
+        {render_slot(
+          @header,
+          @show_roles and not @replying and not task_subject?(@subject, @fixed_subject)
+        )}
+        <div class="mt-0.5 flex flex-wrap items-center gap-1">
+          <.chips {chip_assigns(assigns)} />
+        </div>
+        <.picker :if={@picker_open} {picker_assigns(assigns)} class="mt-2" />
+        <.form
+          for={@form}
+          id={"#{@id}-form"}
+          phx-change="validate"
+          phx-submit="save"
+          phx-target={@myself}
+          autocomplete="off"
+          class="mt-2"
+        >
+          <input
+            type="text"
+            id={"#{@id}_title"}
+            name="note[title]"
+            value={@form[:title].value}
+            placeholder={gettext("Title (optional)")}
+            class="w-full rounded-md border border-gray-300 bg-transparent px-2 py-1 text-xl font-bold placeholder-gray-500 dark:border-gray-600"
+          />
+          <textarea
+            id={"#{@id}_body_#{@rev}"}
+            name="note[body]"
+            rows="6"
+            placeholder={@placeholder || gettext("Write a note…")}
+            class="mt-1 w-full resize-y rounded-md border border-gray-300 bg-transparent px-2 py-1 text-lg placeholder-gray-500 dark:border-gray-600"
+          >{Phoenix.HTML.Form.normalize_value("textarea", @form[:body].value)}</textarea>
+          <.messages {message_assigns(assigns)} />
+          {render_slot(@files)}
+          <.visibility_fields
+            {visibility_assigns(assigns)}
+            class="mt-2 flex flex-wrap items-center gap-1 text-xs"
+          />
+          <div class="mt-2 flex flex-wrap items-center gap-x-8 gap-y-2 text-sm text-gray-500 dark:text-gray-400">
+            {render_slot(@footer)}
+            <span class="ml-auto flex items-center gap-3">
+              {render_slot(@actions)}
+              <.submit_buttons {submit_assigns(assigns)} />
+            </span>
+          </div>
+        </.form>
+      </div>
+    </div>
+    """
+  end
+
   def render(assigns) do
     assigns = assign(assigns, :replying, replying?(assigns))
 
@@ -336,39 +423,11 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
             placeholder={@placeholder || gettext("Write a note…")}
             class="w-full resize-y border-0 bg-transparent p-1 text-lg placeholder-gray-500 focus:ring-0"
           >{Phoenix.HTML.Form.normalize_value("textarea", @form[:body].value)}</textarea>
-          <.error :for={msg <- errors(@form)}>{msg}</.error>
-          <p :if={@error} id={"#{@id}-error"} class="text-sm text-rose-700 dark:text-rose-300">
-            {@error}
-          </p>
-          <p
-            :if={@replying}
-            id={"#{@id}-reply-scope"}
-            class="pb-1 text-xs text-slate-500 dark:text-slate-400"
-          >
-            {gettext("Visible to the same people as the note it replies to.")}
-          </p>
-
-          <div
-            :if={@show_roles and not @replying and not task_subject?(@subject, @fixed_subject)}
+          <.messages {message_assigns(assigns)} />
+          <.visibility_fields
+            {visibility_assigns(assigns)}
             class="flex flex-wrap items-center gap-1 pb-2 text-xs"
-          >
-            <.visibility_chips
-              visibility={roles_of(@form)}
-              id_prefix={"#{@id}-visibility"}
-              target={@myself}
-              roles={@roles}
-              private_title={@private_title}
-            />
-          </div>
-          <div :if={!@show_roles and not @replying and not task_subject?(@subject, @fixed_subject)}>
-            <input type="hidden" name="note[visibility][]" value="" />
-            <input
-              :for={role <- roles_of(@form)}
-              type="hidden"
-              name="note[visibility][]"
-              value={role}
-            />
-          </div>
+          />
           <p
             :if={@hint && not @replying && not task_subject?(@subject, @fixed_subject)}
             class="pb-1 text-xs text-slate-500 dark:text-slate-400"
@@ -377,71 +436,12 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
           </p>
 
           <div class="flex flex-wrap items-center gap-1 border-t border-gray-200 pt-2 dark:border-gray-700">
-            <.record_chip
-              :if={@subject && !@fixed_subject && !@replying}
-              type={@subject.type}
-              target={chip_target(@subject, @current_company)}
-              kind={:subject}
-            >
-              <button
-                type="button"
-                id={"#{@id}-clear-subject"}
-                phx-click="clear_subject"
-                phx-target={@myself}
-                title={gettext("Clear")}
-                class="shrink-0"
-              >
-                ✕
-              </button>
-            </.record_chip>
-            <.record_chip :for={l <- @links} type={l.type} target={chip_target(l, @current_company)}>
-              <button
-                :if={@mode == :edit}
-                type="button"
-                id={"remove-link-#{l.link_id}"}
-                phx-click="remove_link"
-                phx-value-id={l.link_id}
-                phx-target={@myself}
-                title={gettext("Remove")}
-                class="shrink-0"
-              >
-                ✕
-              </button>
-              <button
-                :if={@mode != :edit}
-                type="button"
-                phx-click="remove_queued_link"
-                phx-value-id={l.id}
-                phx-target={@myself}
-                title={gettext("Remove")}
-                class="shrink-0"
-              >
-                ✕
-              </button>
-            </.record_chip>
+            <.chips {chip_assigns(assigns)} />
             <button
               :if={
-                !@fixed_subject and
-                  ((not @replying and (is_nil(@subject) or @full)) or (@replying and @full))
+                (@compact or !@show_roles) and not @replying and
+                  not task_subject?(@subject, @fixed_subject)
               }
-              id={"#{@id}-open-picker"}
-              type="button"
-              phx-click="toggle_picker"
-              phx-target={@myself}
-              class={[
-                "rounded-full border px-2 text-xs",
-                if(is_nil(@subject) and not @replying,
-                  do:
-                    "border-amber-400 bg-amber-50 text-amber-900 dark:border-amber-600 dark:bg-amber-950 dark:text-amber-100",
-                  else:
-                    "border-dashed border-gray-400 text-gray-600 dark:border-gray-500 dark:text-gray-300"
-                )
-              ]}
-            >
-              ＋ {if @subject || @replying, do: gettext("link a record"), else: gettext("about…")}
-            </button>
-            <button
-              :if={(@compact or !@show_roles) and not @replying}
               id={"#{@id}-roles-toggle"}
               type="button"
               phx-click="toggle_roles"
@@ -458,40 +458,202 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
               >
                 {gettext("Full form")}
               </.link>
-              <button
-                :if={@cancellable}
-                type="button"
-                id={"#{@id}-cancel"}
-                phx-click="cancel"
-                phx-target={@myself}
-                class="text-sm text-gray-500 hover:underline"
-              >
-                {gettext("Cancel")}
-              </button>
-              <button
-                type="submit"
-                class="rounded-full bg-sky-500 px-4 py-1 text-sm font-bold text-white hover:bg-sky-600"
-              >
-                {@submit_label || gettext("Post")}
-              </button>
+              <.submit_buttons {submit_assigns(assigns)} />
             </span>
           </div>
         </.form>
-        <div :if={@picker_open} class="mt-2">
-          <.live_component
-            module={RecordPickerComponent}
-            id={"#{@id}-picker"}
-            notify={{__MODULE__, @id}}
-            label={
-              if @subject || @replying,
-                do: gettext("Link other records"),
-                else: gettext("What is this note about?")
-            }
-            current_company={@current_company}
-            current_user={@current_user}
-          />
-        </div>
+        <.picker :if={@picker_open} {picker_assigns(assigns)} class="mt-2" />
       </div>
+    </div>
+    """
+  end
+
+  # The pieces both layouts share. Each gets only the assigns it reads.
+
+  defp chip_assigns(a),
+    do:
+      Map.take(a, [
+        :id,
+        :myself,
+        :subject,
+        :fixed_subject,
+        :replying,
+        :links,
+        :mode,
+        :full,
+        :layout,
+        :current_company
+      ])
+
+  defp message_assigns(a), do: Map.take(a, [:id, :form, :error, :replying])
+
+  defp visibility_assigns(a),
+    do:
+      Map.take(a, [
+        :id,
+        :myself,
+        :form,
+        :show_roles,
+        :replying,
+        :subject,
+        :fixed_subject,
+        :roles,
+        :private_title
+      ])
+
+  defp submit_assigns(a), do: Map.take(a, [:id, :myself, :cancellable, :submit_label])
+
+  defp picker_assigns(a),
+    do: Map.take(a, [:id, :subject, :fixed_subject, :replying, :current_company, :current_user])
+
+  defp chips(assigns) do
+    ~H"""
+    <%!-- A reply's subject is its root's: the post layout shows it, without ✕. --%>
+    <.record_chip
+      :if={@subject && !@fixed_subject && (!@replying or @layout == :post)}
+      type={@subject.type}
+      target={chip_target(@subject, @current_company)}
+      kind={:subject}
+    >
+      <button
+        :if={!@replying}
+        type="button"
+        id={"#{@id}-clear-subject"}
+        phx-click="clear_subject"
+        phx-target={@myself}
+        title={gettext("Clear")}
+        class="shrink-0"
+      >
+        ✕
+      </button>
+    </.record_chip>
+    <.record_chip :for={l <- @links} type={l.type} target={chip_target(l, @current_company)}>
+      <button
+        :if={@mode == :edit}
+        type="button"
+        id={"remove-link-#{l.link_id}"}
+        phx-click="remove_link"
+        phx-value-id={l.link_id}
+        phx-target={@myself}
+        title={gettext("Remove")}
+        class="shrink-0"
+      >
+        ✕
+      </button>
+      <button
+        :if={@mode != :edit}
+        type="button"
+        phx-click="remove_queued_link"
+        phx-value-id={l.id}
+        phx-target={@myself}
+        title={gettext("Remove")}
+        class="shrink-0"
+      >
+        ✕
+      </button>
+    </.record_chip>
+    <button
+      :if={
+        (!@fixed_subject or @full or @mode == :edit) and
+          ((not @replying and (is_nil(@subject) or @full)) or (@replying and @full))
+      }
+      id={"#{@id}-open-picker"}
+      type="button"
+      phx-click="toggle_picker"
+      phx-target={@myself}
+      class={[
+        "rounded-full border px-2 text-xs",
+        if(is_nil(@subject) and not @replying and !@fixed_subject,
+          do:
+            "border-amber-400 bg-amber-50 text-amber-900 dark:border-amber-600 dark:bg-amber-950 dark:text-amber-100",
+          else: "border-dashed border-gray-400 text-gray-600 dark:border-gray-500 dark:text-gray-300"
+        )
+      ]}
+    >
+      ＋ {if @subject || @replying || @fixed_subject,
+        do: gettext("link a record"),
+        else: gettext("about…")}
+    </button>
+    """
+  end
+
+  defp messages(assigns) do
+    ~H"""
+    <.error :for={msg <- errors(@form)}>{msg}</.error>
+    <p :if={@error} id={"#{@id}-error"} class="text-sm text-rose-700 dark:text-rose-300">
+      {@error}
+    </p>
+    <p
+      :if={@replying}
+      id={"#{@id}-reply-scope"}
+      class="pb-1 text-xs text-slate-500 dark:text-slate-400"
+    >
+      {gettext("Visible to the same people as the note it replies to.")}
+    </p>
+    """
+  end
+
+  attr :class, :string, required: true
+
+  defp visibility_fields(assigns) do
+    ~H"""
+    <div
+      :if={@show_roles and not @replying and not task_subject?(@subject, @fixed_subject)}
+      class={@class}
+    >
+      <.visibility_chips
+        visibility={roles_of(@form)}
+        id_prefix={"#{@id}-visibility"}
+        target={@myself}
+        roles={@roles}
+        private_title={@private_title}
+      />
+    </div>
+    <div :if={!@show_roles and not @replying and not task_subject?(@subject, @fixed_subject)}>
+      <input type="hidden" name="note[visibility][]" value="" />
+      <input :for={role <- roles_of(@form)} type="hidden" name="note[visibility][]" value={role} />
+    </div>
+    """
+  end
+
+  defp submit_buttons(assigns) do
+    ~H"""
+    <button
+      :if={@cancellable}
+      type="button"
+      id={"#{@id}-cancel"}
+      phx-click="cancel"
+      phx-target={@myself}
+      class="text-sm text-gray-500 hover:underline"
+    >
+      {gettext("Cancel")}
+    </button>
+    <button
+      type="submit"
+      class="rounded-full bg-sky-500 px-4 py-1 text-sm font-bold text-white hover:bg-sky-600"
+    >
+      {@submit_label || gettext("Post")}
+    </button>
+    """
+  end
+
+  attr :class, :string, default: nil
+
+  defp picker(assigns) do
+    ~H"""
+    <div class={@class}>
+      <.live_component
+        module={RecordPickerComponent}
+        id={"#{@id}-picker"}
+        notify={{__MODULE__, @id}}
+        label={
+          if @subject || @replying || @fixed_subject,
+            do: gettext("Link other records"),
+            else: gettext("What is this note about?")
+        }
+        current_company={@current_company}
+        current_user={@current_user}
+      />
     </div>
     """
   end

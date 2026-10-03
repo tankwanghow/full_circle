@@ -150,6 +150,45 @@ defmodule FullCircleWeb.TaskComponents do
     """
   end
 
+  @doc """
+  The line above a task's title, the same on the list and the task page:
+  "creator · assigned to X", "creator · unassigned", or once closed
+  "creator · Done by X".
+  """
+  def people_line(task) do
+    creator = email_name(task.creator)
+
+    cond do
+      task.status != "open" ->
+        verb = if task.status == "done", do: gettext("Done by"), else: gettext("Skipped by")
+        "#{creator} · #{verb} #{email_name(task.closed_by)}"
+
+      task.assignee ->
+        "#{creator} · " <> gettext("assigned to %{who}", who: email_name(task.assignee))
+
+      true ->
+        "#{creator} · " <> gettext("unassigned")
+    end
+  end
+
+  @doc "\"Repeat every 2 months · reminder 14 days · Everyone\" — below the title."
+  def rhythm(task) do
+    [
+      "#{gettext("Repeat")} #{repeat_label(task) || gettext("never")}",
+      task.reminder_before_days && gettext("reminder %{n} days", n: task.reminder_before_days),
+      visibility_label(task.visibility)
+    ]
+    |> Enum.reject(&(&1 in [nil, false]))
+    |> Enum.join(" · ")
+  end
+
+  defp visibility_label(nil), do: gettext("Everyone")
+  defp visibility_label(["admin"]), do: gettext("Private")
+  defp visibility_label(roles) when is_list(roles), do: Enum.join(roles, ", ")
+
+  defp email_name(%{email: email}) when is_binary(email), do: email |> String.split("@") |> hd()
+  defp email_name(_), do: nil
+
   @doc "\"yearly\", \"every 3 months\"… or nil for a one-off."
   def repeat_label(%{recur_unit: nil}), do: nil
   def repeat_label(%{recur_unit: "day", recur_every: 1}), do: gettext("daily")
@@ -166,6 +205,77 @@ defmodule FullCircleWeb.TaskComponents do
   def group_label(:upcoming), do: gettext("Upcoming")
   def group_label(:someday), do: gettext("Someday")
   def group_label(:closed), do: gettext("Done & skipped")
+
+  attr :id, :string, required: true
+  attr :item, :map, required: true, doc: "a `Tasks.rows/4` row"
+  attr :today, :any, required: true
+  attr :company, :map, required: true
+  attr :new_tab, :boolean, default: false, doc: "open the task in a new tab (record panels)"
+  slot :actions, doc: "right end of the counts row (the list's Done / Skip)"
+
+  @doc """
+  One task as the Tasks list draws it, in the task page's order: due tile,
+  people, title, description, rhythm (one link to the task), the latest
+  progress note as a quote, then 📝 / 🔗. A record's tasks panel uses it too.
+  """
+  def task_row(assigns) do
+    assigns =
+      assign(assigns, path: "/companies/#{assigns.company.id}/tasks/#{assigns.item.task.id}")
+
+    ~H"""
+    <article
+      id={@id}
+      class="flex gap-3 border-b border-gray-200 px-4 py-3 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/60"
+    >
+      <.due_tile task={@item.task} group={@item.group} today={@today} company={@company} />
+      <div class="min-w-0 flex-1">
+        <%!-- People, title, description and rhythm are one link to the task. --%>
+        <.link :if={!@new_tab} navigate={@path} class="block">
+          <.task_row_text item={@item} company={@company} />
+        </.link>
+        <a :if={@new_tab} href={@path} target="_blank" class="block">
+          <.task_row_text item={@item} company={@company} />
+        </a>
+        <%!-- A quoted note, so it never reads as the task's description. --%>
+        <p
+          :if={@item.latest_note}
+          class="mt-1 truncate rounded-r border-l-2 border-sky-400 bg-sky-50 py-0.5 pl-2 pr-1 text-xs italic text-sky-900 dark:border-sky-500 dark:bg-sky-950/40 dark:text-sky-100"
+        >
+          {@item.latest_note.body}
+        </p>
+        <div class="mt-1 flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+          <span title={gettext("Progress")}>📝 {@item.note_count}</span>
+          <span>🔗 {@item.link_count}</span>
+          <span :if={@actions != []} class="ml-auto flex gap-1">{render_slot(@actions)}</span>
+        </div>
+      </div>
+    </article>
+    """
+  end
+
+  attr :item, :map, required: true
+  attr :company, :map, required: true
+
+  defp task_row_text(assigns) do
+    ~H"""
+    <div class="text-sm text-gray-500 dark:text-gray-400">{row_people(@item, @company)}</div>
+    <span class="font-bold">{@item.task.title}</span>
+    <span
+      :if={@item.task.descriptions not in [nil, ""]}
+      class="block truncate text-[0.9375rem] text-gray-800 dark:text-gray-200"
+    >
+      {@item.task.descriptions}
+    </span>
+    <div class="text-sm text-gray-500 dark:text-gray-400">{rhythm(@item.task)}</div>
+    """
+  end
+
+  # The people line; a closed row adds when it was closed.
+  defp row_people(%{group: :closed, task: task}, company) do
+    [people_line(task), closed_on(task, company)] |> Enum.reject(&is_nil/1) |> Enum.join(" · ")
+  end
+
+  defp row_people(%{task: task}, _company), do: people_line(task)
 
   attr :id, :string, required: true
   attr :group, :atom, required: true
@@ -186,9 +296,39 @@ defmodule FullCircleWeb.TaskComponents do
     """
   end
 
-  attr :closing, :map, required: true, doc: "%{task, kind: :done | :skipped, next_due}"
+  attr :task_id, :string, required: true
+  attr :target, :any, default: nil
 
-  @doc "Done / Skip confirmation. Sends confirm_close / cancel_close to the host."
+  @doc "✓ Done and Skip on a list row: open_close to the host (or `target`)."
+  def close_buttons(assigns) do
+    ~H"""
+    <button
+      type="button"
+      phx-click="open_close"
+      phx-value-id={@task_id}
+      phx-value-kind="done"
+      phx-target={@target}
+      class="rounded-full bg-emerald-600 px-2.5 py-0.5 text-xs font-semibold text-white hover:bg-emerald-500"
+    >
+      ✓ {gettext("Done")}
+    </button>
+    <button
+      type="button"
+      phx-click="open_close"
+      phx-value-id={@task_id}
+      phx-value-kind="skip"
+      phx-target={@target}
+      class="rounded-full bg-gray-200 px-2.5 py-0.5 text-xs font-semibold text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200"
+    >
+      {gettext("Skip")}
+    </button>
+    """
+  end
+
+  attr :closing, :map, required: true, doc: "%{task, kind: :done | :skipped, next_due}"
+  attr :target, :any, default: nil
+
+  @doc "Done / Skip confirmation. Sends confirm_close / cancel_close to the host (or `target`)."
   def close_dialog(assigns) do
     ~H"""
     <div id="close-dialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -200,21 +340,28 @@ defmodule FullCircleWeb.TaskComponents do
           :if={@closing.kind == :done and @closing.task.documents_needed}
           class="mt-2 rounded border border-amber-300/70 bg-amber-100/80 px-2 py-1 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/40 dark:text-amber-200"
         >
-          {gettext("This task expects:")} {@closing.task.documents_needed}
+          {gettext("Task expects:")} {@closing.task.documents_needed}
         </p>
-        <.form for={%{}} as={:close} id="close-form" phx-submit="confirm_close" class="mt-3">
+        <.form
+          for={%{}}
+          as={:close}
+          id="close-form"
+          phx-submit="confirm_close"
+          phx-target={@target}
+          class="mt-3"
+        >
           <textarea
             name="close[note]"
             id="close-note"
             rows="3"
-            placeholder={gettext("Closing note (optional) — add files on the task page after")}
+            placeholder={gettext("Progress (optional) — add files on the task page after")}
             class="w-full rounded border-slate-300 text-sm dark:border-gray-600 dark:bg-gray-800"
           ></textarea>
           <p :if={@closing.next_due} class="mt-1 text-sm text-slate-600 dark:text-slate-400">
             {gettext("Next cycle due")} {Helpers.format_date(@closing.next_due)}
           </p>
           <div class="mt-3 flex justify-end gap-2">
-            <button type="button" phx-click="cancel_close" class="gray button">
+            <button type="button" phx-click="cancel_close" phx-target={@target} class="gray button">
               {gettext("Cancel")}
             </button>
             <button

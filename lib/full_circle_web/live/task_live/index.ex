@@ -196,20 +196,6 @@ defmodule FullCircleWeb.TaskLive.Index do
     end
   end
 
-  defp row_meta(%{group: :closed, task: task}, company) do
-    status = if task.status == "done", do: gettext("Done"), else: gettext("Skipped")
-    [status, closed_on(task, company)] |> Enum.reject(&is_nil/1) |> Enum.join(" · ")
-  end
-
-  defp row_meta(%{task: task}, _company) do
-    repeat = repeat_label(task) || gettext("does not repeat")
-    who = assignee_name(task) || gettext("unassigned")
-    "#{repeat} · #{who}"
-  end
-
-  defp assignee_name(%{assignee: %{email: email}}), do: email |> String.split("@") |> hd()
-  defp assignee_name(_task), do: nil
-
   @impl true
   def render(assigns) do
     ~H"""
@@ -347,64 +333,18 @@ defmodule FullCircleWeb.TaskLive.Index do
           <%= if item[:heading] do %>
             <.group_heading id={dom_id} group={item.heading} />
           <% else %>
-            <article
+            <.task_row
               id={dom_id}
-              class="flex gap-3 border-b border-gray-200 px-4 py-3 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/60"
+              item={item}
+              today={@today}
+              company={@current_company}
             >
-              <.due_tile
-                task={item.task}
-                group={item.group}
-                today={@today}
-                company={@current_company}
-              />
-              <div class="min-w-0 flex-1">
-                <.link
-                  navigate={~p"/companies/#{@current_company.id}/tasks/#{item.task.id}"}
-                  class="font-bold hover:underline"
-                >
-                  {item.task.title}
-                </.link>
-                <div class="text-sm text-gray-500 dark:text-gray-400">
-                  {row_meta(item, @current_company)}
-                </div>
-                <p
-                  :if={item.latest_note}
-                  class="mt-0.5 truncate text-sm text-gray-700 dark:text-gray-300"
-                >
-                  {item.latest_note.body}
-                </p>
-                <div class="mt-1 flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                  <span>📝 {item.note_count}</span>
-                  <span>🔗 {item.link_count}</span>
-                  <span
-                    :if={
-                      item.task.status == "open" and
-                        Tasks.may_close?(item.task, @current_user, @rights)
-                    }
-                    class="ml-auto flex gap-1"
-                  >
-                    <button
-                      type="button"
-                      phx-click="open_close"
-                      phx-value-id={item.task.id}
-                      phx-value-kind="done"
-                      class="rounded-full bg-emerald-600 px-2.5 py-0.5 text-xs font-semibold text-white hover:bg-emerald-500"
-                    >
-                      ✓ {gettext("Done")}
-                    </button>
-                    <button
-                      type="button"
-                      phx-click="open_close"
-                      phx-value-id={item.task.id}
-                      phx-value-kind="skip"
-                      class="rounded-full bg-gray-200 px-2.5 py-0.5 text-xs font-semibold text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200"
-                    >
-                      {gettext("Skip")}
-                    </button>
-                  </span>
-                </div>
-              </div>
-            </article>
+              <:actions :if={
+                item.task.status == "open" and Tasks.may_close?(item.task, @current_user, @rights)
+              }>
+                <.close_buttons task_id={item.task.id} />
+              </:actions>
+            </.task_row>
           <% end %>
         <% end %>
       </div>

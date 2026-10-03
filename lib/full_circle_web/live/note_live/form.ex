@@ -257,6 +257,10 @@ defmodule FullCircleWeb.NoteLive.Form do
   def handle_info({:composer, "note", :cancelled}, socket),
     do: {:noreply, socket |> stop_edit() |> reload()}
 
+  # The edit box's 📎 Attach finished an upload: show the new file.
+  def handle_info({:composer, "note", :attachment_uploaded}, socket),
+    do: {:noreply, reload(socket)}
+
   # A reply was posted in the thread: refresh the thread and the 💬 count.
   def handle_info({:composer, "reply", {:saved, :new, _}}, socket), do: {:noreply, reload(socket)}
 
@@ -438,40 +442,51 @@ defmodule FullCircleWeb.NoteLive.Form do
             </:actions>
           </.note_post>
 
+          <%!-- Edit keeps the post's layout: the same header, chips, text, file
+               grid and counts row, each turned into its field. --%>
           <div :if={@editing} class="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
             <.live_component
               module={ComposerComponent}
               id="note"
               mode={:edit}
+              layout={:post}
               note={@edit_note}
               full
-              avatar
               cancellable
               submit_label={gettext("Save")}
               current_company={@current_company}
               current_user={@current_user}
-            />
-            <div id="note-files" class="mt-3">
-              <div class="mb-2 flex items-center">
-                <span class="text-sm font-semibold">📎 {gettext("Files")}</span>
-                <span class="ml-auto">
-                  <.attach_button note_id={@note.id} current_company={@current_company} />
-                </span>
-              </div>
-              <.attachment_tiles
-                attachments={@note.attachments}
-                current_company={@current_company}
-                can_edit
-              />
-            </div>
-            <button
-              type="button"
-              id="toggle-history"
-              phx-click="toggle_history"
-              class="mt-2 text-xs text-gray-500 hover:underline dark:text-gray-400"
             >
-              {gettext("History")} {if @show_history, do: "▾", else: "▸"}
-            </button>
+              <:header :let={roles_editable}>
+                <.post_header
+                  note={@note}
+                  progress={@note.subject_type == "Task"}
+                  reply_to={@item.d[:reply_to]}
+                  detail
+                  show_visibility={!roles_editable}
+                  current_company={@current_company}
+                />
+              </:header>
+              <:files>
+                <.file_grid id="note-files" attachments={@note.attachments} removable />
+              </:files>
+              <:footer>
+                <span title={gettext("Replies")}>💬 {@item.d.replies}</span>
+                <span title={gettext("Links")}>🔗 {length(@item.d.links)}</span>
+                <span title={gettext("Files")}>📎 {length(@note.attachments)}</span>
+              </:footer>
+              <:actions>
+                <.attach_button note_id={@note.id} current_company={@current_company} />
+                <button
+                  type="button"
+                  id="toggle-history"
+                  phx-click="toggle_history"
+                  class="text-xs text-gray-500 hover:underline dark:text-gray-400"
+                >
+                  {gettext("History")} {if @show_history, do: "▾", else: "▸"}
+                </button>
+              </:actions>
+            </.live_component>
           </div>
         </div>
 

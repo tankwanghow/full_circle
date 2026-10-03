@@ -541,8 +541,17 @@ defmodule FullCircle.Tasks do
       |> offset(^((page - 1) * per_page))
       |> limit(^per_page)
       |> Repo.all()
-      |> Repo.preload([:assignee, :closed_by])
 
+    rows(tasks, company, user, today)
+  end
+
+  @doc """
+  The list row of each task — the Tasks list and a record's tasks panel draw
+  the same row: `%{id, task, group, latest_note, note_count, link_count}`,
+  with the people on the task preloaded.
+  """
+  def rows(tasks, company, user, today) do
+    tasks = Repo.preload(tasks, [:assignee, :creator, :closed_by])
     ids = Enum.map(tasks, & &1.id)
     latest = latest_notes(ids, company, user)
     counts = Notes.count_by_records(company, user, "Task", ids)

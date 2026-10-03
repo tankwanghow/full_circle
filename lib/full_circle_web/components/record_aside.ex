@@ -3,6 +3,7 @@ defmodule FullCircleWeb.RecordAside do
   Under a record's card: notes on the left, tasks linked to that record on
   the right. The row takes the card's width. The columns sit side by side
   once that width reaches 56rem (`@4xl`); a narrower card stacks, notes first.
+  Either way each panel is as tall as its own content.
   """
   use FullCircleWeb, :html
 
@@ -43,31 +44,30 @@ defmodule FullCircleWeb.RecordAside do
 
   def record_aside(assigns) do
     ~H"""
-    <div
-      id={"record-aside-#{@record_type}"}
-      class={[
-        "@container mx-auto mt-3 flex flex-col gap-3 @4xl:flex-row @4xl:items-start",
-        @class
-      ]}
-    >
-      <.live_component
-        module={FullCircleWeb.NoteLive.NotesPanelComponent}
-        id="notes-panel"
-        record_type={@record_type}
-        record_id={@record_id}
-        current_company={@current_company}
-        current_user={@current_user}
-        class="min-w-0 w-full flex-1"
-      />
-      <.live_component
-        module={FullCircleWeb.TaskLive.TasksPanelComponent}
-        id="tasks-panel"
-        record_type={@record_type}
-        record_id={@record_id}
-        current_company={@current_company}
-        current_user={@current_user}
-        class="min-w-0 w-full flex-1"
-      />
+    <%!-- A container query sizes against an ancestor, never the element that
+         declares @container: the row lives one level in. Each panel keeps
+         its own height; flex-1 only splits the width once side by side. --%>
+    <div id={"record-aside-#{@record_type}"} class={["@container mx-auto mt-3", @class]}>
+      <div class="flex flex-col gap-1 @4xl:flex-row @4xl:items-start">
+        <.live_component
+          module={FullCircleWeb.NoteLive.NotesPanelComponent}
+          id="notes-panel"
+          record_type={@record_type}
+          record_id={@record_id}
+          current_company={@current_company}
+          current_user={@current_user}
+          class="min-w-0 w-full @4xl:flex-1"
+        />
+        <.live_component
+          module={FullCircleWeb.TaskLive.TasksPanelComponent}
+          id="tasks-panel"
+          record_type={@record_type}
+          record_id={@record_id}
+          current_company={@current_company}
+          current_user={@current_user}
+          class="min-w-0 w-full @4xl:flex-1"
+        />
+      </div>
     </div>
     """
   end

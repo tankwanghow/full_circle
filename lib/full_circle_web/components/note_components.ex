@@ -24,41 +24,49 @@ defmodule FullCircleWeb.NoteComponents do
   def type_label("ReturnCheque"), do: gettext("Return Cheque")
   def type_label(other), do: other
 
+  attr :id, :string, default: nil
   attr :attachments, :list, required: true
-  attr :current_company, :map, required: true
-  attr :can_edit, :boolean, default: false
-  attr :target, :any, default: nil
+  attr :removable, :boolean, default: false, doc: "edit mode: a ✕ and the file name on each"
+  attr :target, :any, default: nil, doc: "who handles remove_attachment (nil: the LiveView)"
 
-  @doc "Files as a tidy grid of tiles: a thumbnail for images, a type badge otherwise."
-  def attachment_tiles(assigns) do
+  @doc """
+  A post's files as the X-style grid: one large tile, or two columns. The post
+  and its edit box both use it, so editing keeps the files where they were.
+  """
+  def file_grid(assigns) do
     ~H"""
-    <div :if={@attachments != []} class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-      <div
-        :for={a <- @attachments}
-        id={"att-#{a.id}"}
-        class="att-tile group flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-2 dark:border-gray-700 dark:bg-gray-800"
-      >
-        <a
-          href={Attachments.url(a)}
-          target="_blank"
-          class="flex min-w-0 flex-1 items-center gap-2"
-          title={a.file_name}
-        >
-          <.file_thumb att={a} class="h-12 w-12 flex-none rounded" />
-          <span class="min-w-0">
-            <span class="block truncate text-sm text-gray-800 dark:text-gray-100">{a.file_name}</span>
-            <span class="block text-xs text-gray-500 dark:text-gray-400">{file_size(a.byte_size)}</span>
-          </span>
+    <div
+      :if={@attachments != []}
+      id={@id}
+      class={[
+        "mt-2 grid gap-0.5 overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700",
+        length(@attachments) > 1 && "grid-cols-2"
+      ]}
+    >
+      <div :for={a <- @attachments} id={@removable && "att-#{a.id}"} class="relative">
+        <a href={Attachments.url(a)} target="_blank" title={a.file_name} class="note-thumb block">
+          <.file_thumb
+            att={a}
+            class={["w-full", if(length(@attachments) > 1, do: "h-32", else: "h-56")]}
+            show_name
+          />
         </a>
+        <%!-- file_thumb names PDFs itself; images get the same bar here. --%>
+        <span
+          :if={@removable and Attachments.kind(a) == :image}
+          class="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-black/55 px-2 py-0.5 text-xs text-white"
+        >
+          {a.file_name}
+        </span>
         <button
-          :if={@can_edit}
+          :if={@removable}
           type="button"
           phx-click="remove_attachment"
           phx-value-id={a.id}
           phx-target={@target}
           data-confirm={gettext("Remove this file from the note?")}
-          class="flex-none rounded p-1 text-gray-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950"
           title={gettext("Remove")}
+          class="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white hover:bg-rose-600"
         >
           <.icon name="hero-x-mark" class="h-4 w-4" />
         </button>
@@ -239,11 +247,6 @@ defmodule FullCircleWeb.NoteComponents do
     """
   end
 
-  defp file_size(nil), do: ""
-  defp file_size(b) when b < 1_000, do: "#{b} B"
-  defp file_size(b) when b < 1_000_000, do: "#{round(b / 1_000)} KB"
-  defp file_size(b), do: "#{Float.round(b / 1_000_000, 1)} MB"
-
   attr :note_id, :string, required: true
   attr :current_company, :map, required: true
 
@@ -342,7 +345,7 @@ defmodule FullCircleWeb.NoteComponents do
 
   @doc """
   An amber (subject) or sky-blue (link) chip naming a linked record — the one
-  chip used by the feed, the note page and the task page. Capped at 20rem: the
+  chip used by the feed, the note page and the task page. Capped at 10rem: the
   "Type · title" text is cut with an ellipsis and shown in full on hover; the
   inner block (✕) sits outside the cut text so it always shows.
   """
@@ -353,7 +356,7 @@ defmodule FullCircleWeb.NoteComponents do
     <span
       title={@text}
       class={[
-        "inline-flex max-w-xs items-center gap-1 rounded-full border px-2 align-middle text-xs",
+        "inline-flex max-w-40 items-center gap-1 rounded-full border px-2 align-middle text-xs",
         @kind == :subject &&
           "border-amber-400 bg-amber-100 text-amber-900 dark:border-amber-600 dark:bg-amber-900 dark:text-amber-100",
         @kind == :link &&
@@ -382,11 +385,9 @@ defmodule FullCircleWeb.NoteComponents do
   attr :host, :any, default: nil, doc: "{type, id} of the record whose page shows this post"
   attr :relation, :atom, default: nil, doc: ":linked tags a note that only links to the host"
   attr :new_tab, :boolean, default: false, doc: "open the note in a new tab (panels)"
-  attr :can_attach, :boolean, default: false
   attr :target, :any, default: nil
-  attr :compact, :boolean, default: false, doc: "one row of small thumbnails (panels)"
   attr :detail, :boolean, default: false, doc: "the post page: full text, all files, no links"
-  slot :actions, doc: "detail only: controls at the end of the counts row"
+  slot :actions, doc: "controls at the end of the counts row (✎ Edit, 📎 Attach, History)"
 
   @doc """
   One note as a post — the feed and every notes panel use this, so a note
@@ -406,6 +407,9 @@ defmodule FullCircleWeb.NoteComponents do
         note: note,
         d: d,
         subject: if(d.subject && !is_host?.(note.subject_type, note.subject_id), do: d.subject),
+        # Progress on a task (a note about it) wears the Tasks amber, except on
+        # that task's own page, where every post is its progress.
+        progress: note.subject_type == "Task" and !is_host?.("Task", note.subject_id),
         links: Enum.reject(d.links, &is_host?.(&1.type, &1.id)),
         # On the root's own page its replies need no "↩ reply to" tag.
         reply_to: if(d[:reply_to] && !is_host?.("Note", d.reply_to.id), do: d.reply_to),
@@ -417,55 +421,26 @@ defmodule FullCircleWeb.NoteComponents do
     ~H"""
     <article
       id={@id}
-      class="flex gap-3 border-b border-gray-200 px-4 py-3 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800/60"
+      class={[
+        "flex gap-3 border-b border-gray-200 px-4 py-3 dark:border-gray-700",
+        if(@progress,
+          do:
+            "note-progress bg-amber-50/70 shadow-[inset_3px_0_0_#f59e0b] hover:bg-amber-100/60 dark:bg-amber-950/25 dark:hover:bg-amber-950/40",
+          else: "hover:bg-gray-50 dark:hover:bg-gray-800/60"
+        )
+      ]}
     >
       <.avatar email={@note.author.email} />
       <div class="min-w-0 flex-1">
-        <div class="flex flex-wrap items-center gap-x-1 text-sm">
-          <span class="font-bold">{@note.author.email |> String.split("@") |> hd()}</span>
-          <span
-            class="text-gray-500 dark:text-gray-400"
-            title={FullCircleWeb.Helpers.format_datetime(@note.inserted_at, @current_company)}
-          >
-            {if @detail,
-              do: FullCircleWeb.Helpers.format_datetime(@note.inserted_at, @current_company),
-              else: "· " <> ago(@note.inserted_at, @current_company)}
-          </span>
-          <span
-            :if={@reply_to}
-            class="note-reply-to ml-1 rounded-full border border-slate-300 px-2 text-xs text-slate-600 dark:border-slate-600 dark:text-slate-300"
-          >
-            <%= case @reply_to.state do %>
-              <% :ok -> %>
-                <a
-                  href={"/companies/#{@current_company.id}/notes/#{@reply_to.id}"}
-                  target={@new_tab && "_blank"}
-                  class="hover:underline"
-                >
-                  ↩ {gettext("reply to")} {@reply_to.title}
-                </a>
-              <% :deleted -> %>
-                ↩ {gettext("reply to a deleted note")}
-              <% :hidden -> %>
-                ↩ {gettext("reply to a note you can't see")}
-            <% end %>
-          </span>
-          <span
-            :if={@relation == :linked}
-            class="note-linked ml-1 rounded-full border border-sky-400 px-2 text-xs text-sky-800 dark:text-sky-200"
-            title={gettext("This note links here; it is about something else.")}
-          >
-            ↩ {gettext("linked")}
-          </span>
-          <span
-            :if={@note.visibility}
-            class="ml-1 rounded-full border border-rose-300 bg-rose-100 px-2 text-xs text-rose-800 dark:border-rose-700 dark:bg-rose-900 dark:text-rose-100"
-          >
-            🔒 {if Note.private?(@note),
-              do: gettext("Private"),
-              else: Enum.join(@note.visibility, ", ")}
-          </span>
-        </div>
+        <.post_header
+          note={@note}
+          progress={@progress}
+          reply_to={@reply_to}
+          relation={@relation}
+          detail={@detail}
+          new_tab={@new_tab}
+          current_company={@current_company}
+        />
 
         <div :if={@subject || @links != []} class="mt-0.5 flex flex-wrap gap-1">
           <.record_chip :if={@subject} target={@subject} type={@note.subject_type} kind={:subject} />
@@ -481,42 +456,9 @@ defmodule FullCircleWeb.NoteComponents do
           <div phx-no-format class="line-clamp-8 whitespace-pre-wrap break-words">{@note.body}</div>
         </.post_link>
 
-        <%!-- Panels sit under a record's form: a row of small thumbnails, names in
-             the tooltip. The feed gets the large X-style grid. --%>
-        <div :if={@compact and @thumbs != []} class="mt-2 flex items-center gap-1.5">
-          <a
-            :for={a <- @thumbs}
-            href={Attachments.url(a)}
-            target="_blank"
-            title={a.file_name}
-            class="note-thumb block overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700"
-          >
-            <.file_thumb att={a} class="h-16 w-16" />
-          </a>
-          <span :if={@hidden_files > 0} class="text-xs text-gray-500">+{@hidden_files}</span>
-        </div>
-        <div
-          :if={!@compact and @thumbs != []}
-          class={[
-            "mt-2 grid gap-0.5 overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700",
-            length(@thumbs) > 1 && "grid-cols-2"
-          ]}
-        >
-          <a
-            :for={a <- @thumbs}
-            href={Attachments.url(a)}
-            target="_blank"
-            title={a.file_name}
-            class="note-thumb block"
-          >
-            <.file_thumb
-              att={a}
-              class={["w-full", if(length(@thumbs) > 1, do: "h-32", else: "h-56")]}
-              show_name
-            />
-          </a>
-        </div>
-        <div :if={!@compact and @hidden_files > 0} class="mt-1 text-xs text-gray-500">
+        <%!-- The feed and every panel: the same X-style grid, at most 4 files. --%>
+        <.file_grid attachments={@thumbs} />
+        <div :if={@hidden_files > 0} class="mt-1 text-xs text-gray-500">
           + {ngettext("1 more file", "%{count} more files", @hidden_files)}
         </div>
 
@@ -533,13 +475,77 @@ defmodule FullCircleWeb.NoteComponents do
             <span title={gettext("Files")}>📎
             <span class="note-files">{length(@note.attachments)}</span></span>
           </div>
-          <span :if={@can_attach}>
-            <.attach_button note_id={@note.id} current_company={@current_company} />
-          </span>
-          <div :if={@detail} class="ml-auto flex items-center gap-3">{render_slot(@actions)}</div>
+          <div :if={@actions != []} class="ml-auto flex items-center gap-3">
+            {render_slot(@actions)}
+          </div>
         </div>
       </div>
     </article>
+    """
+  end
+
+  attr :note, Note, required: true
+  attr :reply_to, :any, default: nil
+  attr :progress, :boolean, default: false, doc: "a ✅ tick: the note is progress on a task"
+  attr :relation, :atom, default: nil
+  attr :detail, :boolean, default: false
+  attr :new_tab, :boolean, default: false
+
+  attr :show_visibility, :boolean,
+    default: true,
+    doc: "false in the edit box while its role chips say it"
+
+  attr :current_company, :map, required: true
+
+  @doc "The line above a post — author, time, ↩ reply to, ↩ linked, 🔒. The edit box reuses it."
+  def post_header(assigns) do
+    ~H"""
+    <div class="flex flex-wrap items-center gap-x-1 text-sm">
+      <span class="font-bold">{@note.author.email |> String.split("@") |> hd()}</span>
+      <span
+        class="text-gray-500 dark:text-gray-400"
+        title={FullCircleWeb.Helpers.format_datetime(@note.inserted_at, @current_company)}
+      >
+        {if @detail,
+          do: FullCircleWeb.Helpers.format_datetime(@note.inserted_at, @current_company),
+          else: "· " <> ago(@note.inserted_at, @current_company)}
+      </span>
+      <span :if={@progress} class="note-progress-tick ml-1" title={gettext("Progress")}>✅</span>
+      <span
+        :if={@reply_to}
+        class="note-reply-to ml-1 rounded-full border border-slate-300 px-2 text-xs text-slate-600 dark:border-slate-600 dark:text-slate-300"
+      >
+        <%= case @reply_to.state do %>
+          <% :ok -> %>
+            <a
+              href={"/companies/#{@current_company.id}/notes/#{@reply_to.id}"}
+              target={@new_tab && "_blank"}
+              class="hover:underline"
+            >
+              ↩ {gettext("reply to")} {@reply_to.title}
+            </a>
+          <% :deleted -> %>
+            ↩ {gettext("reply to a deleted note")}
+          <% :hidden -> %>
+            ↩ {gettext("reply to a note you can't see")}
+        <% end %>
+      </span>
+      <span
+        :if={@relation == :linked}
+        class="note-linked ml-1 rounded-full border border-sky-400 px-2 text-xs text-sky-800 dark:text-sky-200"
+        title={gettext("This note links here; it is about something else.")}
+      >
+        ↩ {gettext("linked")}
+      </span>
+      <span
+        :if={@show_visibility and @note.visibility}
+        class="ml-1 rounded-full border border-rose-300 bg-rose-100 px-2 text-xs text-rose-800 dark:border-rose-700 dark:bg-rose-900 dark:text-rose-100"
+      >
+        🔒 {if Note.private?(@note),
+          do: gettext("Private"),
+          else: Enum.join(@note.visibility, ", ")}
+      </span>
+    </div>
     """
   end
 

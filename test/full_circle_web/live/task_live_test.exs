@@ -160,19 +160,21 @@ defmodule FullCircleWeb.TaskLiveTest do
       clerk = user_with_role(comp, admin, "clerk")
       {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/new")
 
-      {:error, {:live_redirect, %{to: to}}} =
-        lv
-        |> form("#task-form", %{
-          "task" => %{
-            "title" => "Permit – Rahim",
-            "due_date" => "2026-12-01",
-            "recur_unit" => "year",
-            "recur_every" => "1",
-            "reminder_before_days" => "60",
-            "assignee_id" => clerk.id
-          }
-        })
-        |> render_submit()
+      lv
+      |> form("#task-form", %{
+        "task" => %{
+          "title" => "Permit – Rahim",
+          "due_date" => "2026-12-01",
+          "recur_unit" => "year",
+          "recur_every" => "1",
+          "reminder_before_days" => "60",
+          "assignee_id" => clerk.id
+        }
+      })
+      |> render_submit()
+
+      # The write box tells the page, which then navigates to the new task.
+      {to, _flash} = assert_redirect(lv)
 
       [_, id] = Regex.run(~r{/tasks/([0-9a-f-]+)$}, to)
       task = Tasks.get_task(id, comp, admin)
@@ -329,6 +331,38 @@ defmodule FullCircleWeb.TaskLiveTest do
       assert note.visibility == ["clerk"]
     end
 
+    test "a progress note edits in place, keeping the task and its 🔒 tag", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      t = task_fixture(comp, admin, %{"visibility" => ["admin"]})
+
+      {:ok, note} =
+        FullCircle.Notes.create_note(
+          %{"body" => "paid at bank", "subject_type" => "Task", "subject_id" => t.id},
+          comp,
+          admin
+        )
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/#{t.id}")
+      lv |> element("#task-notes-edit-#{note.id}") |> render_click()
+
+      # The task is the note's fixed subject: no chip to clear it, links still open.
+      refute has_element?(lv, "#task-notes-edit-clear-subject")
+      assert has_element?(lv, "#task-notes-edit-open-picker")
+      # No role chips for a task note, so the header keeps saying who can see it.
+      assert has_element?(lv, "#task-notes-editing", "Private")
+
+      lv
+      |> form("#task-notes-edit-form", %{"note" => %{"body" => "paid at bank, receipt filed"}})
+      |> render_submit()
+
+      assert has_element?(lv, "#task-notes-note-#{note.id}", "receipt filed")
+      saved = FullCircle.Repo.get!(FullCircle.Notes.Note, note.id)
+      assert {saved.subject_type, saved.subject_id} == {"Task", t.id}
+    end
+
     test "other cycles show their note count", %{conn: conn, admin: admin, comp: comp} do
       t = monthly(comp, admin, "SOCSO")
       {:ok, %{next: next}} = Tasks.close_task(t, :done, "paid", comp, admin)
@@ -459,10 +493,8 @@ defmodule FullCircleWeb.TaskLiveTest do
       refute has_element?(lv, "#past-cycles")
       refute has_element?(lv, "#task-notes")
 
-      {:error, {:live_redirect, %{to: to}}} =
-        lv
-        |> form("#task-form", %{"task" => %{"title" => "Road tax – WXY 2"}})
-        |> render_submit()
+      lv |> form("#task-form", %{"task" => %{"title" => "Road tax – WXY 2"}}) |> render_submit()
+      {to, _flash} = assert_redirect(lv)
 
       [_, id] = Regex.run(~r{/tasks/([0-9a-f-]+)$}, to)
       copy = Tasks.get_task(id, comp, admin)
@@ -486,7 +518,8 @@ defmodule FullCircleWeb.TaskLiveTest do
       assert has_element?(lv, "#copy-task")
       {:ok, lv, _} = lv |> element("#copy-task") |> render_click() |> follow_redirect(conn)
 
-      {:error, {:live_redirect, %{to: to}}} = lv |> form("#task-form") |> render_submit()
+      lv |> form("#task-form") |> render_submit()
+      {to, _flash} = assert_redirect(lv)
       [_, id] = Regex.run(~r{/tasks/([0-9a-f-]+)$}, to)
       copy = Tasks.get_task(id, comp, admin)
       assert copy.status == "open"
@@ -508,7 +541,8 @@ defmodule FullCircleWeb.TaskLiveTest do
       {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/#{src.id}/copy")
       refute has_element?(lv, "#task-form option[value='#{clerk.id}']")
 
-      {:error, {:live_redirect, %{to: to}}} = lv |> form("#task-form") |> render_submit()
+      lv |> form("#task-form") |> render_submit()
+      {to, _flash} = assert_redirect(lv)
       [_, id] = Regex.run(~r{/tasks/([0-9a-f-]+)$}, to)
       assert Tasks.get_task(id, comp, admin).assignee_id == nil
     end
@@ -579,7 +613,7 @@ defmodule FullCircleWeb.TaskLiveTest do
     end
   end
 
-  test "task page link chips are capped at 20rem with the full title on hover",
+  test "task page link chips are capped at 10rem with the full title on hover",
        %{conn: conn, admin: admin, comp: comp} do
     long =
       "Stainless steel Waste water screen might need to align correctly in order to be effective."
@@ -592,7 +626,7 @@ defmodule FullCircleWeb.TaskLiveTest do
 
     assert has_element?(
              lv,
-             ~s{span.max-w-xs[title="Note · #{long}"] #remove-link-#{link.link_id}}
+             ~s{span.max-w-40[title="Note · #{long}"] #remove-link-#{link.link_id}}
            )
   end
 end
