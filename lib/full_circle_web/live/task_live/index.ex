@@ -44,7 +44,7 @@ defmodule FullCircleWeb.TaskLive.Index do
     s = params["search"] || %{}
 
     search = %{
-      "scope" => if(s["scope"] == "all", do: "all", else: "mine"),
+      "scope" => if(s["scope"] == "mine", do: "mine", else: "all"),
       "state" => if(s["state"] == "closed", do: "closed", else: "open"),
       "terms" => s["terms"] || ""
     }
@@ -203,7 +203,7 @@ defmodule FullCircleWeb.TaskLive.Index do
       <div class="h-1 bg-amber-500"></div>
       <div class="flex border-b border-gray-200 dark:border-gray-700">
         <button
-          :for={{scope, label} <- [{"mine", gettext("Mine")}, {"all", gettext("All")}]}
+          :for={{scope, label} <- [{"all", gettext("All")}, {"mine", gettext("Mine")}]}
           id={"tab-#{scope}"}
           type="button"
           phx-click="scope"

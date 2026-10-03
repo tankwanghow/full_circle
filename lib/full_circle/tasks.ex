@@ -535,7 +535,7 @@ defmodule FullCircle.Tasks do
 
     tasks =
       visible_to(company, user)
-      |> scope(filters["scope"] || "mine", user)
+      |> scope(filters["scope"] || "all", user)
       |> state(filters["state"] || "open", today)
       |> terms(filters["terms"])
       |> offset(^((page - 1) * per_page))

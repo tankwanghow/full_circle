@@ -52,10 +52,23 @@ defmodule FullCircleWeb.TaskLiveTest do
       clerk = user_with_role(comp, admin, "clerk")
       t = task_fixture(comp, admin, %{"title" => "Clerk job", "assignee_id" => clerk.id})
 
-      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks")
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks?search[scope]=mine")
       refute has_element?(lv, "#tasks-#{t.id}")
 
       {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks?search[scope]=all")
+      assert has_element?(lv, "#tasks-#{t.id}")
+    end
+
+    test "opens on All: a clerk sees an unassigned task the admin made", %{
+      admin: admin,
+      comp: comp
+    } do
+      t = task_fixture(comp, admin, %{"title" => "Shared job"})
+      clerk = user_with_role(comp, admin, "clerk")
+
+      {:ok, lv, _} = live(log_in_user(build_conn(), clerk), ~p"/companies/#{comp.id}/tasks")
+
+      assert has_element?(lv, "#tab-all.shadow-\\[inset_0_-3px_0_\\#f59e0b\\]")
       assert has_element?(lv, "#tasks-#{t.id}")
     end
 
