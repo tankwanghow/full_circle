@@ -47,34 +47,43 @@ defmodule FullCircleWeb.NoteLive.PhoneQrComponent do
       >
         📱 {gettext("From phone")}
       </button>
+      <%!-- A centered modal, fixed to the viewport: the notes panel clips
+           its overflow, so a popover under the button was cut off. --%>
       <div
         :if={@qr}
         id={"#{@id}-qr"}
-        class="absolute left-0 top-8 z-30 w-64 rounded-xl border border-gray-300 bg-white p-3 text-center shadow-lg dark:border-gray-600 dark:bg-gray-900"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       >
-        <button
-          type="button"
-          id={"#{@id}-close"}
-          phx-click="close"
+        <div
+          class="relative w-72 rounded-xl border border-gray-300 bg-white p-4 text-center shadow-xl dark:border-gray-600 dark:bg-gray-900"
+          phx-click-away="close"
           phx-target={@myself}
-          class="absolute right-2 top-1 text-gray-500 dark:text-gray-400"
-          title={gettext("Close")}
         >
-          ✕
-        </button>
-        <div class="mx-auto w-48 rounded bg-white p-1 [&>svg]:h-auto [&>svg]:w-full">
-          {Phoenix.HTML.raw(@qr)}
+          <button
+            type="button"
+            id={"#{@id}-close"}
+            phx-click="close"
+            phx-target={@myself}
+            class="absolute right-2 top-1 text-lg text-gray-500 dark:text-gray-400"
+            title={gettext("Close")}
+          >
+            ✕
+          </button>
+          <p class="mb-2 font-semibold">📱 {gettext("Add from phone")}</p>
+          <div class="mx-auto w-56 rounded bg-white p-2 [&>svg]:h-auto [&>svg]:w-full">
+            {Phoenix.HTML.raw(@qr)}
+          </div>
+          <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+            {gettext("Scan with your phone camera. Works for 10 minutes.")}
+          </p>
+          <a
+            href={@url}
+            target="_blank"
+            class="mt-1 block truncate text-xs text-sky-600 dark:text-sky-400"
+          >
+            {@url}
+          </a>
         </div>
-        <p class="mt-2 text-xs text-gray-600 dark:text-gray-300">
-          {gettext("Scan with your phone camera. Works for 10 minutes.")}
-        </p>
-        <a
-          href={@url}
-          target="_blank"
-          class="mt-1 block truncate text-xs text-sky-600 dark:text-sky-400"
-        >
-          {@url}
-        </a>
       </div>
     </span>
     """
