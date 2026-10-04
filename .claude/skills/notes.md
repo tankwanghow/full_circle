@@ -183,7 +183,8 @@ exposes `addPage/sendFile/startScan` for checking the page without a camera
   is started by `application.ex`, so a hot-reloaded dev server needs a
   restart; if the table is missing, Finish is a no-op and uploads still
   work. The page then tries `window.close()` (usually blocked for a tab the
-  camera app opened) and says the tab may be closed.
+  camera app opened) and, still open after 400 ms, `location.replace`s to
+  `/up/done` (a static "All sent" page; routed before `/:token`).
 - **QR SVG:** `QRCode.render(:svg)` emits a fixed `width`/`height` and no
   `viewBox`, so CSS sizing crops it. `PhoneQrComponent.scalable/1` swaps the
   size for a viewBox — do the same anywhere a QR is resized. The QR opens as
