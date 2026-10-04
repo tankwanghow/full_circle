@@ -9,6 +9,17 @@ import { downscale } from "./note_attach"
 const root = document.getElementById("phone-upload")
 if (root) start(root)
 
+// crypto.randomUUID exists only in secure contexts (https, localhost); the
+// dev phone test runs over http on the LAN.
+function uuid() {
+  if (crypto.randomUUID) return crypto.randomUUID()
+  const b = crypto.getRandomValues(new Uint8Array(16))
+  b[6] = (b[6] & 0x0f) | 0x40
+  b[8] = (b[8] & 0x3f) | 0x80
+  const h = Array.from(b, x => x.toString(16).padStart(2, "0")).join("")
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
+}
+
 function start(root) {
   let token = root.dataset.token
   const maxBytes = parseInt(root.dataset.maxBytes, 10)
@@ -16,6 +27,12 @@ function start(root) {
   const sentKey = `phoneUpload:sent:${root.dataset.targetKey}`
   const $ = id => document.getElementById(id)
   let scan = null // {id, pages}
+  let busy = false // one scan request at a time: pages must not race each other
+
+  function setBusy(on) {
+    busy = on
+    for (const id of ["pu-next", "pu-retake", "pu-done"]) $(id).disabled = on
+  }
 
   const store = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)) } catch (_e) { return null } },
@@ -124,7 +141,7 @@ function start(root) {
   }
 
   function startScan() {
-    scan = { id: crypto.randomUUID(), pages: 0 }
+    scan = { id: uuid(), pages: 0 }
     store.set(scanKey, scan)
     $("pu-thumbs").innerHTML = ""
     showScan()
@@ -137,10 +154,17 @@ function start(root) {
   }
 
   function takePage() {
+    if (busy) return
     pick({ capture: true, accept: "image/*" }, files => addPage(files[0]))
   }
 
   async function addPage(file) {
+    if (busy) return
+    setBusy(true)
+    try { await sendPage(file) } finally { setBusy(false) }
+  }
+
+  async function sendPage(file) {
     const blob = await enhance(file, $("pu-look").value)
     const thumb = document.createElement("img")
     thumb.src = URL.createObjectURL(blob)
@@ -164,8 +188,10 @@ function start(root) {
   $("pu-next").onclick = () => takePage()
 
   $("pu-retake").onclick = async () => {
-    if (!scan || scan.pages === 0) return
+    if (busy || !scan || scan.pages === 0) return
+    setBusy(true)
     const res = await call("DELETE", `/scans/${scan.id}/pages/last`)
+    setBusy(false)
     if (!res.ok) return alertLine(res.error)
     scan.pages = res.body.pages
     store.set(scanKey, scan)
@@ -176,7 +202,8 @@ function start(root) {
   }
 
   $("pu-done").onclick = async () => {
-    if (!scan) return
+    if (busy || !scan) return
+    setBusy(true)
     const now = new Date()
     const p = n => String(n).padStart(2, "0")
     const name = `Scan ${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())} ${p(now.getHours())}${p(now.getMinutes())}.pdf`
@@ -184,6 +211,7 @@ function start(root) {
     const form = new FormData()
     form.append("name", name)
     const res = await call("POST", `/scans/${scan.id}/done`, form)
+    setBusy(false)
     markSent(li, res, null)
     if (res.ok) {
       scan = null
@@ -207,7 +235,7 @@ function start(root) {
   }
 
   // For checking the page without a camera (DevTools): window.__phoneUpload.
-  window.__phoneUpload = { addPage, sendFile, startScan: () => { scan = { id: crypto.randomUUID(), pages: 0 }; store.set(scanKey, scan); showScan() } }
+  window.__phoneUpload = { addPage, sendFile, startScan: () => { scan = { id: uuid(), pages: 0 }; store.set(scanKey, scan); showScan() }, uuid }
 }
 
 // --- page look ---------------------------------------------------------------
