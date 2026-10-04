@@ -86,8 +86,16 @@ defmodule FullCircleWeb.PhoneUploadController do
 
   # "✓ Finished": the link stops working now, not after 10 idle minutes.
   def finish(conn, %{"token" => token}) do
-    with_ctx(conn, token, fn _ctx ->
+    with_ctx(conn, token, fn ctx ->
       PhoneUpload.finish(token)
+
+      # The desktop's QR modal for this target closes itself (NoteFiles).
+      Phoenix.PubSub.broadcast(
+        FullCircle.PubSub,
+        Attachments.topic(ctx.company.id),
+        {:phone_closed, ctx.target}
+      )
+
       json(conn, %{ok: true})
     end)
   end

@@ -28,6 +28,9 @@ defmodule FullCircleWeb.NoteFiles do
 
   def listen_self(target), do: put(target, :self)
 
+  @doc "A QR modal for `target` closes when that phone session ends."
+  def listen_phone(target, module, id), do: put({:phone, target}, {module, id})
+
   defp put(target, who) do
     listeners = Process.get(@key, %{})
     Process.put(@key, Map.update(listeners, target, MapSet.new([who]), &MapSet.put(&1, who)))
@@ -40,6 +43,17 @@ defmodule FullCircleWeb.NoteFiles do
         :self -> send(self(), {:note_files, target})
         {module, id} -> Phoenix.LiveView.send_update(module, id: id, note_files: target)
       end
+    end
+
+    {:halt, socket}
+  end
+
+  # The phone pressed ✓ Close: the QR modal showing that target closes.
+  # Its listeners are keyed {:phone, target}, apart from the file listeners,
+  # so a box or panel never gets an update it has no clause for.
+  defp route({:phone_closed, target}, socket) do
+    for {module, id} <- Map.get(Process.get(@key, %{}), {:phone, target}, []) do
+      Phoenix.LiveView.send_update(module, id: id, phone_closed: true)
     end
 
     {:halt, socket}

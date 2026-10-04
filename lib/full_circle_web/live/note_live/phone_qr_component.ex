@@ -10,7 +10,10 @@ defmodule FullCircleWeb.NoteLive.PhoneQrComponent do
   alias FullCircle.Notes.Trays
   alias FullCircleWeb.PhoneUpload
 
+  # The phone pressed ✓ Close (FullCircleWeb.NoteFiles).
   @impl true
+  def update(%{phone_closed: true}, socket), do: {:ok, assign(socket, qr: nil)}
+
   def update(assigns, socket),
     do: {:ok, socket |> assign(assigns) |> assign_new(:qr, fn -> nil end)}
 
@@ -21,6 +24,7 @@ defmodule FullCircleWeb.NoteLive.PhoneQrComponent do
     if ready?(target, com, user) do
       url = PhoneUpload.url(target, label, com, user)
       svg = url |> QRCode.create(:medium) |> QRCode.render(:svg) |> elem(1)
+      FullCircleWeb.NoteFiles.listen_phone(target, __MODULE__, socket.assigns.id)
       {:noreply, assign(socket, qr: scalable(svg), url: url)}
     else
       {:noreply, socket}

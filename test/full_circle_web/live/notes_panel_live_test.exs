@@ -719,4 +719,19 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
     assert [%{file_name: "delivery.jpg"}] =
              FullCircle.Repo.preload(note, :attachments).attachments
   end
+
+  test "the phone pressing Close closes the QR modal on the desktop",
+       %{conn: conn, comp: comp, contact: c} do
+    {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
+    lv |> element("#notes-panel-new") |> render_click()
+    html = lv |> element("#notes-panel-phone-open") |> render_click()
+    assert has_element?(lv, "#notes-panel-phone-qr")
+
+    [_, path] = Regex.run(~r{href="https?://[^/"]+(/up/[^"]+)"}, html)
+    assert %{"ok" => true} = build_conn() |> post(path <> "/finish") |> json_response(200)
+
+    # The broadcast queues a send_update behind the first render.
+    _ = render(lv)
+    refute has_element?(lv, "#notes-panel-phone-qr")
+  end
 end
