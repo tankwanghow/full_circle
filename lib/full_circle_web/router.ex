@@ -145,7 +145,8 @@ defmodule FullCircleWeb.Router do
       on_mount: [
         {FullCircleWeb.UserAuth, :ensure_authenticated},
         {FullCircleWeb.Locale, :set_locale},
-        {FullCircleWeb.ActiveCompany, :assign_active_company}
+        {FullCircleWeb.ActiveCompany, :assign_active_company},
+        {FullCircleWeb.NoteFiles, :route}
       ] do
       live("/dashboard", DashboardLive)
 
