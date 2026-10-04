@@ -243,9 +243,8 @@ function start(root) {
     }
   }
 
-  // ✓ Close: end the link now (not after 10 idle minutes), then close the
-  // tab if the browser lets us — a tab opened from the camera app usually
-  // cannot close itself, so the page says so instead.
+  // ✓ Close: end the link now (not after 10 idle minutes) and say all is
+  // sent. The page stays: no window.close(), no navigation.
   $("pu-close").onclick = async () => {
     if (scan && scan.pages > 0 &&
         !confirm(`${scan.pages} scanned ${scan.pages === 1 ? "page is" : "pages are"} not sent as a PDF yet. Close anyway?`)) return
@@ -258,11 +257,7 @@ function start(root) {
     showScan()
     $("pu-finished").classList.remove("hidden")
     for (const id of ["pu-scan", "pu-photo", "pu-files", "pu-next", "pu-retake", "pu-done", "pu-close"]) $(id).disabled = true
-    // Done page first, then it tries to close the tab. Calling
-    // window.close() here could be *accepted* by a camera app's in-app
-    // browser without closing — and a page marked as closing ignores the
-    // navigation, so the phone was left on this page. (replace: Back skips it.)
-    location.replace("/up/done")
+    $("pu-finished").scrollIntoView({ behavior: "smooth", block: "center" })
   }
 
   // Resume a scan the page was reloaded in the middle of.

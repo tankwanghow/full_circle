@@ -31,14 +31,6 @@ defmodule FullCircleWeb.PhoneUploadController do
     end
   end
 
-  # Where ✓ Close lands when the browser will not let the tab close itself.
-  def done_page(conn, _params) do
-    conn
-    |> put_layout(false)
-    |> put_view(FullCircleWeb.PhoneUploadHTML)
-    |> render(:done)
-  end
-
   def state(conn, %{"token" => token} = params) do
     with_ctx(conn, token, fn ctx ->
       pages = Scans.count(ctx.company.id, params["scan_id"] || "")
