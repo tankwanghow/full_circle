@@ -9,7 +9,7 @@ defmodule FullCircle.Notes.Attachments do
   require Logger
 
   alias FullCircle.{Notes, Repo}
-  alias FullCircle.Notes.{Note, NoteAttachment, Trays}
+  alias FullCircle.Notes.{Note, NoteAttachment, NoteTray, Trays}
 
   @max_bytes 10_000_000
   @content_types ~w(image/jpeg image/png image/webp application/pdf)
@@ -156,11 +156,16 @@ defmodule FullCircle.Notes.Attachments do
   def get_readable(id, company, user) do
     with {:ok, id} <- Ecto.UUID.cast(id) do
       from(a in NoteAttachment,
-        join: n in subquery(Notes.visible_to(company, user)),
+        left_join: n in subquery(Notes.visible_to(company, user)),
         on: n.id == a.note_id,
+        # A tray file (not saved yet) is its owner's alone: the write box
+        # shows it as a thumbnail before Save.
+        left_join: t in NoteTray,
+        on: t.id == a.tray_id and t.company_id == ^company.id and t.user_id == ^user.id,
         # A removed file stays on disk for history, but is usually the wrong
         # upload (an IC, a payslip) — an old link must not keep serving it.
-        where: a.id == ^id and is_nil(a.removed_at)
+        where: a.id == ^id and is_nil(a.removed_at),
+        where: not is_nil(n.id) or not is_nil(t.id)
       )
       |> Repo.one()
     else

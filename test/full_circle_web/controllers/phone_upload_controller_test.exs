@@ -126,4 +126,20 @@ defmodule FullCircleWeb.PhoneUploadControllerTest do
     assert %{"code" => "invalid", "error" => msg} = json_response(conn, 422)
     assert msg =~ "page"
   end
+
+  test "a tray file is served to its owner (thumbnails in the box) and to nobody else", ctx do
+    {:ok, att} =
+      FullCircle.Notes.Attachments.attach_to_tray(
+        ctx.tray.id,
+        %{path: jpeg_file(), file_name: "t.jpg"},
+        ctx.comp,
+        ctx.admin
+      )
+
+    url = FullCircle.Notes.Attachments.url(att)
+    assert ctx.conn |> log_in_user(ctx.admin) |> get(url) |> response(200)
+
+    manager = user_with_role(ctx.comp, ctx.admin, "manager")
+    assert build_conn() |> log_in_user(manager) |> get(url) |> response(404)
+  end
 end
