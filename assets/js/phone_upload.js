@@ -240,27 +240,25 @@ function start(root) {
       store.del(scanKey)
       $("pu-thumbs").innerHTML = ""
       showScan()
-      $("pu-sent-name").textContent = name
-      $("pu-sent-panel").classList.remove("hidden")
     }
   }
 
-  // After Done: the next letter is its own PDF…
-  $("pu-more").onclick = () => {
-    $("pu-sent-panel").classList.add("hidden")
-    startScan()
-  }
-
-  // …or end the link now, not after 10 idle minutes.
-  $("pu-finish").onclick = async () => {
-    $("pu-finish").disabled = true
+  // ✓ Close: end the link now (not after 10 idle minutes), then close the
+  // tab if the browser lets us — a tab opened from the camera app usually
+  // cannot close itself, so the page says so instead.
+  $("pu-close").onclick = async () => {
+    if (scan && scan.pages > 0 &&
+        !confirm(`${scan.pages} scanned ${scan.pages === 1 ? "page is" : "pages are"} not sent as a PDF yet. Close anyway?`)) return
+    $("pu-close").disabled = true
     const res = await call("POST", "/finish")
     // Expired/closed already shows the banner; a dropped connection lets them retry.
-    if (!res.ok) { $("pu-finish").disabled = !res.retry; return }
-    $("pu-sent-panel").classList.add("hidden")
-    $("pu-finished").classList.remove("hidden")
-    for (const id of ["pu-scan", "pu-photo", "pu-files", "pu-more"]) $(id).disabled = true
+    if (!res.ok) { $("pu-close").disabled = !res.retry; return }
     store.del(scanKey)
+    scan = null
+    showScan()
+    $("pu-finished").classList.remove("hidden")
+    for (const id of ["pu-scan", "pu-photo", "pu-files", "pu-next", "pu-retake", "pu-done", "pu-close"]) $(id).disabled = true
+    window.close()
   }
 
   // Resume a scan the page was reloaded in the middle of.

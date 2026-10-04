@@ -92,35 +92,6 @@
         </div>
       </section>
 
-      <%!-- After Done: the PDF is sent; scan the next letter or end the link. --%>
-      <section
-        id="pu-sent-panel"
-        class="mt-4 hidden rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-center dark:border-emerald-700 dark:bg-emerald-950/40"
-      >
-        <p class="text-lg font-semibold text-emerald-800 dark:text-emerald-200">
-          ✓ <span id="pu-sent-name"></span>
-        </p>
-        <p class="text-sm text-emerald-700 dark:text-emerald-300">
-          {gettext("Sent to FullCircle.")}
-        </p>
-        <div class="mt-3 grid grid-cols-2 gap-2">
-          <button
-            id="pu-more"
-            type="button"
-            class="rounded-lg bg-sky-600 p-3 font-bold text-white disabled:opacity-40"
-          >
-            📄 {gettext("Scan more…")}
-          </button>
-          <button
-            id="pu-finish"
-            type="button"
-            class="rounded-lg bg-emerald-600 p-3 font-bold text-white disabled:opacity-40"
-          >
-            ✓ {gettext("Finished")}
-          </button>
-        </div>
-      </section>
-
       <section
         id="pu-finished"
         class="mt-4 hidden rounded-xl bg-emerald-100 p-4 text-center text-lg font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
@@ -129,6 +100,16 @@
       </section>
 
       <ul id="pu-sent" class="mt-4 space-y-1 text-sm"></ul>
+
+      <%!-- Ends the link now (not after 10 idle minutes) and closes the tab
+           when the browser allows it. --%>
+      <button
+        id="pu-close"
+        type="button"
+        class="mt-6 w-full rounded-xl border border-emerald-600 p-3 text-lg font-bold text-emerald-700 disabled:opacity-40 dark:border-emerald-500 dark:text-emerald-300"
+      >
+        ✓ {gettext("Close")}
+      </button>
     </main>
   </body>
 </html>
