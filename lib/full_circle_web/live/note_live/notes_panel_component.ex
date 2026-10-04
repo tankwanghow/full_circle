@@ -245,7 +245,7 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
               phx-click="edit_note"
               phx-value-id={item.id}
               phx-target={@myself}
-              class="rounded-full border border-gray-300 px-3 py-0.5 text-sm hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
+              class="whitespace-nowrap rounded-full border border-gray-300 px-3 py-0.5 text-sm hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
             >
               ✎ {gettext("Edit")}
             </button>

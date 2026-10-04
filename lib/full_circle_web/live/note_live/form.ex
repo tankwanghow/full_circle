@@ -426,7 +426,7 @@ defmodule FullCircleWeb.NoteLive.Form do
                 type="button"
                 id="edit-note"
                 phx-click="edit"
-                class="rounded-full border border-gray-300 px-3 py-0.5 text-sm hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
+                class="whitespace-nowrap rounded-full border border-gray-300 px-3 py-0.5 text-sm hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
               >
                 ✎ {gettext("Edit")}
               </button>
@@ -448,7 +448,7 @@ defmodule FullCircleWeb.NoteLive.Form do
                 type="button"
                 id="toggle-history"
                 phx-click="toggle_history"
-                class="text-xs text-gray-500 hover:underline dark:text-gray-400"
+                class="whitespace-nowrap text-xs text-gray-500 hover:underline dark:text-gray-400"
               >
                 {gettext("History")} {if @show_history, do: "▾", else: "▸"}
               </button>

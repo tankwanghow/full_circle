@@ -266,9 +266,10 @@ defmodule FullCircleWeb.NoteComponents do
         data-url={@url}
         data-multiple={to_string(@multiple)}
         data-max-bytes={FullCircle.Notes.Attachments.max_bytes()}
-        class="rounded border border-gray-400 px-2 hover:bg-gray-100 dark:border-gray-500 dark:hover:bg-gray-700"
+        title={gettext("Attach files")}
+        class="whitespace-nowrap rounded-full border border-gray-300 px-3 py-0.5 text-sm hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
       >
-        📎 {@label || gettext("Attach files")}
+        📎 {@label || gettext("Attach")}
       </button>
       <span id={"#{@id}-msg"} phx-update="ignore" class="text-rose-600 dark:text-rose-400"></span>
     </span>
@@ -469,7 +470,9 @@ defmodule FullCircleWeb.NoteComponents do
           + {ngettext("1 more file", "%{count} more files", @hidden_files)}
         </div>
 
-        <div class="mt-2 flex items-center gap-8 text-sm text-gray-500 dark:text-gray-400">
+        <%!-- Wraps in a narrow panel: the buttons drop to their own line
+             rather than their labels breaking. --%>
+        <div class="mt-2 flex flex-wrap items-center gap-x-8 gap-y-2 text-sm text-gray-500 dark:text-gray-400">
           <.post_link :if={!@detail} path={@path} new_tab={@new_tab} class="flex gap-8">
             <span title={gettext("Replies")}>💬 <span class="note-replies">{@d.replies}</span></span>
             <span title={gettext("Links")}>🔗 <span class="note-links">{length(@d.links)}</span></span>
@@ -482,7 +485,7 @@ defmodule FullCircleWeb.NoteComponents do
             <span title={gettext("Files")}>📎
             <span class="note-files">{length(@note.attachments)}</span></span>
           </div>
-          <div :if={@actions != []} class="ml-auto flex items-center gap-3">
+          <div :if={@actions != []} class="ml-auto flex flex-wrap items-center gap-2">
             {render_slot(@actions)}
           </div>
         </div>

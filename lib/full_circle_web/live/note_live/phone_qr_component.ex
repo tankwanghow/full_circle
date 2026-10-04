@@ -51,9 +51,10 @@ defmodule FullCircleWeb.NoteLive.PhoneQrComponent do
         id={"#{@id}-open"}
         phx-click="open"
         phx-target={@myself}
-        class="rounded border border-gray-400 px-2 text-sm hover:bg-gray-100 dark:border-gray-500 dark:hover:bg-gray-700"
+        title={gettext("Add from phone")}
+        class="whitespace-nowrap rounded-full border border-gray-300 px-3 py-0.5 text-sm hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
       >
-        📱 {gettext("From phone")}
+        📱 {gettext("Phone")}
       </button>
       <%!-- A centered modal, fixed to the viewport: the notes panel clips
            its overflow, so a popover under the button was cut off. --%>
