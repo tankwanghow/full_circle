@@ -9,13 +9,16 @@ defmodule FullCircle.Notes.Attachments do
   require Logger
 
   alias FullCircle.{Notes, Repo}
-  alias FullCircle.Notes.{Note, NoteAttachment}
+  alias FullCircle.Notes.{Note, NoteAttachment, Trays}
 
   @max_bytes 10_000_000
   @content_types ~w(image/jpeg image/png image/webp application/pdf)
 
   def max_bytes, do: @max_bytes
   def content_types, do: @content_types
+
+  @doc "PubSub topic for \"a file landed\" in this company (see FullCircleWeb.NoteFiles)."
+  def topic(company_id), do: "note_files:#{company_id}"
 
   def abs_path(%NoteAttachment{path: rel}), do: Path.join(uploads_dir(), rel)
 
@@ -109,16 +112,35 @@ defmodule FullCircle.Notes.Attachments do
   def kind(%NoteAttachment{}), do: :other
 
   def attach(%Note{} = note, upload, company, user) do
+    with %Note{} = note <- Notes.get_note(note.id, company, user) || {:error, :note_not_found},
+         true <- Notes.may_edit?(note, user, Notes.rights(company, user)) || :not_authorise do
+      store({:note, note}, upload, company, user)
+    end
+  end
+
+  @doc """
+  Adds a file to the caller's tray. A tray already saved follows to its note
+  (a phone still sending after the desktop pressed Save); a cancelled one is
+  `{:error, :tray_closed}`.
+  """
+  def attach_to_tray(tray_id, upload, company, user) do
+    case Trays.get(tray_id, company, user) do
+      {:ok, %{closed_at: nil} = tray} -> store({:tray, tray}, upload, company, user)
+      {:ok, %{note_id: nil}} -> {:error, :tray_closed}
+      {:ok, %{note_id: note_id}} -> attach(%Note{id: note_id}, upload, company, user)
+      error -> error
+    end
+  end
+
+  defp store(owner, upload, company, user) do
     src = upload[:path] || upload["path"]
     file_name = upload[:file_name] || upload["file_name"] || "file"
 
-    with %Note{} = note <- Notes.get_note(note.id, company, user) || {:error, :note_not_found},
-         true <- Notes.may_edit?(note, user, Notes.rights(company, user)) || :not_authorise,
-         {:ok, size} <- assert_size(src),
+    with {:ok, size} <- assert_size(src),
          {:ok, content_type} <- sniff(src) do
       # file_name is display only; cap it under the varchar(255) column.
       name = file_name |> Path.basename() |> String.slice(0, 200)
-      write(note, src, name, size, content_type, company, user)
+      write(owner, src, name, size, content_type, company, user)
     end
   end
 
@@ -165,25 +187,38 @@ defmodule FullCircle.Notes.Attachments do
     end
   end
 
-  defp write(note, src, file_name, size, content_type, company, user) do
-    rel = Path.join([company.id, "notes", note.id, Ecto.UUID.generate() <> ext(content_type)])
+  defp write(owner, src, file_name, size, content_type, company, user) do
+    {dir, owner_attrs, target} =
+      case owner do
+        {:note, note} -> {[note.id], %{note_id: note.id}, {:note, note.id}}
+        {:tray, tray} -> {["tray", tray.id], %{tray_id: tray.id}, {:tray, tray.id}}
+      end
+
+    rel = Path.join([company.id, "notes"] ++ dir ++ [Ecto.UUID.generate() <> ext(content_type)])
     abs = Path.join(uploads_dir(), rel)
     File.mkdir_p!(Path.dirname(abs))
     File.cp!(src, abs)
 
     %NoteAttachment{}
-    |> NoteAttachment.changeset(%{
-      file_name: file_name,
-      content_type: content_type,
-      byte_size: size,
-      path: rel,
-      company_id: company.id,
-      note_id: note.id,
-      uploaded_by_id: user.id
-    })
+    |> NoteAttachment.changeset(
+      Map.merge(owner_attrs, %{
+        file_name: file_name,
+        content_type: content_type,
+        byte_size: size,
+        path: rel,
+        company_id: company.id,
+        uploaded_by_id: user.id
+      })
+    )
     |> Repo.insert()
     |> case do
       {:ok, att} ->
+        Phoenix.PubSub.broadcast(
+          FullCircle.PubSub,
+          topic(company.id),
+          {:note_files_changed, target}
+        )
+
         {:ok, att}
 
       {:error, cs} ->
@@ -202,5 +237,5 @@ defmodule FullCircle.Notes.Attachments do
   defp ext("image/webp"), do: ".webp"
   defp ext("application/pdf"), do: ".pdf"
 
-  defp uploads_dir, do: Application.get_env(:full_circle, :uploads_dir)
+  def uploads_dir, do: Application.get_env(:full_circle, :uploads_dir)
 end

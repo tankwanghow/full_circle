@@ -30,6 +30,11 @@ defmodule FullCircle.NotesFixtures do
   def big_file(bytes),
     do: tmp_file(".jpg", <<0xFF, 0xD8, 0xFF, 0xE0>> <> :binary.copy(<<0>>, bytes))
 
+  def tray_fixture(company, user) do
+    {:ok, tray} = FullCircle.Notes.Trays.open(Ecto.UUID.generate(), company, user)
+    tray
+  end
+
   defp tmp_file(ext, content) do
     path =
       Path.join(System.tmp_dir!(), "notes_fixture_#{System.unique_integer([:positive])}#{ext}")

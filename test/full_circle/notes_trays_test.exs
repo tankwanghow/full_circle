@@ -4,7 +4,8 @@ defmodule FullCircle.NotesTraysTest do
   import FullCircle.BillingFixtures
   import FullCircle.NotesFixtures
 
-  alias FullCircle.Notes.{NoteAttachment, NoteTray}
+  alias FullCircle.Notes
+  alias FullCircle.Notes.{Attachments, NoteAttachment, NoteTray, Trays}
 
   setup do
     %{admin: admin, company: company} = billing_setup()
@@ -42,6 +43,128 @@ defmodule FullCircle.NotesTraysTest do
     test "a tray alone or a note alone is fine", ctx do
       assert {:ok, _} = insert(Map.put(ctx.base, :tray_id, ctx.tray.id))
       assert {:ok, _} = insert(Map.put(ctx.base, :note_id, ctx.note.id))
+    end
+  end
+
+  describe "trays" do
+    test "open creates once and is idempotent for its owner", ctx do
+      id = Ecto.UUID.generate()
+      assert {:ok, %NoteTray{id: ^id}} = Trays.open(id, ctx.company, ctx.admin)
+      assert {:ok, %NoteTray{id: ^id}} = Trays.open(id, ctx.company, ctx.admin)
+      assert Repo.aggregate(NoteTray, :count) == 1
+    end
+
+    test "another user cannot open, read or fill someone's tray", ctx do
+      tray = tray_fixture(ctx.company, ctx.admin)
+      clerk = user_with_role(ctx.company, ctx.admin, "clerk")
+
+      assert {:error, :not_found} = Trays.open(tray.id, ctx.company, clerk)
+
+      assert {:error, :not_found} =
+               Attachments.attach_to_tray(
+                 tray.id,
+                 %{path: jpeg_file(), file_name: "a.jpg"},
+                 ctx.company,
+                 clerk
+               )
+
+      assert Trays.list(tray.id, ctx.company, clerk) == []
+    end
+
+    test "a tray upload is stored under notes/tray/<id>, listed, and broadcast", ctx do
+      tray = tray_fixture(ctx.company, ctx.admin)
+      Phoenix.PubSub.subscribe(FullCircle.PubSub, Attachments.topic(ctx.company.id))
+
+      assert {:ok, att} =
+               Attachments.attach_to_tray(
+                 tray.id,
+                 %{path: jpeg_file(), file_name: "a.jpg"},
+                 ctx.company,
+                 ctx.admin
+               )
+
+      assert att.tray_id == tray.id and is_nil(att.note_id)
+      assert String.starts_with?(att.path, "#{ctx.company.id}/notes/tray/#{tray.id}/")
+      assert [%{id: id}] = Trays.list(tray.id, ctx.company, ctx.admin)
+      assert id == att.id
+      tray_id = tray.id
+      assert_receive {:note_files_changed, {:tray, ^tray_id}}
+    end
+
+    test "a note upload broadcasts its note", ctx do
+      Phoenix.PubSub.subscribe(FullCircle.PubSub, Attachments.topic(ctx.company.id))
+
+      {:ok, _} =
+        Attachments.attach(
+          ctx.note,
+          %{path: jpeg_file(), file_name: "a.jpg"},
+          ctx.company,
+          ctx.admin
+        )
+
+      note_id = ctx.note.id
+      assert_receive {:note_files_changed, {:note, ^note_id}}
+    end
+
+    test "discard_file hard-deletes the row and the file", ctx do
+      tray = tray_fixture(ctx.company, ctx.admin)
+
+      {:ok, att} =
+        Attachments.attach_to_tray(
+          tray.id,
+          %{path: jpeg_file(), file_name: "a.jpg"},
+          ctx.company,
+          ctx.admin
+        )
+
+      path = Attachments.abs_path(att)
+      assert :ok = Trays.discard_file(att.id, tray.id, ctx.company, ctx.admin)
+      refute File.exists?(path)
+      assert Repo.get(NoteAttachment, att.id) == nil
+    end
+
+    test "cancel deletes every file and closes the tray; later uploads are refused", ctx do
+      tray = tray_fixture(ctx.company, ctx.admin)
+      up = %{path: jpeg_file(), file_name: "a.jpg"}
+      {:ok, a1} = Attachments.attach_to_tray(tray.id, up, ctx.company, ctx.admin)
+
+      {:ok, a2} =
+        Attachments.attach_to_tray(tray.id, %{up | path: jpeg_file()}, ctx.company, ctx.admin)
+
+      assert :ok = Trays.cancel(tray.id, ctx.company, ctx.admin)
+      refute File.exists?(Attachments.abs_path(a1))
+      refute File.exists?(Attachments.abs_path(a2))
+      assert Trays.list(tray.id, ctx.company, ctx.admin) == []
+      assert %NoteTray{closed_at: %DateTime{}} = Repo.get(NoteTray, tray.id)
+
+      assert {:error, :tray_closed} =
+               Attachments.attach_to_tray(
+                 tray.id,
+                 %{path: jpeg_file(), file_name: "late.jpg"},
+                 ctx.company,
+                 ctx.admin
+               )
+    end
+
+    test "an upload into a saved tray follows it to the note", ctx do
+      tray = tray_fixture(ctx.company, ctx.admin)
+
+      tray
+      |> Ecto.Changeset.change(note_id: ctx.note.id, closed_at: DateTime.utc_now(:second))
+      |> Repo.update!()
+
+      assert {:ok, att} =
+               Attachments.attach_to_tray(
+                 tray.id,
+                 %{path: jpeg_file(), file_name: "late.jpg"},
+                 ctx.company,
+                 ctx.admin
+               )
+
+      assert att.note_id == ctx.note.id and is_nil(att.tray_id)
+
+      assert [%{file_name: "late.jpg"}] =
+               Notes.get_note(ctx.note.id, ctx.company, ctx.admin).attachments
     end
   end
 end
