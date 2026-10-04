@@ -56,7 +56,7 @@ config :full_circle, FullCircleWeb.Endpoint,
 # Configure esbuild
 config :esbuild,
   full_circle: [
-    args: ~w(js/app.js js/tri_autocomplete.js
+    args: ~w(js/app.js js/tri_autocomplete.js js/phone_upload.js
         --chunk-names=chunks/[name]-[hash] --splitting
         --bundle --target=es2020 --format=esm
         --outdir=../priv/static/assets --external:/fonts/* --external:/images/*
