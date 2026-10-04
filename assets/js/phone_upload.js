@@ -258,10 +258,11 @@ function start(root) {
     showScan()
     $("pu-finished").classList.remove("hidden")
     for (const id of ["pu-scan", "pu-photo", "pu-files", "pu-next", "pu-retake", "pu-done", "pu-close"]) $(id).disabled = true
-    window.close()
-    // Still here: the browser would not close a tab it did not open by
-    // script. Show a plain Done page instead (replace: Back skips this page).
-    setTimeout(() => location.replace("/up/done"), 400)
+    // Done page first, then it tries to close the tab. Calling
+    // window.close() here could be *accepted* by a camera app's in-app
+    // browser without closing — and a page marked as closing ignores the
+    // navigation, so the phone was left on this page. (replace: Back skips it.)
+    location.replace("/up/done")
   }
 
   // Resume a scan the page was reloaded in the middle of.

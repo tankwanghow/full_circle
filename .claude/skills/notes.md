@@ -182,9 +182,11 @@ exposes `addPage/sendFile/startScan` for checking the page without a camera
   the `PhoneUploadFinished` ETS set for the token lifetime (600 s). The set
   is started by `application.ex`, so a hot-reloaded dev server needs a
   restart; if the table is missing, Finish is a no-op and uploads still
-  work. The page then tries `window.close()` (usually blocked for a tab the
-  camera app opened) and, still open after 400 ms, `location.replace`s to
-  `/up/done` (a static "All sent" page; routed before `/:token`). Close
+  work. The page then `location.replace`s to `/up/done` (a static "All sent"
+  page; routed before `/:token`), which itself calls `window.close()`. Not
+  the other way round: a camera app's in-app browser can *accept*
+  `window.close()` without closing, and a page marked as closing ignores
+  further navigation — the phone was left on the upload page. Close
   also broadcasts `{:phone_closed, target}`; `NoteFiles` routes it only to
   QR components registered with `listen_phone/3` (key `{:phone, target}`),
   which close their modal on the desktop.

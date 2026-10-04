@@ -156,5 +156,7 @@ defmodule FullCircleWeb.PhoneUploadControllerTest do
     html = ctx.conn |> get(~p"/up/done") |> html_response(200)
     assert html =~ "All sent"
     refute html =~ "phone_upload.js"
+    # It tries to close the tab itself, once it is already on screen.
+    assert html =~ "window.close()"
   end
 end
