@@ -682,4 +682,15 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
     _ = render(lv)
     assert has_element?(lv, "#notes-panel-note-#{note.id} .note-thumb")
   end
+
+  test "a validation error shows right under the text box, above the files",
+       %{conn: conn, comp: comp, contact: c} do
+    {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
+    lv |> element("#notes-panel-new") |> render_click()
+    html = lv |> form("#notes-panel-form", %{"note" => %{"body" => ""}}) |> render_submit()
+
+    {err_at, _} = :binary.match(html, "can&#39;t be blank")
+    {tray_at, _} = :binary.match(html, ~s(id="notes-panel-tray"))
+    assert err_at < tray_at
+  end
 end

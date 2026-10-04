@@ -400,8 +400,8 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
             placeholder={@placeholder || gettext("Write a note…")}
             class="mt-1 w-full resize-y rounded-md border border-gray-300 bg-transparent px-2 py-1 text-lg placeholder-gray-500 dark:border-gray-600"
           >{Phoenix.HTML.Form.normalize_value("textarea", @form[:body].value)}</textarea>
-          <.tray {tray_assigns(assigns)} />
           <.messages {message_assigns(assigns)} />
+          <.tray {tray_assigns(assigns)} />
           {render_slot(@files)}
           <.visibility_fields
             {visibility_assigns(assigns)}
@@ -451,8 +451,8 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
             placeholder={@placeholder || gettext("Write a note…")}
             class="w-full resize-y border-0 bg-transparent p-1 text-lg placeholder-gray-500 focus:ring-0"
           >{Phoenix.HTML.Form.normalize_value("textarea", @form[:body].value)}</textarea>
-          <.tray {tray_assigns(assigns)} />
           <.messages {message_assigns(assigns)} />
+          <.tray {tray_assigns(assigns)} />
           <.visibility_fields
             {visibility_assigns(assigns)}
             class="flex flex-wrap items-center gap-1 pb-2 text-xs"
