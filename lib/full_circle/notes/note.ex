@@ -55,11 +55,15 @@ defmodule FullCircle.Notes.Note do
   @doc "Every value a stored `visibility` list may hold (notes and tasks)."
   def visibility_values, do: @private ++ @choosable_roles
 
-  def changeset(note, attrs) do
+  @doc """
+  `files?: true` when the note has files (already attached, or waiting in the
+  write box's tray): then the text may be empty — a post of photos only.
+  """
+  def changeset(note, attrs, opts \\ []) do
     note
     |> cast(attrs, @castable)
     |> update_change(:title, &blank_to_nil/1)
-    |> validate_required([:body])
+    |> require_body(Keyword.get(opts, :files?, false))
     |> validate_length(:title, max: 120)
     |> validate_subject_pair()
     |> validate_visibility()
@@ -70,7 +74,18 @@ defmodule FullCircle.Notes.Note do
   def display_title(%__MODULE__{title: t}) when is_binary(t) and t != "", do: t
 
   def display_title(%__MODULE__{body: body}) do
-    (body || "") |> String.split("\n", parts: 2) |> hd() |> String.slice(0, 120)
+    case (body || "") |> String.trim() |> String.split("\n", parts: 2) |> hd() do
+      # A post of files only (no title, no text).
+      "" -> "📎 Files"
+      line -> String.slice(line, 0, 120)
+    end
+  end
+
+  defp require_body(cs, false), do: validate_required(cs, [:body])
+
+  # cast turns "" into nil; the column is NOT NULL, so store "".
+  defp require_body(cs, true) do
+    if is_nil(get_field(cs, :body)), do: put_change(cs, :body, ""), else: cs
   end
 
   defp blank_to_nil(nil), do: nil

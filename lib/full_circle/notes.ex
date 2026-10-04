@@ -155,8 +155,8 @@ defmodule FullCircle.Notes do
 
   # --- write ----------------------------------------------------------------
 
-  def change_note(%Note{} = note, attrs \\ %{}) do
-    Note.changeset(note, normalize_visibility(attrs))
+  def change_note(%Note{} = note, attrs \\ %{}, opts \\ []) do
+    Note.changeset(note, normalize_visibility(attrs), opts)
   end
 
   def create_note(attrs, company, user) do
@@ -174,7 +174,9 @@ defmodule FullCircle.Notes do
           # saved; it may since be deleted or out of the replier's sight.
           changeset =
             %Note{company_id: company.id, author_id: user.id, updated_by_id: user.id}
-            |> Note.changeset(Map.delete(attrs, "links"))
+            |> Note.changeset(Map.delete(attrs, "links"),
+              files?: Trays.has_files?(Map.get(attrs, "tray_id"), company, user)
+            )
             |> then(&if(root, do: &1, else: validate_subject(&1, company, user)))
 
           # Lock order: task row, then the root note, then (on update) the note.
@@ -224,49 +226,61 @@ defmodule FullCircle.Notes do
           do: Map.drop(attrs, ["subject_type", "subject_id", "visibility"]),
           else: attrs
 
-      changeset = note |> Note.changeset(attrs) |> validate_subject(company, user)
+      files? = current.attachments != [] or Trays.has_files?(tray_id, company, user)
+
+      changeset =
+        note |> Note.changeset(attrs, files?: files?) |> validate_subject(company, user)
 
       # Unlocked first read so a forged visibility alone is a no-op save; the
       # locked read inside the transaction is the one that is stored.
       {:ok, preview} = read_task_visibility(Repo, changeset, false)
       changeset = follow_task_visibility(changeset, preview)
 
-      if changeset.changes == %{} do
-        # Only new files (or nothing at all): no version, no lock bump.
-        {:ok, _} = Repo.transaction(fn -> Trays.claim(Repo, tray_id, current, company, user) end)
-        {:ok, Repo.preload(current, [:attachments], force: true)}
-      else
-        changeset =
-          changeset
-          |> Ecto.Changeset.put_change(:updated_by_id, user.id)
-          |> Ecto.Changeset.optimistic_lock(:lock_version)
+      cond do
+        # validate_required drops the blanked field from `changes`, so an
+        # invalid changeset can look like "nothing changed": report it.
+        not changeset.valid? ->
+          {:error, changeset}
 
-        # Lock order: task row → root note → reply note — the same order as
-        # Tasks.update_task/4 (task UPDATE, then its notes) and a root's save
-        # (root, then its replies). Taking the note (snapshot's FOR UPDATE)
-        # first would deadlock against a concurrent change of its task or root.
-        Multi.new()
-        |> Multi.run(:task_visibility, fn repo, _ -> read_task_visibility(repo, changeset) end)
-        |> Multi.run(:root, fn repo, _ -> lock_root_or_keep(repo, current.reply_to_id) end)
-        |> snapshot(current, user, note.lock_version)
-        |> Multi.update(:note, fn m ->
-          changeset |> follow_root(m.root) |> follow_task_visibility(m.task_visibility)
-        end)
-        |> Multi.run(:replies, fn repo, %{note: n} -> sync_replies(repo, current, n) end)
-        |> Multi.run(:tray, fn repo, %{note: n} ->
-          Trays.claim(repo, tray_id, n, company, user)
-        end)
-        |> Repo.transaction()
-        |> case do
-          {:ok, %{note: n}} ->
-            {:ok, Repo.preload(n, [:author, :updated_by, :attachments], force: true)}
+        changeset.changes == %{} ->
+          # Only new files (or nothing at all): no version, no lock bump.
+          {:ok, _} =
+            Repo.transaction(fn -> Trays.claim(Repo, tray_id, current, company, user) end)
 
-          {:error, :note, cs, _} ->
-            {:error, cs}
+          {:ok, Repo.preload(current, [:attachments], force: true)}
 
-          {:error, _, reason, _} ->
-            {:error, reason}
-        end
+        true ->
+          changeset =
+            changeset
+            |> Ecto.Changeset.put_change(:updated_by_id, user.id)
+            |> Ecto.Changeset.optimistic_lock(:lock_version)
+
+          # Lock order: task row → root note → reply note — the same order as
+          # Tasks.update_task/4 (task UPDATE, then its notes) and a root's save
+          # (root, then its replies). Taking the note (snapshot's FOR UPDATE)
+          # first would deadlock against a concurrent change of its task or root.
+          Multi.new()
+          |> Multi.run(:task_visibility, fn repo, _ -> read_task_visibility(repo, changeset) end)
+          |> Multi.run(:root, fn repo, _ -> lock_root_or_keep(repo, current.reply_to_id) end)
+          |> snapshot(current, user, note.lock_version)
+          |> Multi.update(:note, fn m ->
+            changeset |> follow_root(m.root) |> follow_task_visibility(m.task_visibility)
+          end)
+          |> Multi.run(:replies, fn repo, %{note: n} -> sync_replies(repo, current, n) end)
+          |> Multi.run(:tray, fn repo, %{note: n} ->
+            Trays.claim(repo, tray_id, n, company, user)
+          end)
+          |> Repo.transaction()
+          |> case do
+            {:ok, %{note: n}} ->
+              {:ok, Repo.preload(n, [:author, :updated_by, :attachments], force: true)}
+
+            {:error, :note, cs, _} ->
+              {:error, cs}
+
+            {:error, _, reason, _} ->
+              {:error, reason}
+          end
       end
     end
   rescue

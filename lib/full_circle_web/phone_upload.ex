@@ -73,9 +73,11 @@ defmodule FullCircleWeb.PhoneUpload do
 
   def note_label(%Note{title: title}) when is_binary(title) and title != "", do: title
 
-  def note_label(%Note{body: body}) do
-    body = String.trim(body || "")
-    if String.length(body) > 40, do: String.slice(body, 0, 40) <> "…", else: body
+  def note_label(%Note{body: body} = note) do
+    case String.trim(body || "") do
+      "" -> Note.display_title(note)
+      body -> if String.length(body) > 40, do: String.slice(body, 0, 40) <> "…", else: body
+    end
   end
 
   defp kind("tray"), do: {:ok, :tray}

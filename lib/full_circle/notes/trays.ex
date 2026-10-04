@@ -46,6 +46,9 @@ defmodule FullCircle.Notes.Trays do
     end
   end
 
+  def has_files?(nil, _company, _user), do: false
+  def has_files?(tray_id, company, user), do: list(tray_id, company, user) != []
+
   def discard_file(att_id, tray_id, company, user) do
     with {:ok, tray} <- get(tray_id, company, user),
          {:ok, att_id} <- Ecto.UUID.cast(att_id),

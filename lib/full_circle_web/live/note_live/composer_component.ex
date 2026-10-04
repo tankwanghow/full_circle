@@ -147,11 +147,18 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
     cs =
       socket.assigns
       |> base_note()
-      |> Notes.change_note(Map.merge(params, subject_attrs(socket.assigns)))
+      |> Notes.change_note(Map.merge(params, subject_attrs(socket.assigns)),
+        files?: has_files?(socket.assigns)
+      )
       |> Map.put(:action, :validate)
 
     assign(socket, form: to_form(cs, id: "#{socket.assigns.id}_note"), params: params)
   end
+
+  # Files in the box (or already on the note being edited) make text optional.
+  defp has_files?(%{tray_files: [_ | _]}), do: true
+  defp has_files?(%{mode: :edit, note: %Note{attachments: [_ | _]}}), do: true
+  defp has_files?(_assigns), do: false
 
   defp notify(%{assigns: %{notify: :liveview, id: id}}, event),
     do: send(self(), {:composer, id, event})

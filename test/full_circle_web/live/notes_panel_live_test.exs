@@ -693,4 +693,30 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
     {tray_at, _} = :binary.match(html, ~s(id="notes-panel-tray"))
     assert err_at < tray_at
   end
+
+  test "a post of files only (no text) saves from the box",
+       %{conn: conn, admin: admin, comp: comp, contact: c} do
+    {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
+    lv |> element("#notes-panel-new") |> render_click()
+    [_, tray] = Regex.run(~r/id="notes-panel-tray"[^>]*data-tray-id="([^"]+)"/, render(lv))
+    {:ok, _} = FullCircle.Notes.Trays.open(tray, comp, admin)
+
+    {:ok, _} =
+      FullCircle.Notes.Attachments.attach_to_tray(
+        tray,
+        %{path: jpeg_file(), file_name: "delivery.jpg"},
+        comp,
+        admin
+      )
+
+    _ = render(lv)
+    html = lv |> form("#notes-panel-form", %{"note" => %{"body" => ""}}) |> render_change()
+    refute html =~ "can&#39;t be blank"
+
+    lv |> form("#notes-panel-form", %{"note" => %{"body" => ""}}) |> render_submit()
+    [note] = FullCircle.Repo.all(FullCircle.Notes.Note)
+
+    assert [%{file_name: "delivery.jpg"}] =
+             FullCircle.Repo.preload(note, :attachments).attachments
+  end
 end

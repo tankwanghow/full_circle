@@ -321,4 +321,84 @@ defmodule FullCircle.NotesTraysTest do
              ) in [{:ok, []}, {:error, :enoent}]
     end
   end
+
+  describe "a note may be files only" do
+    defp tray_with_photo(ctx) do
+      tray = tray_fixture(ctx.company, ctx.admin)
+
+      {:ok, _} =
+        Attachments.attach_to_tray(
+          tray.id,
+          %{path: jpeg_file(), file_name: "photo.jpg"},
+          ctx.company,
+          ctx.admin
+        )
+
+      tray
+    end
+
+    test "no text but files in the tray saves", ctx do
+      tray = tray_with_photo(ctx)
+
+      assert {:ok, note} =
+               Notes.create_note(%{"body" => "", "tray_id" => tray.id}, ctx.company, ctx.admin)
+
+      assert note.body == ""
+      assert [%{file_name: "photo.jpg"}] = note.attachments
+    end
+
+    test "a reply of files only saves", ctx do
+      tray = tray_with_photo(ctx)
+
+      assert {:ok, reply} =
+               Notes.create_note(
+                 %{"body" => "", "tray_id" => tray.id, "reply_to_id" => ctx.note.id},
+                 ctx.company,
+                 ctx.admin
+               )
+
+      assert reply.reply_to_id == ctx.note.id
+    end
+
+    test "no text and no files is still refused", ctx do
+      assert {:error, cs} = Notes.create_note(%{"body" => ""}, ctx.company, ctx.admin)
+      assert {"can't be blank", _} = cs.errors[:body]
+
+      empty_tray = tray_fixture(ctx.company, ctx.admin)
+
+      assert {:error, _} =
+               Notes.create_note(
+                 %{"body" => "", "tray_id" => empty_tray.id},
+                 ctx.company,
+                 ctx.admin
+               )
+    end
+
+    test "editing away the text keeps the note when it already has files", ctx do
+      {:ok, _} =
+        Attachments.attach(
+          ctx.note,
+          %{path: jpeg_file(), file_name: "a.jpg"},
+          ctx.company,
+          ctx.admin
+        )
+
+      assert {:ok, note} = Notes.update_note(ctx.note, %{"body" => ""}, ctx.company, ctx.admin)
+      assert note.body == ""
+    end
+
+    test "editing away the text of a note without files is refused", ctx do
+      assert {:error, %Ecto.Changeset{}} =
+               Notes.update_note(ctx.note, %{"body" => ""}, ctx.company, ctx.admin)
+    end
+  end
+
+  test "a files-only note still has a name in links, chips and search" do
+    alias FullCircle.Notes.Note
+    assert Note.display_title(%Note{title: nil, body: ""}) == "📎 Files"
+    assert Note.display_title(%Note{title: nil, body: "  \n"}) == "📎 Files"
+    assert Note.display_title(%Note{title: nil, body: "Bank letter\nmore"}) == "Bank letter"
+
+    assert FullCircleWeb.PhoneUpload.note_label(%Note{title: nil, body: ""}) == "📎 Files"
+  end
 end
