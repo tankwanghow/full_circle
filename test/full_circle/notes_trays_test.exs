@@ -248,4 +248,29 @@ defmodule FullCircle.NotesTraysTest do
       assert [_] = Trays.list(tray.id, ctx.company, ctx.admin)
     end
   end
+
+  describe "prune_before" do
+    test "removes old trays and their unsaved files, never a note's files", ctx do
+      old = tray_fixture(ctx.company, ctx.admin)
+      fresh = tray_fixture(ctx.company, ctx.admin)
+      up = fn -> %{path: jpeg_file(), file_name: "a.jpg"} end
+      {:ok, old_att} = Attachments.attach_to_tray(old.id, up.(), ctx.company, ctx.admin)
+      {:ok, _} = Attachments.attach_to_tray(fresh.id, up.(), ctx.company, ctx.admin)
+      {:ok, note_att} = Attachments.attach(ctx.note, up.(), ctx.company, ctx.admin)
+
+      two_days_ago = DateTime.add(DateTime.utc_now(:second), -2, :day)
+
+      Repo.update_all(from(t in NoteTray, where: t.id == ^old.id),
+        set: [inserted_at: two_days_ago]
+      )
+
+      assert {:ok, %{trays: 1, files: 1}} =
+               Trays.prune_before(DateTime.add(DateTime.utc_now(), -1, :day))
+
+      refute File.exists?(Attachments.abs_path(old_att))
+      assert Repo.get(NoteTray, old.id) == nil
+      assert Repo.get(NoteTray, fresh.id)
+      assert File.exists?(Attachments.abs_path(note_att))
+    end
+  end
 end

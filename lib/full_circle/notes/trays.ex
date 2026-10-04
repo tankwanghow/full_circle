@@ -10,7 +10,7 @@ defmodule FullCircle.Notes.Trays do
   import Ecto.Query, warn: false
 
   alias FullCircle.Repo
-  alias FullCircle.Notes.{Attachments, NoteAttachment, NoteTray}
+  alias FullCircle.Notes.{Attachments, NoteAttachment, NoteTray, Scans}
 
   def open(id, company, user) do
     with {:ok, id} <- Ecto.UUID.cast(id) do
@@ -99,6 +99,20 @@ defmodule FullCircle.Notes.Trays do
     else
       _ -> {:ok, 0}
     end
+  end
+
+  @doc """
+  Housekeeping (`TrayPruner`): deletes trays opened before `cutoff` with any
+  files still in them (a browser closed without Save or Cancel), plus scan
+  folders older than `cutoff`. A saved tray has no files left — they moved
+  to the note — so only its row goes.
+  """
+  def prune_before(%DateTime{} = cutoff) do
+    trays = Repo.all(from t in NoteTray, where: t.inserted_at < ^cutoff, select: t.id)
+    files = Repo.all(from a in NoteAttachment, where: a.tray_id in ^trays)
+    delete_files(files)
+    {n, _} = Repo.delete_all(from t in NoteTray, where: t.id in ^trays)
+    {:ok, %{trays: n, files: length(files), scans: Scans.prune_before(cutoff)}}
   end
 
   # Rows first, then files: a crash between leaves orphan files (pruned with
