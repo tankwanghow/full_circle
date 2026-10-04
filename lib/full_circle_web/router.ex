@@ -36,6 +36,8 @@ defmodule FullCircleWeb.Router do
 
   scope "/up", FullCircleWeb do
     pipe_through :phone_upload
+    # Before "/:token", or "done" would be read as a token.
+    get "/done", PhoneUploadController, :done_page
     get "/:token", PhoneUploadController, :show
     get "/:token/state", PhoneUploadController, :state
     post "/:token/files", PhoneUploadController, :file

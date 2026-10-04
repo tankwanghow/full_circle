@@ -259,6 +259,9 @@ function start(root) {
     $("pu-finished").classList.remove("hidden")
     for (const id of ["pu-scan", "pu-photo", "pu-files", "pu-next", "pu-retake", "pu-done", "pu-close"]) $(id).disabled = true
     window.close()
+    // Still here: the browser would not close a tab it did not open by
+    // script. Show a plain Done page instead (replace: Back skips this page).
+    setTimeout(() => location.replace("/up/done"), 400)
   }
 
   // Resume a scan the page was reloaded in the middle of.

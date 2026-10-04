@@ -151,4 +151,10 @@ defmodule FullCircleWeb.PhoneUploadControllerTest do
     assert %{"code" => "expired"} = json_response(conn, 401)
     assert ctx.conn |> get(~p"/up/#{t}") |> html_response(410) =~ "expired"
   end
+
+  test "the Done page after Close: a plain page, not read as a token", ctx do
+    html = ctx.conn |> get(~p"/up/done") |> html_response(200)
+    assert html =~ "All sent"
+    refute html =~ "phone_upload.js"
+  end
 end
