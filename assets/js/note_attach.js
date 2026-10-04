@@ -13,7 +13,7 @@ function ext(name) {
   return i >= 0 ? name.slice(i + 1).toLowerCase() : ""
 }
 
-async function downscale(file, maxEdge = 1920, quality = 0.85) {
+export async function downscale(file, maxEdge = 1920, quality = 0.85) {
   const isPhoto = PHOTO_EXT.has(ext(file.name)) || PHOTO_TYPES.has(file.type || "")
   if (!isPhoto || file.size < 50000) return file
   let bitmap
@@ -30,66 +30,129 @@ async function downscale(file, maxEdge = 1920, quality = 0.85) {
   return new File([blob], `${base}.jpg`, { type: "image/jpeg" })
 }
 
+function post(url, file) {
+  return new Promise(resolve => {
+    const form = new FormData()
+    form.append("file", file, file.name)
+    const xhr = new XMLHttpRequest()
+    xhr.open("POST", url)
+    xhr.setRequestHeader("x-csrf-token", document.querySelector("meta[name='csrf-token']").content)
+    xhr.onload = () => {
+      let body = {}
+      try { body = JSON.parse(xhr.responseText) } catch (_e) {}
+      resolve(xhr.status === 200 ? { ok: true, body } : { ok: false, error: body.error || `Upload failed (${xhr.status}).` })
+    }
+    xhr.onerror = () => resolve({ ok: false, error: "Upload failed — check the connection and try again." })
+    xhr.send(form)
+  })
+}
+
+// One file at a time, so a slow line shows steady progress and one bad file
+// does not stop the rest.
+export async function uploadFiles(files, { url, maxBytes, onMessage }) {
+  const list = Array.from(files)
+  let ok = 0
+  const failed = []
+  for (let i = 0; i < list.length; i++) {
+    onMessage(list.length > 1 ? `Uploading ${i + 1} of ${list.length}…` : "Uploading…")
+    const file = await downscale(list[i])
+    if (file.size > maxBytes) {
+      failed.push(`${list[i].name}: larger than ${Math.floor(maxBytes / 1000000)} MB`)
+      continue
+    }
+    const res = await post(url, file)
+    if (res.ok) ok++
+    else failed.push(`${list[i].name}: ${res.error}`)
+  }
+  onMessage(failed.join(" · "))
+  return { ok, failed }
+}
+
+// Announce to the element carrying this id *now*: the upload can outlive a
+// re-render, and pushing from a detached element would reach the host
+// LiveView instead of the component, which has no handler and would crash.
+// No forced reload when the socket is down: that would lose unsaved input.
+function announce(hook) {
+  const current = document.getElementById(hook.el.id)
+  if (current && hook.liveSocket.isConnected()) current.dispatchEvent(new CustomEvent(DONE_EVENT))
+}
+
+function listenDone(hook) {
+  hook.el.addEventListener(DONE_EVENT, () => hook.pushEventTo(hook.el, "attachment_uploaded", {}))
+}
+
 export const NoteAttach = {
   mounted() {
-    // The upload can outlive this element: the panel may re-render while the
-    // XHR runs. The finished upload is announced to whichever element carries
-    // this id *now*, and that element's hook pushes to its own component.
-    // Pushing from a detached element would reach the host LiveView instead,
-    // which has no handler for it and would crash, losing unsaved input.
-    this.el.addEventListener(DONE_EVENT, e => {
-      this.pushEventTo(this.el, "attachment_uploaded", e.detail || {})
-    })
+    listenDone(this)
     this.el.addEventListener("click", e => {
       e.preventDefault()
       const input = document.createElement("input")
       input.type = "file"
       input.accept = "image/*,application/pdf"
+      input.multiple = this.el.dataset.multiple === "true"
       input.style.display = "none"
       document.body.appendChild(input)
-      input.addEventListener("change", () => {
-        const file = input.files && input.files[0]
+      input.addEventListener("change", async () => {
+        const files = Array.from(input.files || [])
         input.remove()
-        if (file) this.upload(file)
+        if (files.length === 0) return
+        const msg = document.getElementById(`${this.el.id}-msg`)
+        const { ok } = await uploadFiles(files, {
+          url: this.el.dataset.url,
+          maxBytes: parseInt(this.el.dataset.maxBytes, 10),
+          onMessage: t => { if (msg) msg.textContent = t || "" }
+        })
+        if (ok > 0) announce(this)
       })
       input.click()
     })
-  },
+  }
+}
 
-  message(text) {
-    const el = document.getElementById(`${this.el.id}-msg`)
-    if (el) el.textContent = text || ""
+// The write box's tray: drop files onto the box, or paste a screenshot /
+// copied file anywhere in it. Plain-text paste is left alone.
+export const NoteDrop = {
+  mounted() {
+    listenDone(this)
+    const box = this.el.closest("[id$='-box']") || this.el
+    const send = async files => {
+      const msgEl = this.el.querySelector("[id$='-attach-msg']")
+      const { ok } = await uploadFiles(files, {
+        url: this.el.dataset.url,
+        maxBytes: parseInt(this.el.dataset.maxBytes, 10),
+        onMessage: t => { if (msgEl) msgEl.textContent = t || "" }
+      })
+      if (ok > 0) announce(this)
+    }
+    this.onDragOver = e => {
+      if (!e.dataTransfer || !Array.from(e.dataTransfer.types).includes("Files")) return
+      e.preventDefault()
+      box.classList.add("ring-2", "ring-sky-400")
+    }
+    this.onDragLeave = () => box.classList.remove("ring-2", "ring-sky-400")
+    this.onDrop = e => {
+      if (!e.dataTransfer || e.dataTransfer.files.length === 0) return
+      e.preventDefault()
+      box.classList.remove("ring-2", "ring-sky-400")
+      send(e.dataTransfer.files)
+    }
+    this.onPaste = e => {
+      const files = e.clipboardData ? Array.from(e.clipboardData.files) : []
+      if (files.length === 0) return
+      e.preventDefault()
+      send(files)
+    }
+    box.addEventListener("dragover", this.onDragOver)
+    box.addEventListener("dragleave", this.onDragLeave)
+    box.addEventListener("drop", this.onDrop)
+    box.addEventListener("paste", this.onPaste)
+    this.box = box
   },
-
-  async upload(original) {
-    const file = await downscale(original)
-    const max = parseInt(this.el.dataset.maxBytes, 10)
-    if (file.size > max) {
-      this.message(`File is larger than ${Math.floor(max / 1000000)} MB.`)
-      return
-    }
-    this.message("Uploading…")
-    const form = new FormData()
-    form.append("file", file, file.name)
-    const xhr = new XMLHttpRequest()
-    xhr.open("POST", this.el.dataset.url)
-    xhr.setRequestHeader("x-csrf-token", document.querySelector("meta[name='csrf-token']").content)
-    xhr.onload = () => {
-      let body = {}
-      try { body = JSON.parse(xhr.responseText) } catch (_e) {}
-      if (xhr.status === 200) {
-        this.message("")
-        const current = document.getElementById(this.el.id)
-        if (current && this.liveSocket.isConnected()) {
-          current.dispatchEvent(new CustomEvent(DONE_EVENT, { detail: { id: body.id } }))
-        }
-        // Otherwise the file is saved and the page shows it on its next
-        // (re)load. No forced reload: that would throw away unsaved input.
-      } else {
-        this.message(body.error || `Upload failed (${xhr.status}).`)
-      }
-    }
-    xhr.onerror = () => this.message("Upload failed — check the connection and try again.")
-    xhr.send(form)
+  destroyed() {
+    if (!this.box) return
+    this.box.removeEventListener("dragover", this.onDragOver)
+    this.box.removeEventListener("dragleave", this.onDragLeave)
+    this.box.removeEventListener("drop", this.onDrop)
+    this.box.removeEventListener("paste", this.onPaste)
   }
 }
