@@ -69,13 +69,33 @@ function start(root) {
 
   // --- sent list -----------------------------------------------------------
 
-  function addSent(name) {
+  // `thumb`: an image URL (photo, scan page), "pdf" for a 📄 tile, or none
+  // (names restored after a reload have no picture left).
+  function addSent(name, thumb) {
     const li = document.createElement("li")
     li.className = "flex items-center gap-2 rounded bg-white p-2 dark:bg-gray-900"
     li.innerHTML = `<span class="pu-mark">⏳</span><span class="pu-name truncate"></span><span class="pu-err ml-auto text-rose-600 dark:text-rose-400"></span>`
     li.querySelector(".pu-name").textContent = name
+    if (thumb) {
+      const tile = document.createElement(thumb === "pdf" ? "span" : "img")
+      tile.className = "h-12 w-12 shrink-0 rounded border border-gray-300 object-cover dark:border-gray-600"
+      if (thumb === "pdf") {
+        tile.className += " flex items-center justify-center text-2xl"
+        tile.textContent = "📄"
+      } else {
+        tile.src = thumb
+        tile.alt = ""
+      }
+      li.querySelector(".pu-mark").after(tile)
+    }
     $("pu-sent").prepend(li)
     return li
+  }
+
+  function thumbFor(file) {
+    if ((file.type || "").startsWith("image/")) return URL.createObjectURL(file)
+    if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) return "pdf"
+    return null
   }
 
   function markSent(li, res, retry) {
@@ -119,7 +139,7 @@ function start(root) {
 
   async function sendFile(file) {
     const ready = await downscale(file)
-    const li = addSent(file.name)
+    const li = addSent(file.name, thumbFor(ready))
     const attempt = async () => {
       if (ready.size > maxBytes) return { ok: false, error: `Larger than ${Math.floor(maxBytes / 1000000)} MB.` }
       const form = new FormData()
@@ -207,7 +227,9 @@ function start(root) {
     const now = new Date()
     const p = n => String(n).padStart(2, "0")
     const name = `Scan ${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())} ${p(now.getHours())}${p(now.getMinutes())}.pdf`
-    const li = addSent(`${name} (${scan.pages} pages)`)
+    const first = $("pu-thumbs").querySelector("img")
+    const pages = `${scan.pages} ${scan.pages === 1 ? "page" : "pages"}`
+    const li = addSent(`${name} (${pages})`, first ? first.src : "pdf")
     const form = new FormData()
     form.append("name", name)
     const res = await call("POST", `/scans/${scan.id}/done`, form)
