@@ -33,6 +33,9 @@ config :full_circle, FullCircleWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
   http: [ip: {0, 0, 0, 0}, port: 4000],
+  # Absolute links (the note "📱 From phone" QR) use this host. To test from
+  # a phone on the same Wi-Fi: PHX_HOST=<this machine's LAN IP> iex -S mix phx.server
+  url: [host: System.get_env("PHX_HOST") || "localhost", port: 4000, scheme: "http"],
   https: [
     ip: {0, 0, 0, 0},
     port: 4001,

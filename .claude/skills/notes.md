@@ -116,11 +116,48 @@ noting journals and cashiers noting credit/debit notes and return cheques.
   call `:sys.get_state(lv.pid)` twice before `render(lv)`.
 
 ## Attachments
-Plain HTTP (`NoteAttachmentController`), never LiveView uploads — phones lose
-socket uploads when the camera backgrounds the page. Type sniffed from magic
-bytes. **Removal hides the file from the note and from download**
-(`get_readable/3` filters `removed_at`) but keeps it on disk — a removed file is
-usually the wrong upload, so an old link must not keep serving it.
+Plain HTTP (`NoteAttachmentController`, `PhoneUploadController`), never
+LiveView uploads — phones lose socket uploads when the camera backgrounds the
+page. Type sniffed from magic bytes. **Removal from a saved note hides the
+file** (`get_readable/3` filters `removed_at`) but keeps it on disk — a
+removed file is usually the wrong upload, so an old link must not keep
+serving it. Spec: `docs/superpowers/specs/2026-10-04-note-attach-from-phone-design.md`.
+
+**Tray (hold until Save).** Every write box (`ComposerComponent`) owns a
+`tray_id`, fresh on each open/Save/Cancel (`reset/1` → `new_tray/1`). Files
+picked (📎 `#{id}-attach`, several at once), dropped or pasted (`NoteDrop`
+hook on `#{id}-tray`) or sent from the phone go into that tray
+(`note_attachments.tray_id`, `note_id` empty — the `note_xor_tray` check) and
+show as `#{id}-tray-files`. The `note_trays` row (owner, later the note) is
+created by `Trays.open/3` on the first desktop upload (`create_tray` route) or
+when the phone QR opens. Save passes `"tray_id"` to `Notes.create_note` /
+`update_note`, which `Trays.claim/5` inside the note's transaction (a
+files-only edit still claims; a stale/invalid save does not). Cancel
+hard-deletes the tray's files (`Trays.cancel/3`). A saved tray follows: a
+late phone upload attaches to its note; a cancelled one answers 409
+"closed". `TrayPruner` deletes trays and scan folders older than 24 h. Files
+already on a note keep the immediate soft remove (✕ on `#note-files`).
+
+**Phone (`/up/:token`).** `FullCircleWeb.PhoneUpload` signs `{:tray | :note,
+id}` + company + user + label; 600 s idle — every success returns a fresh
+token and the page swaps it into the URL. Every request re-checks the user is
+active in the company; note uploads re-check `may_edit?`. The page is a plain
+controller page (`put_layout(false)`, own esbuild entry `phone_upload.js`),
+no LiveView. Scans upload page by page (`Notes.Scans`,
+`<uploads>/<company>/scans/<scan_id>/NNN.jpg`, max 30) and `ScanPdf` builds
+the PDF on Done (JPEGs embedded as DCTDecode, no re-encode). The 📱 button is
+`PhoneQrComponent` (QR made on open from `Endpoint.url()` — in dev set
+`PHX_HOST` to the LAN IP or the QR says localhost). `window.__phoneUpload`
+exposes `addPage/sendFile/startScan` for checking the page without a camera.
+
+**Live arrival.** Every upload broadcasts `{:note_files_changed, {:tray |
+:note, id}}` on `Attachments.topic(company_id)`. `FullCircleWeb.NoteFiles`
+(on_mount in the company live_session) halts it and `send_update`s whoever
+called `NoteFiles.listen/3` for that target (composer: its tray; notes
+panel: each shown note), or sends `{:note_files, target}` to a LiveView that
+called `listen_self/1` (the note page). Tests: a second `render(lv)` sees the
+update (the send_update queues behind the first render call), and open the
+tray (`Trays.open/3`) before `attach_to_tray/4`, as the route does.
 
 **Templates never build file addresses or read `content_type`.** Get the
 address from `Attachments.url(att, :original | :thumb)` and choose how to show
@@ -228,7 +265,7 @@ Items are `%{id, note, d}` with `d` from `Notes.feed_details/3`.
 subject every pick is a link (a pick of the record itself is ignored), the
 button and picker read "link a record" / "Link other records", never
 "about…". A Task subject hides the roles pill as well as the chips (task notes
-take the task's visibility). Files attach after the first save, through ✎ Edit.
+take the task's visibility). Files go into the box's tray and attach on Save.
 Every Linkable type hosts this one panel (records, the 9 documents, Task, and
 the list pages' 📝 modal), so create/edit in place covers them all.
 
@@ -309,7 +346,7 @@ would otherwise show the pre-save text and `lock_version`.
 | `roles` | `false` hides the role chips. A Task subject hides them either way (`task_subject?/2`) |
 | `placeholder`, `submit_label` | "Write a note…" / "Post your reply…"; "Post" / "Reply" / "Save" |
 | `cancellable` | shows Cancel |
-| `notify` | `:liveview` (default) sends `{:composer, id, event}` to the host LiveView. `{module, id}` does `send_update(module, id: id, composer: {composer_id, event})`. Events are `{:saved, mode, note}`, `:cancelled`, or `:attachment_uploaded` (post layout: the 📎 button inside the box finished an upload) |
+| `notify` | `:liveview` (default) sends `{:composer, id, event}` to the host LiveView. `{module, id}` does `send_update(module, id: id, composer: {composer_id, event})`. Events are `{:saved, mode, note}` or `:cancelled` (uploads stay inside the box's tray) |
 | `layout` | `:box` (default): the write box. `:post`: edit in place (note page and panels), laid out like `note_post` — author avatar, `:header` slot (`post_header`; the slot's `:let` is whether the role chips show, and `show_visibility={!roles_editable}` keeps the 🔒 tag when they do not: task notes, replies), record chips (a reply shows its subject chip without ✕), bordered title (text-xl) and body (text-lg), `:files` slot (`file_grid removable`), visibility chips, then the counts row: `:footer` slot left, `:actions` slot + Cancel/Save right. The chips and picker sit above the `<form>`, so `#note-form` holds only the fields |
 
 A pick reaches the box through `RecordPickerComponent`'s `notify`:
@@ -332,14 +369,15 @@ A pick reaches the box through `RecordPickerComponent`'s `notify`:
 - Delete lives in the `⋯` menu (`#delete-note`) when `can_delete?`.
 - Files: the post and edit mode share `file_grid/1`. Edit mode passes
   `removable` (`#note-files`, `#att-<id>`: a ✕ and the file name on each).
-  Attach goes through `attach_button` and the HTTP upload. In the post view
-  the button sits in this LiveView, which handles `attachment_uploaded`. In
-  edit mode it sits inside the composer, and a hook pushes to the component
-  it sits in (`closestComponentID`), so the composer forwards it as
-  `{:composer, "note", :attachment_uploaded}`. LiveViewTest does not mimic
-  that: `element(...) |> render_hook` goes to the element's `phx-target`
-  (else the LiveView). Test it with `with_target("#note-box")`. The ✕ has no `phx-target`
-  and reaches this LiveView's `remove_attachment` directly.
+  In the post view 📎 (`attach_button`, `#attach-<note id>`) and 📱
+  (`#note-phone`) attach straight to the note; this LiveView handles
+  `attachment_uploaded` and `{:note_files, {:note, id}}`. In edit mode the
+  composer's own tray takes new files (see Attachments): a hook pushes to the
+  component it sits in (`closestComponentID`), so `attachment_uploaded` reloads
+  the tray. LiveViewTest does not mimic that: `element(...) |> render_hook`
+  goes to the element's `phx-target` (else the LiveView). Test it with
+  `with_target("#note-box")`. The existing files' ✕ has no `phx-target` and
+  reaches this LiveView's `remove_attachment` directly.
 - History (`#toggle-history`, `#note-history`) lists versions with the same
   per-version filter as `list_versions/3`.
 - Thread, top to bottom: `#replying-to` (reply pages only: the root as a
@@ -374,7 +412,7 @@ A pick reaches the box through `RecordPickerComponent`'s `notify`:
     clicking, and set the highlight colours as inline styles to screenshot
     them.
 - `/notes/new` (including `?subject_type=&subject_id=`) is the composer at
-  full size. Files attach after the first save. Posting navigates to the
+  full size. Files go into its tray and attach on Post. Posting navigates to the
   new note's page.
 - Title, body, subject and visibility save with Save. Links on a saved note
   apply immediately, so Cancel still reloads the post. A stale save keeps
