@@ -35,6 +35,14 @@ defmodule FullCircle.NotesFixtures do
     tray
   end
 
+  # Real, decodable JPEGs (ImageMagick: 40x30 sRGB, 30x40 greyscale). ScanPdf
+  # reads their size from the SOF marker and pdftoppm must render them.
+  @rgb_jpeg "/9j/4AAQSkZJRgABAQAAAAAAAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAAeACgDASIAAhEBAxEB/8QAFwABAQEBAAAAAAAAAAAAAAAAAAcGBf/EACUQAAEEAQIFBQAAAAAAAAAAAAEAAgMEBQYRBxY1QVFUdJKy0v/EABgBAAMBAQAAAAAAAAAAAAAAAAIDBQQG/8QAHhEAAQUAAwEBAAAAAAAAAAAAAgABAwQRBRMxQXH/2gAMAwEAAhEDEQA/AN/mctXw1Rlm0yV7HSCMCMAncgnuR4XF58xXp7vwb+k4hdCg9y36vU6WOaYgLGXRcZxsFiDsk3df6qphtS0szbfWqxWGPbGZCZGtA2BA7E+V2lOuHnXZ/bO+zVRU+E3MddTeSrhXneOPzGRERNU9cXVWJsZnGx1qr4mPbMJCZCQNgHDsD5WU5DyvqKXzd+VRUSjhE311Qr8lPXDrjzPxZTSumruGyUlm1LXex0JjAjc4nclp7geFq0RGAMDYyzWLB2D7JPURERJC/9k="
+  @gray_jpeg "/9j/4AAQSkZJRgABAQAAAAAAAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//wAALCAAoAB4BAREA/8QAFwABAQEBAAAAAAAAAAAAAAAABgAHBf/EACYQAAEDAwMCBwAAAAAAAAAAAAEAAgMEBQYRISIHQRc2VHSTstL/2gAIAQEAAD8AcZHkFJjdvjra6OeSN8oiAhaCdSCe5G3Eo14q2H0ly+OP9rrY3mtsyS4SUVDBVxyRxGUmZjQNAQOzjvyCSoJ1f8q0vvWfSRY6nfSDzTVeyf8Adi2JGs7x+rySyw0VDJBHIyobKTM4gaBrh2B35BAvCq/ertvySfhJcEwq543epq2unpJI5Kd0QEL3E6lzT3aNuJT1SlKUpSl//9k="
+
+  def real_jpeg_file(:rgb), do: tmp_file(".jpg", Base.decode64!(@rgb_jpeg))
+  def real_jpeg_file(:gray), do: tmp_file(".jpg", Base.decode64!(@gray_jpeg))
+
   defp tmp_file(ext, content) do
     path =
       Path.join(System.tmp_dir!(), "notes_fixture_#{System.unique_integer([:positive])}#{ext}")
