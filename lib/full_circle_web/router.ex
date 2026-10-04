@@ -42,6 +42,7 @@ defmodule FullCircleWeb.Router do
     post "/:token/scans/:scan_id/pages", PhoneUploadController, :page
     delete "/:token/scans/:scan_id/pages/last", PhoneUploadController, :drop_page
     post "/:token/scans/:scan_id/done", PhoneUploadController, :done
+    post "/:token/finish", PhoneUploadController, :finish
   end
 
   pipeline :list do

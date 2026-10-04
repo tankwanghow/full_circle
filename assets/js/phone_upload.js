@@ -218,7 +218,27 @@ function start(root) {
       store.del(scanKey)
       $("pu-thumbs").innerHTML = ""
       showScan()
+      $("pu-sent-name").textContent = name
+      $("pu-sent-panel").classList.remove("hidden")
     }
+  }
+
+  // After Done: the next letter is its own PDF…
+  $("pu-more").onclick = () => {
+    $("pu-sent-panel").classList.add("hidden")
+    startScan()
+  }
+
+  // …or end the link now, not after 10 idle minutes.
+  $("pu-finish").onclick = async () => {
+    $("pu-finish").disabled = true
+    const res = await call("POST", "/finish")
+    // Expired/closed already shows the banner; a dropped connection lets them retry.
+    if (!res.ok) { $("pu-finish").disabled = !res.retry; return }
+    $("pu-sent-panel").classList.add("hidden")
+    $("pu-finished").classList.remove("hidden")
+    for (const id of ["pu-scan", "pu-photo", "pu-files", "pu-more"]) $(id).disabled = true
+    store.del(scanKey)
   }
 
   // Resume a scan the page was reloaded in the middle of.

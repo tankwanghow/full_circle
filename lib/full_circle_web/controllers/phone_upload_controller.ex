@@ -76,6 +76,14 @@ defmodule FullCircleWeb.PhoneUploadController do
     end)
   end
 
+  # "✓ Finished": the link stops working now, not after 10 idle minutes.
+  def finish(conn, %{"token" => token}) do
+    with_ctx(conn, token, fn _ctx ->
+      PhoneUpload.finish(token)
+      json(conn, %{ok: true})
+    end)
+  end
+
   # --- helpers --------------------------------------------------------------
 
   defp with_ctx(conn, token, fun) do

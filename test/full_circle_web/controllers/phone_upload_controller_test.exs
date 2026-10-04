@@ -142,4 +142,13 @@ defmodule FullCircleWeb.PhoneUploadControllerTest do
     manager = user_with_role(ctx.comp, ctx.admin, "manager")
     assert build_conn() |> log_in_user(manager) |> get(url) |> response(404)
   end
+
+  test "Finished ends the link: later uploads answer expired", ctx do
+    t = tok(ctx, {:tray, ctx.tray.id})
+    assert %{"ok" => true} = ctx.conn |> post(~p"/up/#{t}/finish") |> json_response(200)
+
+    conn = post(ctx.conn, ~p"/up/#{t}/files", %{"file" => upload(jpeg_file(), "a.jpg")})
+    assert %{"code" => "expired"} = json_response(conn, 401)
+    assert ctx.conn |> get(~p"/up/#{t}") |> html_response(410) =~ "expired"
+  end
 end

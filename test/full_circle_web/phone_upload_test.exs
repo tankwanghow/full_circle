@@ -75,4 +75,16 @@ defmodule FullCircleWeb.PhoneUploadTest do
              body: String.duplicate("x", 60)
            }) == String.duplicate("x", 40) <> "…"
   end
+
+  test "finishing a session ends its tokens at once, refreshed ones too", %{admin: a, company: c} do
+    token = PhoneUpload.sign({:tray, Ecto.UUID.generate()}, "x", c.id, a.id)
+    {:ok, %{token: refreshed}} = PhoneUpload.resolve(token)
+
+    assert :ok = PhoneUpload.finish(refreshed)
+    assert {:error, :expired} = PhoneUpload.resolve(token)
+    assert {:error, :expired} = PhoneUpload.resolve(refreshed)
+
+    other = PhoneUpload.sign({:tray, Ecto.UUID.generate()}, "x", c.id, a.id)
+    assert {:ok, _} = PhoneUpload.resolve(other)
+  end
 end

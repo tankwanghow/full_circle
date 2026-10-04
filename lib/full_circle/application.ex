@@ -17,6 +17,7 @@ defmodule FullCircle.Application do
       FullCircle.PunchGate.PhotoPruner,
       FullCircle.PunchGate.IngestLogPruner,
       FullCircle.Notes.TrayPruner,
+      FullCircleWeb.PhoneUploadFinished,
       # Start the PubSub system
       {Phoenix.PubSub, name: FullCircle.PubSub},
       # Start Finch

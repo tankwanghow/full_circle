@@ -5,7 +5,9 @@ defmodule FullCircleWeb.PhoneUpload do
   that one target only — never reads. Idle expiry is 600s: every successful
   upload hands the phone a fresh token. Every request re-checks that the user
   is still active in the company (and, for a note, may still edit it — the
-  upload functions do that).
+  upload functions do that). Each QR is one session (`s`, carried by the
+  refreshed tokens too); "✓ Finished" on the phone ends it at once
+  (`finish/1`, `PhoneUploadFinished`).
   """
   alias FullCircle.{Repo, Sys}
   alias FullCircle.Notes.Note
@@ -17,22 +19,35 @@ defmodule FullCircleWeb.PhoneUpload do
 
   def max_age, do: @max_age
 
-  def sign({kind, id}, label, company_id, user_id) when kind in [:tray, :note] do
+  def sign({kind, id}, label, company_id, user_id, session \\ Ecto.UUID.generate())
+      when kind in [:tray, :note] do
     Phoenix.Token.sign(FullCircleWeb.Endpoint, @salt, %{
       t: Atom.to_string(kind),
       i: id,
       c: company_id,
       u: user_id,
-      l: label
+      l: label,
+      s: session
     })
   end
+
+  @doc "Ends the token's session (\"✓ Finished\" on the phone): every token of it stops working."
+  def finish(token) do
+    case verify(token) do
+      {:ok, %{s: session}} -> FullCircleWeb.PhoneUploadFinished.put(session, @max_age)
+      _ -> :ok
+    end
+  end
+
+  defp verify(token),
+    do: Phoenix.Token.verify(FullCircleWeb.Endpoint, @salt, token, max_age: @max_age)
 
   def url(target, label, company, user),
     do: FullCircleWeb.Endpoint.url() <> "/up/" <> sign(target, label, company.id, user.id)
 
   def resolve(token) when is_binary(token) do
-    with {:ok, %{t: t, i: id, c: cid, u: uid, l: label}} <-
-           Phoenix.Token.verify(FullCircleWeb.Endpoint, @salt, token, max_age: @max_age),
+    with {:ok, %{t: t, i: id, c: cid, u: uid, l: label, s: session}} <- verify(token),
+         false <- FullCircleWeb.PhoneUploadFinished.finished?(session),
          {:ok, kind} <- kind(t),
          %Company{} = company <- Repo.get(Company, cid),
          %User{} = user <- Repo.get(User, uid),
@@ -43,10 +58,12 @@ defmodule FullCircleWeb.PhoneUpload do
          label: label,
          company: company,
          user: user,
-         token: sign({kind, id}, label, cid, uid)
+         token: sign({kind, id}, label, cid, uid, session)
        }}
     else
       {:error, :expired} -> {:error, :expired}
+      # The session was ended with "✓ Finished".
+      true -> {:error, :expired}
       %CompanyUser{} -> {:error, :no_access}
       _ -> {:error, :invalid}
     end
