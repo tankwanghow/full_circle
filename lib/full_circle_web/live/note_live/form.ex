@@ -257,10 +257,6 @@ defmodule FullCircleWeb.NoteLive.Form do
   def handle_info({:composer, "note", :cancelled}, socket),
     do: {:noreply, socket |> stop_edit() |> reload()}
 
-  # The edit box's 📎 Attach finished an upload: show the new file.
-  def handle_info({:composer, "note", :attachment_uploaded}, socket),
-    do: {:noreply, reload(socket)}
-
   # A reply was posted in the thread: refresh the thread and the 💬 count.
   def handle_info({:composer, "reply", {:saved, :new, _}}, socket), do: {:noreply, reload(socket)}
 
@@ -430,7 +426,11 @@ defmodule FullCircleWeb.NoteLive.Form do
               >
                 ✎ {gettext("Edit")}
               </button>
-              <.attach_button :if={@can_edit} note_id={@note.id} current_company={@current_company} />
+              <.attach_button
+                :if={@can_edit}
+                id={"attach-#{@note.id}"}
+                url={~p"/companies/#{@current_company.id}/notes/#{@note.id}/attachments"}
+              />
               <button
                 type="button"
                 id="toggle-history"
@@ -476,7 +476,6 @@ defmodule FullCircleWeb.NoteLive.Form do
                 <span title={gettext("Files")}>📎 {length(@note.attachments)}</span>
               </:footer>
               <:actions>
-                <.attach_button note_id={@note.id} current_company={@current_company} />
                 <button
                   type="button"
                   id="toggle-history"

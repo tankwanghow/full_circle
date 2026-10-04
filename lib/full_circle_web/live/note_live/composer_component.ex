@@ -11,8 +11,8 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
   import FullCircleWeb.NoteComponents
 
   alias FullCircle.{Linkable, Notes}
-  alias FullCircle.Notes.Note
-  alias FullCircleWeb.NoteLive.RecordPickerComponent
+  alias FullCircle.Notes.{Note, Trays}
+  alias FullCircleWeb.NoteLive.{PhoneQrComponent, RecordPickerComponent}
 
   @defaults [
     mode: :new,
@@ -43,6 +43,10 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
   # A pick from this box's picker (RecordPickerComponent notify).
   @impl true
   def update(%{picked: {_picker_id, picked}}, socket), do: {:ok, pick(socket, picked)}
+
+  # A file landed in this box's tray (FullCircleWeb.NoteFiles): desktop 📎,
+  # drop, paste, or the phone.
+  def update(%{note_files: {:tray, _}}, socket), do: {:ok, load_tray(socket)}
 
   def update(assigns, socket) do
     first? = is_nil(socket.assigns[:rev])
@@ -88,6 +92,20 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
     |> assign(
       form: to_form(Notes.change_note(base_note(socket.assigns)), id: "#{socket.assigns.id}_note")
     )
+    |> new_tray()
+  end
+
+  # Each fresh box (open, after Save, after Cancel) gets a new tray id. The
+  # row is created on first upload or when the phone QR opens.
+  defp new_tray(socket) do
+    tray_id = Ecto.UUID.generate()
+    FullCircleWeb.NoteFiles.listen({:tray, tray_id}, __MODULE__, socket.assigns.id)
+    assign(socket, tray_id: tray_id, tray_files: [])
+  end
+
+  defp load_tray(socket) do
+    %{tray_id: id, current_company: com, current_user: user} = socket.assigns
+    assign(socket, tray_files: Trays.list(id, com, user))
   end
 
   defp roles_open?(%{roles_open: nil, full: full}), do: full
@@ -180,21 +198,30 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
     end
   end
 
-  # The post layout carries the page's 📎 Attach button; its hook pushes to the
-  # component it sits in, so pass the upload on to the host.
-  def handle_event("attachment_uploaded", _, socket) do
-    notify(socket, :attachment_uploaded)
-    {:noreply, socket}
+  # The box's own 📎 / drop / paste finished an upload (the broadcast also
+  # arrives; loading twice is harmless).
+  def handle_event("attachment_uploaded", _, socket), do: {:noreply, load_tray(socket)}
+
+  def handle_event("discard_file", %{"id" => id}, socket) do
+    %{tray_id: tray_id, current_company: com, current_user: user} = socket.assigns
+    Trays.discard_file(id, tray_id, com, user)
+    {:noreply, load_tray(socket)}
   end
 
   def handle_event("cancel", _, socket) do
+    %{tray_id: tray_id, current_company: com, current_user: user} = socket.assigns
+    Trays.cancel(tray_id, com, user)
     notify(socket, :cancelled)
     {:noreply, reset(socket)}
   end
 
   def handle_event("save", %{"note" => params}, socket) do
     %{current_company: com, current_user: user, mode: mode} = socket.assigns
-    params = Map.merge(params, subject_attrs(socket.assigns))
+
+    params =
+      params
+      |> Map.merge(subject_attrs(socket.assigns))
+      |> Map.put("tray_id", socket.assigns.tray_id)
 
     result =
       case mode do
@@ -373,6 +400,7 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
             placeholder={@placeholder || gettext("Write a note…")}
             class="mt-1 w-full resize-y rounded-md border border-gray-300 bg-transparent px-2 py-1 text-lg placeholder-gray-500 dark:border-gray-600"
           >{Phoenix.HTML.Form.normalize_value("textarea", @form[:body].value)}</textarea>
+          <.tray {tray_assigns(assigns)} />
           <.messages {message_assigns(assigns)} />
           {render_slot(@files)}
           <.visibility_fields
@@ -423,6 +451,7 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
             placeholder={@placeholder || gettext("Write a note…")}
             class="w-full resize-y border-0 bg-transparent p-1 text-lg placeholder-gray-500 focus:ring-0"
           >{Phoenix.HTML.Form.normalize_value("textarea", @form[:body].value)}</textarea>
+          <.tray {tray_assigns(assigns)} />
           <.messages {message_assigns(assigns)} />
           <.visibility_fields
             {visibility_assigns(assigns)}
@@ -576,6 +605,63 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
     </button>
     """
   end
+
+  defp tray(assigns) do
+    ~H"""
+    <div
+      id={"#{@id}-tray"}
+      data-tray-id={@tray_id}
+      phx-hook="NoteDrop"
+      data-url={~p"/companies/#{@current_company.id}/note_trays/#{@tray_id}/files"}
+      data-max-bytes={FullCircle.Notes.Attachments.max_bytes()}
+      class="mt-1"
+    >
+      <.file_grid
+        id={"#{@id}-tray-files"}
+        attachments={@tray_files}
+        removable
+        remove_event="discard_file"
+        confirm={nil}
+        target={@myself}
+      />
+      <div class="mt-1 flex flex-wrap items-center gap-2">
+        <.attach_button
+          id={"#{@id}-attach"}
+          url={~p"/companies/#{@current_company.id}/note_trays/#{@tray_id}/files"}
+        />
+        <.live_component
+          module={PhoneQrComponent}
+          id={"#{@id}-phone"}
+          target={{:tray, @tray_id}}
+          label={tray_label(assigns)}
+          current_company={@current_company}
+          current_user={@current_user}
+        />
+        <span class="text-xs text-gray-500 dark:text-gray-400">
+          {gettext("or drop / paste files here")}
+        </span>
+      </div>
+    </div>
+    """
+  end
+
+  defp tray_label(%{mode: :edit, note: %Note{} = note}),
+    do: FullCircleWeb.PhoneUpload.note_label(note)
+
+  defp tray_label(_), do: gettext("a new note")
+
+  defp tray_assigns(a),
+    do:
+      Map.take(a, [
+        :id,
+        :myself,
+        :tray_id,
+        :tray_files,
+        :current_company,
+        :current_user,
+        :mode,
+        :note
+      ])
 
   defp messages(assigns) do
     ~H"""

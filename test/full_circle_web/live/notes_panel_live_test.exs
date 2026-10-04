@@ -241,9 +241,13 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
       |> form("#notes-panel-edit-form", %{"note" => %{"body" => "half typed"}})
       |> render_change()
 
+      # The edit box's 📎 uploads into its tray (the route opens it first).
+      [_, tray] = Regex.run(~r/id="notes-panel-edit-tray"[^>]*data-tray-id="([^"]+)"/, render(lv))
+      {:ok, _} = FullCircle.Notes.Trays.open(tray, comp, admin)
+
       {:ok, _} =
-        FullCircle.Notes.Attachments.attach(
-          note,
+        FullCircle.Notes.Attachments.attach_to_tray(
+          tray,
           %{path: jpeg_file(), file_name: "receipt.jpg"},
           comp,
           admin
@@ -251,8 +255,10 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
 
       # In the browser the 📎 hook pushes to the component it sits in: the box.
       lv |> with_target("#notes-panel-edit-box") |> render_hook("attachment_uploaded", %{})
-      assert has_element?(lv, "#notes-panel-files", "receipt.jpg")
+      assert has_element?(lv, "#notes-panel-edit-tray-files", "receipt.jpg")
       assert has_element?(lv, "#notes-panel-edit-form textarea", "half typed")
+      # Held until Save: not on the note yet.
+      assert FullCircle.Notes.get_note(note.id, comp, admin).attachments == []
     end
 
     test "a file's ✕ in the box removes it", %{
@@ -570,5 +576,83 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
     {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
     assert has_element?(lv, "#notes-panel-note-#{r.id} .note-reply-to")
     assert render(lv) =~ "approved 60 days"
+  end
+
+  describe "write box tray" do
+    defp tray_id(lv) do
+      [_, id] = Regex.run(~r/id="notes-panel-tray"[^>]*data-tray-id="([^"]+)"/, render(lv))
+      id
+    end
+
+    defp drop_in(lv, comp, admin, name \\ "scan.jpg") do
+      # The tray route opens the tray before the first upload.
+      {:ok, _} = FullCircle.Notes.Trays.open(tray_id(lv), comp, admin)
+
+      {:ok, _} =
+        FullCircle.Notes.Attachments.attach_to_tray(
+          tray_id(lv),
+          %{path: jpeg_file(), file_name: name},
+          comp,
+          admin
+        )
+
+      # The broadcast reaches the LiveView, whose hook queues a send_update
+      # behind this render; the second render sees it.
+      _ = render(lv)
+      render(lv)
+    end
+
+    test "a file uploaded into the box shows at once and attaches on Post",
+         %{conn: conn, admin: admin, comp: comp, contact: c} do
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
+      lv |> element("#notes-panel-new") |> render_click()
+      assert has_element?(lv, "#notes-panel-attach")
+      assert has_element?(lv, "#notes-panel-phone-open")
+
+      assert drop_in(lv, comp, admin) =~ "scan.jpg"
+
+      lv
+      |> form("#notes-panel-form", %{"note" => %{"body" => "letter from bank"}})
+      |> render_submit()
+
+      [note] = FullCircle.Repo.all(FullCircle.Notes.Note)
+      note = FullCircle.Repo.preload(note, :attachments)
+      assert [%{file_name: "scan.jpg"}] = note.attachments
+    end
+
+    test "Cancel throws the box's files away", %{
+      conn: conn,
+      admin: admin,
+      comp: comp,
+      contact: c
+    } do
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
+      lv |> element("#notes-panel-new") |> render_click()
+      id = tray_id(lv)
+      drop_in(lv, comp, admin)
+
+      lv |> element("#notes-panel-cancel") |> render_click()
+      assert FullCircle.Notes.Trays.list(id, comp, admin) == []
+    end
+
+    test "✕ on a box file deletes it", %{conn: conn, admin: admin, comp: comp, contact: c} do
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
+      lv |> element("#notes-panel-new") |> render_click()
+      id = tray_id(lv)
+      drop_in(lv, comp, admin)
+      [att] = FullCircle.Notes.Trays.list(id, comp, admin)
+
+      lv |> element("#notes-panel-tray-files #att-#{att.id} button") |> render_click()
+      refute render(lv) =~ "scan.jpg"
+      assert FullCircle.Notes.Trays.list(id, comp, admin) == []
+    end
+
+    test "From phone shows a QR code", %{conn: conn, comp: comp, contact: c} do
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
+      lv |> element("#notes-panel-new") |> render_click()
+      html = lv |> element("#notes-panel-phone-open") |> render_click()
+      assert html =~ "<svg"
+      assert html =~ "/up/"
+    end
   end
 end

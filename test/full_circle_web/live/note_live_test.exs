@@ -686,9 +686,13 @@ defmodule FullCircleWeb.NoteLiveTest do
       {:ok, lv, _} = live(conn, edit_path(comp, note))
       lv |> form("#note-form", %{"note" => %{"body" => "half typed"}}) |> render_change()
 
+      # The edit box's 📎 uploads into its tray (the route opens it first).
+      [_, tray] = Regex.run(~r/id="note-tray"[^>]*data-tray-id="([^"]+)"/, render(lv))
+      {:ok, _} = FullCircle.Notes.Trays.open(tray, comp, admin)
+
       {:ok, _} =
-        FullCircle.Notes.Attachments.attach(
-          note,
+        FullCircle.Notes.Attachments.attach_to_tray(
+          tray,
           %{path: jpeg_file(), file_name: "from-box.jpg"},
           comp,
           admin
@@ -696,7 +700,7 @@ defmodule FullCircleWeb.NoteLiveTest do
 
       # In the browser the 📎 hook pushes to the component it sits in: the box.
       lv |> with_target("#note-box") |> render_hook("attachment_uploaded", %{})
-      assert has_element?(lv, "#note-files", "from-box.jpg")
+      assert has_element?(lv, "#note-tray-files", "from-box.jpg")
       assert has_element?(lv, "#note-form textarea", "half typed")
     end
 
@@ -862,6 +866,47 @@ defmodule FullCircleWeb.NoteLiveTest do
       assert has_element?(lv, "#note-post", "clerk reply")
       assert has_element?(lv, "#replying-to-gone")
       refute html =~ "secret root"
+    end
+
+    test "editing: new files wait for Save; existing ✕ still removes at once",
+         %{conn: conn, admin: admin, comp: comp} do
+      note = note_fixture(comp, admin, %{"body" => "edit me"})
+
+      {:ok, old} =
+        FullCircle.Notes.Attachments.attach(
+          note,
+          %{path: jpeg_file(), file_name: "old.jpg"},
+          comp,
+          admin
+        )
+
+      {:ok, lv, _} = live(conn, edit_path(comp, note))
+      [_, tray] = Regex.run(~r/id="note-tray"[^>]*data-tray-id="([^"]+)"/, render(lv))
+      # The tray route opens the tray before the first upload.
+      {:ok, _} = FullCircle.Notes.Trays.open(tray, comp, admin)
+
+      {:ok, _} =
+        FullCircle.Notes.Attachments.attach_to_tray(
+          tray,
+          %{path: jpeg_file(), file_name: "new.jpg"},
+          comp,
+          admin
+        )
+
+      # The broadcast queues a send_update behind the first render.
+      _ = render(lv)
+      assert render(lv) =~ "new.jpg"
+
+      assert [%{file_name: "old.jpg"}] =
+               FullCircle.Notes.get_note(note.id, comp, admin).attachments
+
+      lv |> element("#note-files #att-#{old.id} button") |> render_click()
+      assert FullCircle.Notes.get_note(note.id, comp, admin).attachments == []
+
+      lv |> form("#note-form", %{"note" => %{"body" => "edited"}}) |> render_submit()
+
+      assert [%{file_name: "new.jpg"}] =
+               FullCircle.Notes.get_note(note.id, comp, admin).attachments
     end
   end
 end

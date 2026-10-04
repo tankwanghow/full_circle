@@ -24,9 +24,6 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
 
       :cancelled ->
         {:ok, if(editor?, do: socket |> stop(true) |> load(), else: stop(socket, false))}
-
-      :attachment_uploaded ->
-        {:ok, load(socket)}
     end
   end
 
@@ -224,9 +221,6 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
               <span title={gettext("Links")}>🔗 {length(item.d.links)}</span>
               <span title={gettext("Files")}>📎 {length(item.note.attachments)}</span>
             </:footer>
-            <:actions>
-              <.attach_button note_id={item.id} current_company={@current_company} />
-            </:actions>
           </.live_component>
         </div>
         <.note_post
@@ -249,7 +243,10 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
             >
               ✎ {gettext("Edit")}
             </button>
-            <.attach_button note_id={item.id} current_company={@current_company} />
+            <.attach_button
+              id={"attach-#{item.id}"}
+              url={~p"/companies/#{@current_company.id}/notes/#{item.id}/attachments"}
+            />
           </:actions>
         </.note_post>
       <% end %>

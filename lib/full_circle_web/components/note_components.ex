@@ -28,6 +28,8 @@ defmodule FullCircleWeb.NoteComponents do
   attr :attachments, :list, required: true
   attr :removable, :boolean, default: false, doc: "edit mode: a ✕ and the file name on each"
   attr :target, :any, default: nil, doc: "who handles remove_attachment (nil: the LiveView)"
+  attr :remove_event, :string, default: "remove_attachment"
+  attr :confirm, :any, default: :default, doc: "confirm text; nil for none"
 
   @doc """
   A post's files as the X-style grid: one large tile, or two columns. The post
@@ -61,10 +63,12 @@ defmodule FullCircleWeb.NoteComponents do
         <button
           :if={@removable}
           type="button"
-          phx-click="remove_attachment"
+          phx-click={@remove_event}
           phx-value-id={a.id}
           phx-target={@target}
-          data-confirm={gettext("Remove this file from the note?")}
+          data-confirm={
+            if @confirm == :default, do: gettext("Remove this file from the note?"), else: @confirm
+          }
           title={gettext("Remove")}
           class="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white hover:bg-rose-600"
         >
@@ -247,23 +251,26 @@ defmodule FullCircleWeb.NoteComponents do
     """
   end
 
-  attr :note_id, :string, required: true
-  attr :current_company, :map, required: true
+  attr :id, :string, required: true
+  attr :url, :string, required: true, doc: "where the file is POSTed (a note's or a tray's route)"
+  attr :multiple, :boolean, default: true
+  attr :label, :string, default: nil
 
   def attach_button(assigns) do
     ~H"""
     <span class="inline-flex items-center gap-2 text-sm">
       <button
         type="button"
-        id={"attach-#{@note_id}"}
+        id={@id}
         phx-hook="NoteAttach"
-        data-url={"/companies/#{@current_company.id}/notes/#{@note_id}/attachments"}
+        data-url={@url}
+        data-multiple={to_string(@multiple)}
         data-max-bytes={FullCircle.Notes.Attachments.max_bytes()}
         class="rounded border border-gray-400 px-2 hover:bg-gray-100 dark:border-gray-500 dark:hover:bg-gray-700"
       >
-        📎 {gettext("Attach file")}
+        📎 {@label || gettext("Attach files")}
       </button>
-      <span id={"attach-#{@note_id}-msg"} phx-update="ignore" class="text-rose-600 dark:text-rose-400"></span>
+      <span id={"#{@id}-msg"} phx-update="ignore" class="text-rose-600 dark:text-rose-400"></span>
     </span>
     """
   end
