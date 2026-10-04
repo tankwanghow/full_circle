@@ -651,8 +651,11 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
       {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
       lv |> element("#notes-panel-new") |> render_click()
       html = lv |> element("#notes-panel-phone-open") |> render_click()
-      assert html =~ "<svg"
       assert html =~ "/up/"
+      # Scales to its box: a fixed-size SVG with no viewBox gets cropped by CSS.
+      [svg_tag] = Regex.run(~r/<svg[^>]*>/, html)
+      assert svg_tag =~ ~r/viewBox="0 0 \d+ \d+"/
+      refute svg_tag =~ ~r/\swidth="/
     end
   end
 

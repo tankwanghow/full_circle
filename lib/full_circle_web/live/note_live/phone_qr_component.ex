@@ -21,13 +21,21 @@ defmodule FullCircleWeb.NoteLive.PhoneQrComponent do
     if ready?(target, com, user) do
       url = PhoneUpload.url(target, label, com, user)
       svg = url |> QRCode.create(:medium) |> QRCode.render(:svg) |> elem(1)
-      {:noreply, assign(socket, qr: svg, url: url)}
+      {:noreply, assign(socket, qr: scalable(svg), url: url)}
     else
       {:noreply, socket}
     end
   end
 
   def handle_event("close", _, socket), do: {:noreply, assign(socket, qr: nil)}
+
+  # QRCode renders a fixed `width`/`height` and no viewBox, so CSS sizing
+  # crops it instead of scaling it. Swap the size for a viewBox.
+  defp scalable(svg) do
+    String.replace(svg, ~r/<svg width="(\d+)" height="(\d+)"/, ~S(<svg viewBox="0 0 \1 \2"),
+      global: false
+    )
+  end
 
   defp ready?({:tray, id}, com, user), do: match?({:ok, _}, Trays.open(id, com, user))
   defp ready?({:note, _id}, _com, _user), do: true
