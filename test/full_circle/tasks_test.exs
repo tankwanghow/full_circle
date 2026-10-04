@@ -927,8 +927,8 @@ defmodule FullCircle.TasksTest do
     end
   end
 
-  describe "badge_count/3" do
-    test "mine, open, overdue or due soon; undated never counts", %{
+  describe "badge_counts/3" do
+    test "open, overdue or due soon, all visible and mine; undated never counts", %{
       company: company,
       admin: admin
     } do
@@ -941,8 +941,10 @@ defmodule FullCircle.TasksTest do
       task_fixture(company, admin, %{})
       task_fixture(company, admin, %{"due_date" => "2026-10-01", "assignee_id" => clerk.id})
 
-      assert Tasks.badge_count(company, admin, today) == 3
-      assert Tasks.badge_count(company, clerk, today) == 1
+      task_fixture(company, admin, %{"due_date" => "2026-10-02", "visibility" => ["admin"]})
+
+      assert Tasks.badge_counts(company, admin, today) == %{all: 5, mine: 4}
+      assert Tasks.badge_counts(company, clerk, today) == %{all: 4, mine: 1}
     end
 
     test "today is the company's local date", %{company: company} do

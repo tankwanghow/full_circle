@@ -1,6 +1,7 @@
 defmodule FullCircleWeb.TaskLive.NavBadge do
   @moduledoc """
-  "✅ Tasks (n)" in the nav. The nav lives in the root layout, which LiveView
+  "✅ Tasks (n)" in the nav, n = open tasks overdue or due soon that I can
+  see (the All tab's count). The nav lives in the root layout, which LiveView
   does not re-render on live navigation, so this is a sticky nested LiveView
   that stays mounted across pages and recounts on `{:tasks_changed, _}`.
   The company comes from the session, like `ActiveCompany` (switching company
@@ -35,7 +36,7 @@ defmodule FullCircleWeb.TaskLive.NavBadge do
   defp recount(socket),
     do:
       assign(socket,
-        count: Tasks.badge_count(socket.assigns.company, socket.assigns.current_user)
+        count: Tasks.badge_counts(socket.assigns.company, socket.assigns.current_user).all
       )
 
   @impl true

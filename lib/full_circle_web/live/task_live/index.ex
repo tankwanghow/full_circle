@@ -67,6 +67,7 @@ defmodule FullCircleWeb.TaskLive.Index do
 
     socket
     |> assign(page: page, today: today, last_group: last_group)
+    |> assign(counts: Tasks.badge_counts(com, user, today))
     |> assign(end_of_timeline?: length(rows) < @per_page)
     |> stream(:rows, items, reset: reset)
   end
@@ -203,7 +204,12 @@ defmodule FullCircleWeb.TaskLive.Index do
       <div class="h-1 bg-amber-500"></div>
       <div class="flex border-b border-gray-200 dark:border-gray-700">
         <button
-          :for={{scope, label} <- [{"all", gettext("All")}, {"mine", gettext("Mine")}]}
+          :for={
+            {scope, label, count} <- [
+              {"all", gettext("All"), @counts.all},
+              {"mine", gettext("Mine"), @counts.mine}
+            ]
+          }
           id={"tab-#{scope}"}
           type="button"
           phx-click="scope"
@@ -216,7 +222,11 @@ defmodule FullCircleWeb.TaskLive.Index do
             )
           ]}
         >
-          {label}
+          {label}<span
+            :if={count > 0}
+            id={"tab-#{scope}-count"}
+            class="ml-1 rounded-full bg-rose-600 px-1.5 text-xs font-bold text-white"
+          >{count}</span>
         </button>
       </div>
 

@@ -569,7 +569,12 @@ defmodule FullCircle.Tasks do
     end)
   end
 
-  def badge_count(company, user, today \\ nil) do
+  @doc """
+  Open tasks that are overdue or due soon, as `%{all: n, mine: m}`: every
+  visible one (the nav badge and the All tab) and those that are mine (the
+  Mine tab, so `m <= n`). One query.
+  """
+  def badge_counts(company, user, today \\ nil) do
     today = today || today(company)
 
     from(t in visible_to(company, user),
@@ -578,9 +583,16 @@ defmodule FullCircle.Tasks do
         t.due_date <= ^today or
           (not is_nil(t.reminder_before_days) and
              fragment("? - ? <= ?", t.due_date, t.reminder_before_days, ^today)),
-      select: count(t.id)
+      select: %{
+        all: count(t.id),
+        # twin of scope(q, "mine", user)
+        mine:
+          filter(
+            count(t.id),
+            t.assignee_id == ^user.id or (is_nil(t.assignee_id) and t.creator_id == ^user.id)
+          )
+      }
     )
-    |> scope("mine", user)
     |> Repo.one()
   end
 

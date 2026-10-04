@@ -59,6 +59,35 @@ defmodule FullCircleWeb.TaskLiveTest do
       assert has_element?(lv, "#tasks-#{t.id}")
     end
 
+    test "each tab carries its own due count and updates on a change", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      clerk = user_with_role(comp, admin, "clerk")
+      task_fixture(comp, admin, %{"due_date" => past(comp, 2)})
+      t = task_fixture(comp, admin, %{"due_date" => past(comp, 1), "assignee_id" => clerk.id})
+      task_fixture(comp, admin, %{"title" => "Undated"})
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks")
+
+      assert has_element?(lv, "#tab-all-count", "2")
+      assert has_element?(lv, "#tab-mine-count", "1")
+
+      {:ok, _} = Tasks.close_task(t, :done, nil, comp, admin)
+      assert has_element?(lv, "#tab-all-count", "1")
+      assert has_element?(lv, "#tab-mine-count", "1")
+    end
+
+    test "a tab with nothing due shows no count", %{conn: conn, admin: admin, comp: comp} do
+      task_fixture(comp, admin, %{"title" => "Undated"})
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks")
+
+      refute has_element?(lv, "#tab-all-count")
+      refute has_element?(lv, "#tab-mine-count")
+    end
+
     test "opens on All: a clerk sees an unassigned task the admin made", %{
       admin: admin,
       comp: comp
@@ -607,6 +636,18 @@ defmodule FullCircleWeb.TaskLiveTest do
         live(log_in_user(build_conn(), guest), ~p"/companies/#{comp.id}/dashboard")
 
       refute html =~ ~s{id="full_circle_tasks"}
+    end
+
+    test "counts every due task I can see, not only mine", %{admin: admin, comp: comp} do
+      task_fixture(comp, admin, %{"due_date" => past(comp, 1)})
+      clerk = user_with_role(comp, admin, "clerk")
+
+      {:ok, lv, _} =
+        live_isolated(log_in_user(build_conn(), clerk), FullCircleWeb.TaskLive.NavBadge,
+          session: %{"company_id" => comp.id}
+        )
+
+      assert has_element?(lv, "#task-badge-count", "1")
     end
 
     test "counts my due tasks and updates when one is closed", %{
