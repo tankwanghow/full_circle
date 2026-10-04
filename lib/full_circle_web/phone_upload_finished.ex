@@ -14,17 +14,23 @@ defmodule FullCircleWeb.PhoneUploadFinished do
 
   def start_link(_), do: GenServer.start_link(__MODULE__, nil, name: __MODULE__)
 
+  # Without the table (the process restarting, or a dev server hot-reloaded
+  # into this code before a restart) uploads must still work: Finished is
+  # then a no-op and a session counts as not finished.
   def put(session, ttl_s) do
-    :ets.insert(@table, {session, now() + ttl_s})
+    if table?(), do: :ets.insert(@table, {session, now() + ttl_s})
     :ok
   end
 
   def finished?(session) do
-    case :ets.lookup(@table, session) do
-      [{_, until}] -> until > now()
-      [] -> false
-    end
+    table?() and
+      case :ets.lookup(@table, session) do
+        [{_, until}] -> until > now()
+        [] -> false
+      end
   end
+
+  defp table?, do: :ets.whereis(@table) != :undefined
 
   @impl true
   def init(nil) do
