@@ -68,6 +68,39 @@ defmodule FullCircle.Notes.Trays do
     :ok
   end
 
+  @doc """
+  Moves an open tray's files onto `note` and closes the tray as saved. Runs
+  inside the note's transaction (`repo` is the Multi's). The tray row is
+  locked so a phone upload racing the save either lands in the tray before
+  the claim or follows the saved tray to the note afterwards — never lost.
+  """
+  def claim(_repo, nil, _note, _company, _user), do: {:ok, 0}
+
+  def claim(repo, tray_id, note, company, user) do
+    with {:ok, id} <- Ecto.UUID.cast(tray_id),
+         %NoteTray{} = tray <-
+           repo.one(
+             from t in NoteTray,
+               where:
+                 t.id == ^id and t.company_id == ^company.id and t.user_id == ^user.id and
+                   is_nil(t.closed_at),
+               lock: "FOR UPDATE"
+           ) do
+      {n, _} =
+        repo.update_all(from(a in NoteAttachment, where: a.tray_id == ^tray.id),
+          set: [note_id: note.id, tray_id: nil]
+        )
+
+      tray
+      |> Ecto.Changeset.change(note_id: note.id, closed_at: DateTime.utc_now(:second))
+      |> repo.update!()
+
+      {:ok, n}
+    else
+      _ -> {:ok, 0}
+    end
+  end
+
   # Rows first, then files: a crash between leaves orphan files (pruned with
   # their folder), never rows pointing at nothing.
   defp delete_files([]), do: :ok

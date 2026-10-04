@@ -167,4 +167,85 @@ defmodule FullCircle.NotesTraysTest do
                Notes.get_note(ctx.note.id, ctx.company, ctx.admin).attachments
     end
   end
+
+  describe "save claims the tray" do
+    defp tray_with_file(ctx) do
+      tray = tray_fixture(ctx.company, ctx.admin)
+
+      {:ok, att} =
+        Attachments.attach_to_tray(
+          tray.id,
+          %{path: jpeg_file(), file_name: "scan.jpg"},
+          ctx.company,
+          ctx.admin
+        )
+
+      {tray, att}
+    end
+
+    test "create_note attaches the tray's files and closes it as saved", ctx do
+      {tray, att} = tray_with_file(ctx)
+
+      assert {:ok, note} =
+               Notes.create_note(
+                 %{"body" => "with file", "tray_id" => tray.id},
+                 ctx.company,
+                 ctx.admin
+               )
+
+      assert [%{id: id}] = note.attachments
+      assert id == att.id
+      assert %{note_id: note_id, closed_at: %DateTime{}} = Repo.get(NoteTray, tray.id)
+      assert note_id == note.id
+    end
+
+    test "a failed create (invalid) leaves the tray as it was", ctx do
+      {tray, _att} = tray_with_file(ctx)
+
+      assert {:error, %Ecto.Changeset{}} =
+               Notes.create_note(
+                 %{"body" => "x", "visibility" => ["nonsense"], "tray_id" => tray.id},
+                 ctx.company,
+                 ctx.admin
+               )
+
+      assert [_] = Trays.list(tray.id, ctx.company, ctx.admin)
+      assert %{closed_at: nil} = Repo.get(NoteTray, tray.id)
+    end
+
+    test "update_note with only new files (no field change) still claims", ctx do
+      {tray, _att} = tray_with_file(ctx)
+
+      assert {:ok, note} =
+               Notes.update_note(ctx.note, %{"tray_id" => tray.id}, ctx.company, ctx.admin)
+
+      assert [%{file_name: "scan.jpg"}] = note.attachments
+    end
+
+    test "a stale update leaves the tray as it was", ctx do
+      {tray, _att} = tray_with_file(ctx)
+      {:ok, _} = Notes.update_note(ctx.note, %{"body" => "someone else"}, ctx.company, ctx.admin)
+
+      assert {:error, :stale} =
+               Notes.update_note(
+                 ctx.note,
+                 %{"body" => "mine", "tray_id" => tray.id},
+                 ctx.company,
+                 ctx.admin
+               )
+
+      assert [_] = Trays.list(tray.id, ctx.company, ctx.admin)
+    end
+
+    test "a tray id from another user is ignored, not claimed", ctx do
+      {tray, _att} = tray_with_file(ctx)
+      manager = user_with_role(ctx.company, ctx.admin, "manager")
+
+      assert {:ok, note} =
+               Notes.create_note(%{"body" => "x", "tray_id" => tray.id}, ctx.company, manager)
+
+      assert note.attachments == []
+      assert [_] = Trays.list(tray.id, ctx.company, ctx.admin)
+    end
+  end
 end

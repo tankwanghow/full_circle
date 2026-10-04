@@ -12,7 +12,7 @@ defmodule FullCircle.Notes do
   alias FullCircle.{Linkable, Repo, Sys}
   alias FullCircle.CommandPalette.Types, as: PaletteTypes
   alias FullCircle.Linkable.RecordLink
-  alias FullCircle.Notes.{Note, NoteVersion}
+  alias FullCircle.Notes.{Note, NoteVersion, Trays}
 
   # --- visibility -----------------------------------------------------------
 
@@ -50,7 +50,11 @@ defmodule FullCircle.Notes do
   end
 
   defp own_root_ids(company, user),
-    do: from(r in Note, where: r.company_id == ^company.id and r.author_id == ^user.id, select: r.id)
+    do:
+      from(r in Note,
+        where: r.company_id == ^company.id and r.author_id == ^user.id,
+        select: r.id
+      )
 
   def can_read?(%Note{id: id}, company, user) do
     Repo.exists?(from(n in visible_to(company, user), where: n.id == ^id))
@@ -181,6 +185,9 @@ defmodule FullCircle.Notes do
             changeset |> follow_root(m.root) |> follow_task_visibility(m.task_visibility)
           end)
           |> insert_links(Map.get(attrs, "links") || [], company, user)
+          |> Multi.run(:tray, fn repo, %{note: note} ->
+            Trays.claim(repo, Map.get(attrs, "tray_id"), note, company, user)
+          end)
           |> Repo.transaction()
           |> case do
             {:ok, %{note: note}} ->
@@ -206,7 +213,8 @@ defmodule FullCircle.Notes do
   `lock_version` is what detects a concurrent save.
   """
   def update_note(%Note{} = note, attrs, company, user) do
-    attrs = attrs |> normalize_visibility() |> Map.drop(["links", "reply_to_id"])
+    tray_id = Map.get(attrs, "tray_id")
+    attrs = attrs |> normalize_visibility() |> Map.drop(["links", "reply_to_id", "tray_id"])
 
     with %Note{} = current <- get_note(note.id, company, user) || {:error, :not_found},
          true <- may_edit?(current, user, rights(company, user)) || :not_authorise do
@@ -224,7 +232,9 @@ defmodule FullCircle.Notes do
       changeset = follow_task_visibility(changeset, preview)
 
       if changeset.changes == %{} do
-        {:ok, current}
+        # Only new files (or nothing at all): no version, no lock bump.
+        {:ok, _} = Repo.transaction(fn -> Trays.claim(Repo, tray_id, current, company, user) end)
+        {:ok, Repo.preload(current, [:attachments], force: true)}
       else
         changeset =
           changeset
@@ -243,6 +253,9 @@ defmodule FullCircle.Notes do
           changeset |> follow_root(m.root) |> follow_task_visibility(m.task_visibility)
         end)
         |> Multi.run(:replies, fn repo, %{note: n} -> sync_replies(repo, current, n) end)
+        |> Multi.run(:tray, fn repo, %{note: n} ->
+          Trays.claim(repo, tray_id, n, company, user)
+        end)
         |> Repo.transaction()
         |> case do
           {:ok, %{note: n}} ->
