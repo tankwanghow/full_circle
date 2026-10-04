@@ -125,10 +125,22 @@ defmodule FullCircle.Notes.Attachments do
   """
   def attach_to_tray(tray_id, upload, company, user) do
     case Trays.get(tray_id, company, user) do
-      {:ok, %{closed_at: nil} = tray} -> store({:tray, tray}, upload, company, user)
-      {:ok, %{note_id: nil}} -> {:error, :tray_closed}
-      {:ok, %{note_id: note_id}} -> attach(%Note{id: note_id}, upload, company, user)
+      {:ok, tray} -> store_in_tray(tray, upload, company, user)
       error -> error
+    end
+  end
+
+  @doc """
+  `tray` is the caller's tray as last read; it may have been saved or
+  cancelled since (a phone upload racing the desktop's Save). The insert
+  re-reads it under a row lock (`FOR SHARE` against `Trays.claim/5`'s and
+  `Trays.cancel/3`'s `FOR UPDATE`), so the file lands in the open tray, on
+  the saved note, or is refused — never left in a closed tray.
+  """
+  def store_in_tray(%NoteTray{} = tray, upload, company, user) do
+    case store({:tray, tray}, upload, company, user) do
+      {:error, {:follow, note_id}} -> attach(%Note{id: note_id}, upload, company, user)
+      other -> other
     end
   end
 
@@ -215,7 +227,7 @@ defmodule FullCircle.Notes.Attachments do
         uploaded_by_id: user.id
       })
     )
-    |> Repo.insert()
+    |> insert(owner)
     |> case do
       {:ok, att} ->
         Phoenix.PubSub.broadcast(
@@ -235,6 +247,29 @@ defmodule FullCircle.Notes.Attachments do
     e in [File.Error, File.CopyError] ->
       Logger.error("note attachment copy failed: #{Exception.message(e)}")
       {:error, :copy_failed}
+  end
+
+  defp insert(changeset, {:note, _note}), do: Repo.insert(changeset)
+
+  defp insert(changeset, {:tray, %NoteTray{id: id}}) do
+    Repo.transaction(fn ->
+      case Repo.one(from t in NoteTray, where: t.id == ^id, lock: "FOR SHARE") do
+        %NoteTray{closed_at: nil} ->
+          case Repo.insert(changeset) do
+            {:ok, att} -> att
+            {:error, cs} -> Repo.rollback(cs)
+          end
+
+        %NoteTray{note_id: nil} ->
+          Repo.rollback(:tray_closed)
+
+        %NoteTray{note_id: note_id} ->
+          Repo.rollback({:follow, note_id})
+
+        nil ->
+          Repo.rollback(:not_found)
+      end
+    end)
   end
 
   defp ext("image/jpeg"), do: ".jpg"

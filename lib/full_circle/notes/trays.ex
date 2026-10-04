@@ -58,11 +58,22 @@ defmodule FullCircle.Notes.Trays do
 
   def cancel(tray_id, company, user) do
     with {:ok, tray} <- get(tray_id, company, user) do
-      delete_files(Repo.all(from a in NoteAttachment, where: a.tray_id == ^tray.id))
+      # Locked like claim/5: an upload racing the cancel either lands before
+      # it (and is deleted here) or sees the tray closed and is refused.
+      {:ok, atts} =
+        Repo.transaction(fn ->
+          Repo.one!(from t in NoteTray, where: t.id == ^tray.id, lock: "FOR UPDATE")
+          atts = Repo.all(from a in NoteAttachment, where: a.tray_id == ^tray.id)
+          Repo.delete_all(from a in NoteAttachment, where: a.tray_id == ^tray.id)
 
-      tray
-      |> Ecto.Changeset.change(closed_at: DateTime.utc_now(:second))
-      |> Repo.update!()
+          tray
+          |> Ecto.Changeset.change(closed_at: DateTime.utc_now(:second))
+          |> Repo.update!()
+
+          atts
+        end)
+
+      Enum.each(atts, &File.rm(Attachments.abs_path(&1)))
     end
 
     :ok

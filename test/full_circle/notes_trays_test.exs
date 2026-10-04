@@ -273,4 +273,52 @@ defmodule FullCircle.NotesTraysTest do
       assert File.exists?(Attachments.abs_path(note_att))
     end
   end
+
+  describe "an upload racing Save or Cancel" do
+    # The phone saw the tray open (Trays.get), then Save/Cancel committed
+    # before its insert. store_in_tray/4 takes the tray as last seen; the
+    # state that counts is re-read under lock at insert time.
+    test "landing after Save goes onto the saved note", ctx do
+      seen_open = tray_fixture(ctx.company, ctx.admin)
+
+      {:ok, note} =
+        Notes.create_note(%{"body" => "x", "tray_id" => seen_open.id}, ctx.company, ctx.admin)
+
+      assert {:ok, att} =
+               Attachments.store_in_tray(
+                 seen_open,
+                 %{path: jpeg_file(), file_name: "late.jpg"},
+                 ctx.company,
+                 ctx.admin
+               )
+
+      assert att.note_id == note.id and is_nil(att.tray_id)
+    end
+
+    test "landing after Cancel is refused and leaves nothing behind", ctx do
+      seen_open = tray_fixture(ctx.company, ctx.admin)
+      :ok = Trays.cancel(seen_open.id, ctx.company, ctx.admin)
+
+      assert {:error, :tray_closed} =
+               Attachments.store_in_tray(
+                 seen_open,
+                 %{path: jpeg_file(), file_name: "late.jpg"},
+                 ctx.company,
+                 ctx.admin
+               )
+
+      assert Repo.aggregate(from(a in NoteAttachment, where: a.tray_id == ^seen_open.id), :count) ==
+               0
+
+      assert File.ls(
+               Path.join([
+                 Attachments.uploads_dir(),
+                 ctx.company.id,
+                 "notes",
+                 "tray",
+                 seen_open.id
+               ])
+             ) in [{:ok, []}, {:error, :enoent}]
+    end
+  end
 end
