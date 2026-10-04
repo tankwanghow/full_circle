@@ -29,6 +29,29 @@ defmodule FullCircle.NotesScansTest do
     assert Scans.count(c, "../../etc") == 0
   end
 
+  test "a 16-byte traversal string is not a scan id (Ecto.UUID.cast takes raw binaries)",
+       %{cid: c} do
+    raw = "../../../../tmp/"
+    assert byte_size(raw) == 16
+    assert {:error, :invalid_scan} = Scans.add_page(c, raw, real_jpeg_file(:rgb))
+    assert {:error, :invalid_scan} = Scans.finish(c, raw)
+    assert Scans.count(c, raw) == 0
+  end
+
+  test "an existing page is never overwritten (pages numbered after the highest)",
+       %{cid: c, sid: s} do
+    {:ok, 1} = Scans.add_page(c, s, real_jpeg_file(:rgb))
+    {:ok, 2} = Scans.add_page(c, s, real_jpeg_file(:rgb))
+    {:ok, 3} = Scans.add_page(c, s, real_jpeg_file(:gray))
+    # A gap (as a racing retake can leave): 001 and 003 remain.
+    File.rm!(Path.join(Scans.dir(c, s), "002.jpg"))
+    third = File.read!(Path.join(Scans.dir(c, s), "003.jpg"))
+
+    assert {:ok, 3} = Scans.add_page(c, s, real_jpeg_file(:rgb))
+    assert File.read!(Path.join(Scans.dir(c, s), "003.jpg")) == third
+    assert File.exists?(Path.join(Scans.dir(c, s), "004.jpg"))
+  end
+
   test "more than max_pages is refused", %{cid: c, sid: s} do
     for _ <- 1..Scans.max_pages(), do: {:ok, _} = Scans.add_page(c, s, real_jpeg_file(:rgb))
     assert {:error, :too_many_pages} = Scans.add_page(c, s, real_jpeg_file(:rgb))

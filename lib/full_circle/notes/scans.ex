@@ -24,9 +24,9 @@ defmodule FullCircle.Notes.Scans do
          n when n < @max_pages <- count(company_id, scan_id) do
       dir = dir(company_id, scan_id)
       File.mkdir_p!(dir)
-      File.write!(Path.join(dir, page_name(n + 1)), bin)
+      write_next(dir, bin, 3)
       File.touch!(dir)
-      {:ok, n + 1}
+      {:ok, count(company_id, scan_id)}
     else
       {:error, :invalid_scan} -> {:error, :invalid_scan}
       {:ok, %File.Stat{}} -> {:error, :too_large}
@@ -49,7 +49,8 @@ defmodule FullCircle.Notes.Scans do
   def count(company_id, scan_id), do: length(pages(company_id, scan_id))
 
   def finish(company_id, scan_id) do
-    with [_ | _] = pages <- pages(company_id, scan_id),
+    with {:ok, scan_id} <- cast(scan_id),
+         [_ | _] = pages <- pages(company_id, scan_id),
          pdf = Path.join(dir(company_id, scan_id), "scan.pdf"),
          :ok <- ScanPdf.build(pages, pdf),
          {:ok, %{size: size}} <- File.stat(pdf) do
@@ -89,10 +90,38 @@ defmodule FullCircle.Notes.Scans do
 
   defp page_name(n), do: String.pad_leading(Integer.to_string(n), 3, "0") <> ".jpg"
 
-  defp cast(scan_id) do
-    case Ecto.UUID.cast(scan_id) do
-      {:ok, id} -> {:ok, id}
-      :error -> {:error, :invalid_scan}
+  # Next number after the highest page, written :exclusive — two uploads at
+  # once (or a racing retake) must never overwrite a page; the loser of a
+  # race takes the next number.
+  defp write_next(dir, bin, tries) do
+    last =
+      Path.join(dir, "[0-9][0-9][0-9].jpg")
+      |> Path.wildcard()
+      |> Enum.map(&(&1 |> Path.basename(".jpg") |> String.to_integer()))
+      |> Enum.max(fn -> 0 end)
+
+    case File.open(Path.join(dir, page_name(last + 1)), [:write, :exclusive, :binary]) do
+      {:ok, io} ->
+        IO.binwrite(io, bin)
+        File.close(io)
+
+      {:error, :eexist} when tries > 1 ->
+        write_next(dir, bin, tries - 1)
+
+      {:error, reason} ->
+        raise File.Error, reason: reason, action: "write scan page", path: dir
     end
   end
+
+  # Only the canonical 36-character form: Ecto.UUID.cast/1 also accepts any
+  # 16-byte binary ("../../../../tmp/"), and the id names a folder.
+  @uuid ~r/\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i
+
+  defp cast(scan_id) when is_binary(scan_id) do
+    if Regex.match?(@uuid, scan_id),
+      do: {:ok, String.downcase(scan_id)},
+      else: {:error, :invalid_scan}
+  end
+
+  defp cast(_), do: {:error, :invalid_scan}
 end
