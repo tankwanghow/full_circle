@@ -27,6 +27,23 @@ defmodule FullCircleWeb.Router do
     plug FullCircleWeb.PunchDeviceAuth
   end
 
+  # The phone upload page (/up/:token): no session, no CSRF — the signed
+  # token in the path is the credential (FullCircleWeb.PhoneUpload).
+  pipeline :phone_upload do
+    plug :accepts, ["html", "json"]
+    plug :put_secure_browser_headers
+  end
+
+  scope "/up", FullCircleWeb do
+    pipe_through :phone_upload
+    get "/:token", PhoneUploadController, :show
+    get "/:token/state", PhoneUploadController, :state
+    post "/:token/files", PhoneUploadController, :file
+    post "/:token/scans/:scan_id/pages", PhoneUploadController, :page
+    delete "/:token/scans/:scan_id/pages/last", PhoneUploadController, :drop_page
+    post "/:token/scans/:scan_id/done", PhoneUploadController, :done
+  end
+
   pipeline :list do
     plug(:accepts, ["json"])
     plug(:fetch_session)
@@ -119,6 +136,7 @@ defmodule FullCircleWeb.Router do
     get "/csv", CsvController, :show
     get "/TimeAttend/:id/photo", PunchPhotoController, :show
     post "/notes/:note_id/attachments", NoteAttachmentController, :create
+    post "/note_trays/:tray_id/files", NoteAttachmentController, :create_tray
     get "/note_attachments/:id", NoteAttachmentController, :show
     get "/punch_ingest_logs/:id/photo", PunchIngestLogPhotoController, :show
     get "/statutory_bundle/export", BundleController, :export

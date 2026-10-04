@@ -6,7 +6,7 @@ defmodule FullCircleWeb.NoteAttachmentController do
   """
   use FullCircleWeb, :controller
 
-  alias FullCircle.Notes.{Attachments, Note}
+  alias FullCircle.Notes.{Attachments, Note, Trays}
 
   def create(conn, %{"note_id" => note_id, "file" => %Plug.Upload{} = file}) do
     company = conn.assigns.current_company
@@ -35,6 +35,35 @@ defmodule FullCircleWeb.NoteAttachmentController do
   end
 
   def create(conn, _params),
+    do: conn |> put_status(422) |> json(%{error: gettext("No file received.")})
+
+  # The write box's 📎 / drop / paste: into its tray, created on first use.
+  def create_tray(conn, %{"tray_id" => tray_id, "file" => %Plug.Upload{} = file}) do
+    company = conn.assigns.current_company
+    user = conn.assigns.current_user
+
+    with {:ok, _tray} <- Trays.open(tray_id, company, user),
+         {:ok, att} <-
+           Attachments.attach_to_tray(
+             tray_id,
+             %{path: file.path, file_name: file.filename},
+             company,
+             user
+           ) do
+      json(conn, %{ok: true, id: att.id})
+    else
+      {:error, :not_found} ->
+        conn |> put_status(404) |> json(%{error: gettext("Not found.")})
+
+      :not_authorise ->
+        conn |> put_status(403) |> json(%{error: gettext("Not Authorise.")})
+
+      {:error, reason} ->
+        conn |> put_status(422) |> json(%{error: message(reason)})
+    end
+  end
+
+  def create_tray(conn, _params),
     do: conn |> put_status(422) |> json(%{error: gettext("No file received.")})
 
   def show(conn, %{"id" => id} = params) do
@@ -66,13 +95,18 @@ defmodule FullCircleWeb.NoteAttachmentController do
     end
   end
 
-  defp message(:too_large), do: gettext("File is larger than 10 MB.")
+  def message(:too_large), do: gettext("File is larger than 10 MB.")
 
-  defp message(:unsupported_type),
+  def message(:unsupported_type),
     do: gettext("Only JPEG, PNG, WebP images and PDF files are allowed.")
 
-  defp message(:not_found), do: gettext("File could not be read.")
-  defp message(_), do: gettext("Upload failed.")
+  def message(:not_found), do: gettext("File could not be read.")
+  def message(:tray_closed), do: gettext("This note was closed on the desktop.")
+  def message(:no_pages), do: gettext("Take at least one page.")
+  def message(:too_many_pages), do: gettext("Up to 30 pages per PDF — finish this one first.")
+  def message(:not_jpeg), do: gettext("That page is not a photo. Take it again.")
+  def message(:bad_page), do: gettext("A page could not be read. Retake it.")
+  def message(_), do: gettext("Upload failed.")
 
   defp safe_name(name), do: String.replace(name, ~r/["\r\n\\]/, "_")
 end

@@ -141,4 +141,22 @@ defmodule FullCircleWeb.NoteAttachmentControllerTest do
 
     assert response(conn, 404)
   end
+
+  test "a logged-in tray upload opens the tray on first use", %{
+    conn: conn,
+    admin: admin,
+    comp: comp
+  } do
+    tray_id = Ecto.UUID.generate()
+
+    conn =
+      conn
+      |> log_in_user(admin)
+      |> post(~p"/companies/#{comp.id}/note_trays/#{tray_id}/files", %{
+        "file" => upload(jpeg_file(), "p.jpg")
+      })
+
+    assert %{"ok" => true, "id" => _} = json_response(conn, 200)
+    assert [_] = FullCircle.Notes.Trays.list(tray_id, comp, admin)
+  end
 end
