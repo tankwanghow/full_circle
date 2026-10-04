@@ -908,5 +908,23 @@ defmodule FullCircleWeb.NoteLiveTest do
       assert [%{file_name: "new.jpg"}] =
                FullCircle.Notes.get_note(note.id, comp, admin).attachments
     end
+
+    test "the note page shows From phone and reloads when a file lands",
+         %{conn: conn, admin: admin, comp: comp} do
+      note = note_fixture(comp, admin, %{"body" => "phone me"})
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{note.id}")
+      assert has_element?(lv, "#note-phone-open")
+
+      {:ok, _} =
+        FullCircle.Notes.Attachments.attach(
+          note,
+          %{path: jpeg_file(), file_name: "p.jpg"},
+          comp,
+          admin
+        )
+
+      _ = render(lv)
+      assert render(lv) =~ "p.jpg"
+    end
   end
 end

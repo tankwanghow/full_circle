@@ -12,7 +12,7 @@ defmodule FullCircleWeb.NoteLive.Form do
 
   alias FullCircle.{Linkable, Notes, Repo}
   alias FullCircle.Notes.{Attachments, Note}
-  alias FullCircleWeb.NoteLive.ComposerComponent
+  alias FullCircleWeb.NoteLive.{ComposerComponent, PhoneQrComponent}
 
   @impl true
   def mount(params, _session, socket) do
@@ -88,6 +88,7 @@ defmodule FullCircleWeb.NoteLive.Form do
   # Everything shown for a saved note: rights, the post item, files, history.
   defp assign_note(socket, note) do
     %{current_company: com, current_user: user} = socket.assigns
+    FullCircleWeb.NoteFiles.listen_self({:note, note.id})
 
     socket
     |> assign(
@@ -260,6 +261,9 @@ defmodule FullCircleWeb.NoteLive.Form do
   # A reply was posted in the thread: refresh the thread and the 💬 count.
   def handle_info({:composer, "reply", {:saved, :new, _}}, socket), do: {:noreply, reload(socket)}
 
+  # A file landed on this note (phone, another tab): show it.
+  def handle_info({:note_files, {:note, _}}, socket), do: {:noreply, reload(socket)}
+
   def handle_info(_msg, socket), do: {:noreply, socket}
 
   defp edited?(%Note{} = note), do: note.updated_at != note.inserted_at
@@ -430,6 +434,15 @@ defmodule FullCircleWeb.NoteLive.Form do
                 :if={@can_edit}
                 id={"attach-#{@note.id}"}
                 url={~p"/companies/#{@current_company.id}/notes/#{@note.id}/attachments"}
+              />
+              <.live_component
+                :if={@can_edit}
+                module={PhoneQrComponent}
+                id="note-phone"
+                target={{:note, @note.id}}
+                label={FullCircleWeb.PhoneUpload.note_label(@note)}
+                current_company={@current_company}
+                current_user={@current_user}
               />
               <button
                 type="button"

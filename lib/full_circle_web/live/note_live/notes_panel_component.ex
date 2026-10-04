@@ -9,11 +9,14 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
 
   alias FullCircle.Notes
   alias FullCircle.Notes.Attachments
-  alias FullCircleWeb.NoteLive.ComposerComponent
+  alias FullCircleWeb.NoteLive.{ComposerComponent, PhoneQrComponent}
 
   # A composer finished: the quick-add box (`id`) or a note edited in place
   # (`id-edit`). Links on a saved note apply at once, so any edit reloads.
+  # A file landed on one of the shown notes (FullCircleWeb.NoteFiles).
   @impl true
+  def update(%{note_files: {:note, _}}, socket), do: {:ok, load(socket)}
+
   def update(%{composer: {cid, event}}, socket) do
     editor? = cid == edit_id(socket.assigns.id)
 
@@ -67,6 +70,9 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
           can_attach: Notes.may_edit?(r.note, user, rights)
         }
       end
+
+    for item <- items,
+        do: FullCircleWeb.NoteFiles.listen({:note, item.id}, __MODULE__, socket.assigns.id)
 
     assign(socket, items: items, can_create: rights.create)
   end
@@ -246,6 +252,14 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
             <.attach_button
               id={"attach-#{item.id}"}
               url={~p"/companies/#{@current_company.id}/notes/#{item.id}/attachments"}
+            />
+            <.live_component
+              module={PhoneQrComponent}
+              id={"#{@id}-phone-#{item.id}"}
+              target={{:note, item.id}}
+              label={FullCircleWeb.PhoneUpload.note_label(item.note)}
+              current_company={@current_company}
+              current_user={@current_user}
             />
           </:actions>
         </.note_post>

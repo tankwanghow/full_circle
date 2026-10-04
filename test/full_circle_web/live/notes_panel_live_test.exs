@@ -655,4 +655,28 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
       assert html =~ "/up/"
     end
   end
+
+  test "a file landing on a shown note (e.g. from the phone) appears without reload",
+       %{conn: conn, admin: admin, comp: comp, contact: c} do
+    note =
+      note_fixture(comp, admin, %{
+        "body" => "letter",
+        "subject_type" => "Contact",
+        "subject_id" => c.id
+      })
+
+    {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
+    assert has_element?(lv, "#notes-panel-phone-#{note.id}-open")
+
+    {:ok, _} =
+      FullCircle.Notes.Attachments.attach(
+        note,
+        %{path: jpeg_file(), file_name: "p.jpg"},
+        comp,
+        admin
+      )
+
+    _ = render(lv)
+    assert has_element?(lv, "#notes-panel-note-#{note.id} .note-thumb")
+  end
 end
