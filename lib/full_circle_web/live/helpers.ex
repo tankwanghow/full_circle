@@ -17,6 +17,17 @@ defmodule FullCircleWeb.Helpers do
     )
   end
 
+  # The tab a Receipt / Payment / Debit Note / Credit Note form opens on: the
+  # first of `amount_fields` (in priority order) with a non-zero amount, else
+  # :details. Set once at mount — later tab switches are client-side JS, so the
+  # server-rendered tab classes must not change under them.
+  def default_doc_tab(form, amount_fields) do
+    Enum.find_value(amount_fields, :details, fn {tab, field} ->
+      amount = Ecto.Changeset.fetch_field!(form.source, field)
+      if amount && !Decimal.eq?(amount, 0), do: tab
+    end)
+  end
+
   def list_n_value(socket, terms, list_fn) do
     list = list_fn.(terms, socket.assigns.current_company, socket.assigns.current_user)
 

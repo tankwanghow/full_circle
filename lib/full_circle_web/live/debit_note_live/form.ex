@@ -24,6 +24,13 @@ defmodule FullCircleWeb.DebitNoteLive.Form do
      socket
      |> assign(details_got_error: false)
      |> assign(matchers_got_error: false)
+     |> assign(
+       active_tab:
+         FullCircleWeb.Helpers.default_doc_tab(socket.assigns.form,
+           details: :note_amount,
+           matchers: :matched_amount
+         )
+     )
      |> assign(query: %{from: from, to: to})
      |> assign(query_match_trans: [])
      |> assign(e_inv_obj: obj)}
@@ -530,7 +537,7 @@ defmodule FullCircleWeb.DebitNoteLive.Form do
                 |> JS.remove_class("tab-hidden", to: "#debit-note-details")
                 |> JS.add_class("active")
               }
-              class="active basis-1/2 tab"
+              class={["basis-1/2 tab", @active_tab == :details && "active"]}
             >
               {gettext("Details")} =
               <span
@@ -554,7 +561,7 @@ defmodule FullCircleWeb.DebitNoteLive.Form do
                 |> JS.remove_class("active", to: "#debit-note-details-tab")
                 |> JS.show(to: "#query-match-trans")
               }
-              class="basis-1/2 tab"
+              class={["basis-1/2 tab", @active_tab == :matchers && "active"]}
             >
               {gettext("Matchers")} =
               <span
@@ -579,7 +586,10 @@ defmodule FullCircleWeb.DebitNoteLive.Form do
           <.live_component
             module={FullCircleWeb.CreditNoteLive.DetailComponent}
             id="debit-note-details"
-            klass="detail-fit text-center border bg-purple-100 mt-2 p-3 rounded-lg border-purple-400"
+            klass={[
+              "detail-fit text-center border bg-purple-100 mt-2 p-3 rounded-lg border-purple-400",
+              @active_tab != :details && "tab-hidden"
+            ]}
             doc_name="DebitNote"
             detail_name={:debit_note_details}
             form={@form}
@@ -595,7 +605,10 @@ defmodule FullCircleWeb.DebitNoteLive.Form do
           <.live_component
             module={FullCircleWeb.ReceiptLive.MatcherComponent}
             id="match-trans"
-            klass="tab-hidden text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
+            klass={[
+              "text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400",
+              @active_tab != :matchers && "tab-hidden"
+            ]}
             form={@form}
             current_company={@current_company}
             current_user={@current_user}
@@ -647,7 +660,10 @@ defmodule FullCircleWeb.DebitNoteLive.Form do
         <.live_component
           module={FullCircleWeb.ReceiptLive.QryMatcherComponent}
           id="query-match-trans"
-          klass="hidden text-center border-4 bg-green-200 mt-4 p-3 rounded-lg border-green-800"
+          klass={[
+            "text-center border-4 bg-green-200 mt-4 p-3 rounded-lg border-green-800",
+            @active_tab != :matchers && "hidden"
+          ]}
           query={@query}
           query_match_trans={@query_match_trans}
           form={@form}

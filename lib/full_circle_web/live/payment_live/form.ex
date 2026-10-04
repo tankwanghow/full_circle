@@ -24,6 +24,13 @@ defmodule FullCircleWeb.PaymentLive.Form do
      |> assign(query_match_trans: [])
      |> assign(details_got_error: false)
      |> assign(matchers_got_error: false)
+     |> assign(
+       active_tab:
+         FullCircleWeb.Helpers.default_doc_tab(socket.assigns.form,
+           details: :payment_detail_amount,
+           matchers: :matched_amount
+         )
+     )
      |> assign_new(:e_inv_supplier_ids, fn -> nil end)
      |> assign_new(:e_inv_preview, fn -> nil end)
      |> assign(
@@ -714,7 +721,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
         >
           <.input type="hidden" field={@form[:payment_no]} />
           <div class="flex flex-row flex-nowrap">
-            <div class="basis-64 grow shrink">
+            <div class="w-[20%] grow shrink">
               <.input type="hidden" field={@form[:contact_id]} />
               <.input
                 field={@form[:contact_name]}
@@ -723,13 +730,13 @@ defmodule FullCircleWeb.PaymentLive.Form do
                 url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=contact&name="}
               />
             </div>
-            <div class="w-36 shrink-0">
+            <div class="w-[10%] shrink">
               <.input field={@form[:reg_no]} label={gettext("Reg No")} readonly tabindex="-1" />
             </div>
-            <div class="w-36 shrink-0">
+            <div class="w-[10%] shrink">
               <.input field={@form[:tax_id]} label={gettext("Tax Id")} readonly tabindex="-1" />
             </div>
-            <div class="basis-56 grow shrink">
+            <div class="w-[20%] grow shrink">
               <.input type="hidden" field={@form[:funds_account_id]} />
               <.input
                 field={@form[:funds_account_name]}
@@ -738,73 +745,72 @@ defmodule FullCircleWeb.PaymentLive.Form do
                 url={"/list/companies/#{@current_company.id}/#{@current_user.id}/autocomplete?schema=fundsaccount&name="}
               />
             </div>
-          </div>
-          <div class="flex flex-row flex-nowrap">
-            <div class="w-32 shrink-0">
+            <div class="w-[10%] shrink">
+              <.input field={@form[:payment_date]} label={gettext("Pay Date")} type="date" />
+            </div>
+            <div class="w-[10%] shrink">
               <.input
                 field={@form[:funds_amount]}
-                label={gettext("Funds Amount")}
+                label={gettext("Funds Amt")}
                 phx-hook="calculatorInput"
                 klass="text-right"
                 step="0.01"
               />
             </div>
-            <div class="w-[9.5rem] shrink-0">
-              <.input field={@form[:payment_date]} label={gettext("Payment Date")} type="date" />
-            </div>
-            <div class="basis-48 grow shrink">
-              <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
-            </div>
-            <div class="w-32 shrink-0">
+            <div class="w-[10%] shrink">
               <.input
                 feedback={true}
                 type="number"
                 readonly
                 field={@form[:payment_balance]}
-                label={gettext("Payment Balance")}
+                label={gettext("Pay Balance")}
                 value={Ecto.Changeset.fetch_field!(@form.source, :payment_balance)}
               />
             </div>
           </div>
-
-          <div class="flex flex-row flex-nowrap mt-2">
-            <div class="w-[14%]">
+          <div class="flex flex-row flex-nowrap">
+            <div class="w-[35%] grow shrink">
+              <.input field={@form[:descriptions]} label={gettext("Descriptions")} />
+            </div>
+            <div class="w-[18%]">
               <.input field={@form[:e_inv_internal_id]} label={gettext("E Invoice Internal Id")} />
             </div>
-            <div class="w-[20%] min-w-[17rem]">
+            <div class="w-[21%]">
               <.input field={@form[:e_inv_uuid]} label={gettext("E Invoice UUID")} />
             </div>
-            <div
-              :if={is_nil(@form[:e_inv_uuid].value) and @live_action != :new}
-              class="text-blue-600 hover:font-medium w-[20%] ml-5 mt-6"
-            >
-              <a
-                id={@form[:payment_no].value}
-                href="#"
-                phx-hook="copyAndOpen"
-                copy-text={@form[:payment_no].value}
-                goto-url={"#{@einv_portal}/newdocument"}
+            <div class="w-[26%] flex gap-2 flex-nowrap">
+              <div
+                :if={is_nil(@form[:e_inv_uuid].value) and @live_action != :new}
+                class="text-blue-600 hover:font-medium mt-7 ml-2"
               >
-                {gettext("New E-Invoice")}
-              </a>
-            </div>
-            <div
-              :if={!is_nil(@form[:e_inv_uuid].value)}
-              class="text-blue-600 hover:font-medium ml-5 mt-6"
-            >
-              <.link
-                target="_blank"
-                href={"#{@einv_portal}/documents/#{@form[:e_inv_uuid].value}"}
+                <a
+                  id={@form[:payment_no].value}
+                  href="#"
+                  phx-hook="copyAndOpen"
+                  copy-text={@form[:payment_no].value}
+                  goto-url={"#{@einv_portal}/newdocument"}
+                >
+                  {gettext("New E-Invoice")}
+                </a>
+              </div>
+              <div
+                :if={!is_nil(@form[:e_inv_uuid].value)}
+                class="text-blue-600 hover:font-medium mt-7 ml-2"
               >
-                Open E-Invoice
-              </.link>
-            </div>
-            <div class="shrink-0 ml-2 mt-1">
-              <% {url, qrcode} =
-                FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data, 1) %>
-              <.link target="_blank" href={url}>
-                {qrcode |> raw}
-              </.link>
+                <.link
+                  target="_blank"
+                  href={"#{@einv_portal}/documents/#{@form[:e_inv_uuid].value}"}
+                >
+                  Open E-Invoice
+                </.link>
+              </div>
+              <div class="mt-2 shrink-0">
+                <% {url, qrcode} =
+                  FullCircle.Helpers.e_invoice_validation_url_qrcode(@form.source.data, 1) %>
+                <.link target="_blank" href={url}>
+                  {qrcode |> raw}
+                </.link>
+              </div>
             </div>
           </div>
 
@@ -818,7 +824,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
                 |> JS.remove_class("active", to: "#payment-details-tab")
                 |> JS.show(to: "#query-match-trans")
               }
-              class="active basis-1/2 tab"
+              class={["basis-1/2 tab", @active_tab == :matchers && "active"]}
             >
               {gettext("Matchers")} =
               <span
@@ -848,7 +854,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
                 |> JS.remove_class("tab-hidden", to: "#payment-details")
                 |> JS.add_class("active")
               }
-              class="basis-1/2 tab"
+              class={["basis-1/2 tab", @active_tab == :details && "active"]}
             >
               {gettext("Details")} =
               <span
@@ -869,7 +875,10 @@ defmodule FullCircleWeb.PaymentLive.Form do
           <.live_component
             module={FullCircleWeb.InvoiceLive.DetailComponent}
             id="payment-details"
-            klass="tab-hidden detail-fit text-center border bg-purple-100 mt-2 p-3 rounded-lg border-purple-400"
+            klass={[
+              "detail-fit text-center border bg-purple-100 mt-2 p-3 rounded-lg border-purple-400",
+              @active_tab != :details && "tab-hidden"
+            ]}
             settings={@settings}
             doc_name="Payment"
             detail_name={:payment_details}
@@ -886,7 +895,10 @@ defmodule FullCircleWeb.PaymentLive.Form do
           <.live_component
             module={FullCircleWeb.ReceiptLive.MatcherComponent}
             id="match-trans"
-            klass="text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
+            klass={[
+              "text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400",
+              @active_tab != :matchers && "tab-hidden"
+            ]}
             form={@form}
             current_company={@current_company}
             current_user={@current_user}
@@ -1047,7 +1059,10 @@ defmodule FullCircleWeb.PaymentLive.Form do
         <.live_component
           module={FullCircleWeb.ReceiptLive.QryMatcherComponent}
           id="query-match-trans"
-          klass="text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400"
+          klass={[
+            "text-center border bg-green-100 mt-2 p-3 rounded-lg border-green-400",
+            @active_tab != :matchers && "hidden"
+          ]}
           query={@query}
           query_match_trans={@query_match_trans}
           form={@form}
