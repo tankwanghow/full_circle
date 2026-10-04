@@ -82,10 +82,16 @@ carries on.
 
 ### Data: the tray is attachments without a note
 
+A small `note_trays` table (`id, company_id, user_id, note_id, closed_at`)
+names each tray: its owner, and after Save the note it became. Amended during
+planning: without it, a phone upload arriving after Save or Cancel had nowhere
+to go. Late phone uploads now follow a saved tray to its note, and are refused
+("closed on the desktop") after Cancel.
+
 Migration on `note_attachments`:
 
 - `note_id` becomes nullable;
-- add `tray_id :binary_id`, nullable and indexed;
+- add `tray_id` referencing `note_trays`, nullable and indexed;
 - add a check constraint: exactly one of `note_id` and `tray_id` is set.
 
 A write box generates its `tray_id` (UUID) when it opens. Tray files are stored at
@@ -96,9 +102,8 @@ opaque, so claiming a file never moves it on disk.
 
 - `attach_to_tray(tray_id, upload, company, user)`: the same size check and magic-byte
   sniff as `attach/4`. A tray belongs to the user who opened it, and only that
-  user, or a phone token carrying their id, may add to it. There is no tray table,
-  so the rule is enforced on rows: an upload is refused if the tray already holds
-  a row from another user or another company. Combined with a random UUID
+  user, or a phone token carrying their id, may add to it. The tray row records
+  its owner; an upload into another user's tray id is refused. Combined with a random UUID
   `tray_id`, nobody else can add to a tray.
 - `list_tray(tray_id, company, user)` returns the tray's files.
 - `discard_tray(tray_id, company, user)` and `discard(att, company, user)` hard-delete rows and files.
