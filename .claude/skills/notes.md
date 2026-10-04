@@ -137,6 +137,23 @@ hard-deletes the tray's files (`Trays.cancel/3`). A saved tray follows: a
 late phone upload attaches to its note; a cancelled one answers 409
 "closed". `TrayPruner` deletes trays and scan folders older than 24 h. Files
 already on a note keep the immediate soft remove (✕ on `#note-files`).
+- **Never trust the tray as read.** An upload copies the file (up to 10 MB)
+  *after* reading the tray, so Save/Cancel can commit in between. The insert
+  goes through `Attachments.store_in_tray/4`, which re-reads the tray row
+  `FOR SHARE` (claim and cancel take `FOR UPDATE`) and lands in the open
+  tray, follows a saved one to its note, or refuses. Without that, the FK
+  check simply waited for the claim and inserted into a closed tray: ✓ on
+  the phone, never on the note, pruned a day later.
+- **Tray files are readable by their owner** (`get_readable/3` left-joins
+  `note_trays` on owner + company): the box shows them as `file_thumb`
+  tiles before Save. Nobody else gets them (404).
+- **Text is optional when there are files** — attached or in the tray.
+  `Note.changeset/3` takes `files?: true` (body stored as `""`, the column is
+  NOT NULL); the composer passes it on validate too. A files-only note's
+  `display_title/1` is "📎 Files". `update_note` returns `{:error, cs}` for an
+  invalid changeset *before* its "nothing changed" check: `validate_required`
+  drops the blanked field from `changes`, so an invalid edit used to look
+  like a no-op and returned `{:ok, current}`.
 
 **Phone (`/up/:token`).** `FullCircleWeb.PhoneUpload` signs `{:tray | :note,
 id}` + company + user + label; 600 s idle — every success returns a fresh
@@ -148,7 +165,35 @@ no LiveView. Scans upload page by page (`Notes.Scans`,
 the PDF on Done (JPEGs embedded as DCTDecode, no re-encode). The 📱 button is
 `PhoneQrComponent` (QR made on open from `Endpoint.url()` — in dev set
 `PHX_HOST` to the LAN IP or the QR says localhost). `window.__phoneUpload`
-exposes `addPage/sendFile/startScan` for checking the page without a camera.
+exposes `addPage/sendFile/startScan` for checking the page without a camera
+(Chrome automation may only reach `localhost`, not the LAN IP).
+- **Scan ids are a path segment: canonical 36-char UUIDs only.**
+  `Ecto.UUID.cast/1` also accepts any 16-byte binary, so `"../../../../tmp/"`
+  passed it and `finish/2` wrote outside the uploads dir. `Scans` checks the
+  regex in every public function. Pages are numbered after the highest
+  existing one and written `:exclusive`, so racing uploads never overwrite;
+  the page also allows one scan request at a time (`busy`).
+- **The phone page is not a secure context in dev** (`http://<LAN IP>`):
+  `crypto.randomUUID` does not exist there — `uuid()` falls back to
+  `getRandomValues`. Its script URL is undigested in dev and cached, so a
+  phone may keep an old `phone_upload.js`; use a private tab.
+- **✓ Close ends the link at once.** Each QR is one session (`s` in the
+  token, carried by refreshed tokens); `PhoneUpload.finish/1` records it in
+  the `PhoneUploadFinished` ETS set for the token lifetime (600 s). The set
+  is started by `application.ex`, so a hot-reloaded dev server needs a
+  restart; if the table is missing, Finish is a no-op and uploads still
+  work. The page then tries `window.close()` (usually blocked for a tab the
+  camera app opened) and says the tab may be closed.
+- **QR SVG:** `QRCode.render(:svg)` emits a fixed `width`/`height` and no
+  `viewBox`, so CSS sizing crops it. `PhoneQrComponent.scalable/1` swaps the
+  size for a viewBox — do the same anywhere a QR is resized. The QR opens as
+  a fixed, centered modal: the notes panel is `overflow-hidden` and clipped a
+  popover.
+
+**Post actions row.** Counts and ✎ Edit / 📎 Attach / 📱 Phone share one
+row (`note_post/1`, an `@container`). Under 28rem (a record's notes panel)
+📎 and 📱 show icons only (`@[28rem]:inline` labels, full names in `title`);
+the buttons are matching `whitespace-nowrap` pills.
 
 **Live arrival.** Every upload broadcasts `{:note_files_changed, {:tray |
 :note, id}}` on `Attachments.topic(company_id)`. `FullCircleWeb.NoteFiles`
