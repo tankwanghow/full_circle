@@ -54,7 +54,7 @@ defmodule FullCircleWeb.NoteLive.PhoneQrComponent do
         title={gettext("Add from phone")}
         class="whitespace-nowrap rounded-full border border-gray-300 px-3 py-0.5 text-sm hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
       >
-        📱 {gettext("Phone")}
+        📱<span class="ml-1 hidden @[28rem]:inline">{gettext("Phone")}</span>
       </button>
       <%!-- A centered modal, fixed to the viewport: the notes panel clips
            its overflow, so a popover under the button was cut off. --%>

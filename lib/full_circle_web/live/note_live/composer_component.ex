@@ -624,7 +624,7 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
         confirm={nil}
         target={@myself}
       />
-      <div class="mt-1 flex flex-wrap items-center gap-2">
+      <div class="@container mt-1 flex flex-wrap items-center gap-2">
         <.attach_button
           id={"#{@id}-attach"}
           url={~p"/companies/#{@current_company.id}/note_trays/#{@tray_id}/files"}

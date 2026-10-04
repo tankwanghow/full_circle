@@ -258,7 +258,7 @@ defmodule FullCircleWeb.NoteComponents do
 
   def attach_button(assigns) do
     ~H"""
-    <span class="inline-flex items-center gap-2 text-sm">
+    <span class="inline-flex items-center gap-1.5 text-sm">
       <button
         type="button"
         id={@id}
@@ -269,9 +269,13 @@ defmodule FullCircleWeb.NoteComponents do
         title={gettext("Attach files")}
         class="whitespace-nowrap rounded-full border border-gray-300 px-3 py-0.5 text-sm hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
       >
-        📎 {@label || gettext("Attach")}
+        📎<span class="ml-1 hidden @[28rem]:inline">{@label || gettext("Attach")}</span>
       </button>
-      <span id={"#{@id}-msg"} phx-update="ignore" class="text-rose-600 dark:text-rose-400"></span>
+      <span
+        id={"#{@id}-msg"}
+        phx-update="ignore"
+        class="text-rose-600 empty:hidden dark:text-rose-400"
+      ></span>
     </span>
     """
   end
@@ -470,22 +474,25 @@ defmodule FullCircleWeb.NoteComponents do
           + {ngettext("1 more file", "%{count} more files", @hidden_files)}
         </div>
 
-        <%!-- Wraps in a narrow panel: the buttons drop to their own line
-             rather than their labels breaking. --%>
-        <div class="mt-2 flex flex-wrap items-center gap-x-8 gap-y-2 text-sm text-gray-500 dark:text-gray-400">
-          <.post_link :if={!@detail} path={@path} new_tab={@new_tab} class="flex gap-8">
+        <%!-- Counts and buttons share one row. Under 28rem (a record's notes
+             panel) 📎 and 📱 show icons only (`@container`); labels never break. --%>
+        <div class="@container mt-2 flex items-center gap-x-4 text-sm text-gray-500 dark:text-gray-400">
+          <.post_link :if={!@detail} path={@path} new_tab={@new_tab} class="flex shrink-0 gap-5">
             <span title={gettext("Replies")}>💬 <span class="note-replies">{@d.replies}</span></span>
             <span title={gettext("Links")}>🔗 <span class="note-links">{length(@d.links)}</span></span>
             <span title={gettext("Files")}>📎
             <span class="note-files">{length(@note.attachments)}</span></span>
           </.post_link>
-          <div :if={@detail} class="flex gap-8">
+          <div :if={@detail} class="flex shrink-0 gap-5">
             <span title={gettext("Replies")}>💬 <span class="note-replies">{@d.replies}</span></span>
             <span title={gettext("Links")}>🔗 <span class="note-links">{length(@d.links)}</span></span>
             <span title={gettext("Files")}>📎
             <span class="note-files">{length(@note.attachments)}</span></span>
           </div>
-          <div :if={@actions != []} class="ml-auto flex flex-wrap items-center gap-2">
+          <div
+            :if={@actions != []}
+            class="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1.5"
+          >
             {render_slot(@actions)}
           </div>
         </div>
