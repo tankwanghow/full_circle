@@ -42,7 +42,7 @@ the same classes are the old percentage widths.
 ## Tabs inside a fit card: `.tab-hidden`, never `JS.hide` / `hidden`
 
 `display: none` takes a panel out of width calculation, so the card would
-jump in width between tabs (Receipt starts on Cheques with Details hidden).
+jump in width between tabs.
 Inactive panels use `.tab-hidden` (visibility hidden, zero height, no
 padding/border — still counted for width, unfocusable):
 
@@ -51,9 +51,17 @@ JS.remove_class("tab-hidden", to: "#receipt-details")
 |> JS.add_class("tab-hidden", to: "#match-trans")
 ```
 
-and an initially-inactive panel's `klass` starts with `tab-hidden`, not
-`hidden`. Panels *outside* the tabs (e.g. `#query-match-trans`) may keep
+Panels *outside* the tabs (e.g. `#query-match-trans`) may keep
 `JS.show`/`JS.hide`.
+
+The opening tab is data-driven: `FullCircleWeb.Helpers.default_doc_tab/2`
+picks the first of Details → Matchers → Cheques with a non-zero amount (else
+Details), assigned once at mount as `@active_tab`. Tab and panel classes are
+lists — `class={["basis-1/3 tab", @active_tab == :details && "active"]}`,
+`klass={["…", @active_tab != :details && "tab-hidden"]}` (`"hidden"`, not
+`tab-hidden`, for `#query-match-trans`). Never recompute `@active_tab` after
+mount: tab switching is client-side `JS` class ops, and a server-side class
+change would fight them.
 
 The Matchers tab's search panel (`QryMatcherComponent`, `id="query-match-trans"`)
 lives **inside the card, after the main `<.form>`** — it has its own form and
