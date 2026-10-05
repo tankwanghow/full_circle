@@ -42,6 +42,7 @@ Dockerfile
 
 *.csv
 *.tar
+*.tar.gz
 
 txnpart*
 stuff*.*
