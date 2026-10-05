@@ -688,16 +688,21 @@ defmodule FullCircle.Notes do
     end)
   end
 
-  # `%{record_id, note_id}`: for each **done** task linking one of `ids`, its
-  # final note — the latest note about it that is not a reply. Visibility is
-  # applied by the caller, to the final note itself: a user who cannot read it
-  # sees nothing, never an older note standing in.
+  # `%{record_id, note_id}`: the final note — the latest note about the task
+  # that is not a reply — of one **done** cycle per task series per record.
+  # Visibility is applied by the caller, to the final note itself: a user who
+  # cannot read it sees nothing, never an older note standing in.
   #
-  # Only the cycle that owns the link counts: the earliest in its series with
-  # that link. Closing a repeating task copies its links onto the next cycle
-  # (`Tasks.spawn_next`); without this, next year's outcome would land on this
-  # year's payment. Timestamps cannot tell a copy from a link added when the
-  # task was created (same second), but copies only ever move forward.
+  # Closing a repeating task copies its links onto the next cycle
+  # (`Tasks.spawn_next`), so which cycle counts depends on the record:
+  # - a document (`Linkable.document?/1`, e.g. this year's payment) belongs to
+  #   the cycle that owns the link — the earliest in the series with it — so
+  #   next year's outcome never lands on this year's payment;
+  # - a lasting record (a lorry on every yearly permit) shows the latest done
+  #   cycle with the link, so its page carries the current outcome.
+  # Timestamps cannot tell a copy from a link added at task creation (same
+  # second), but copies only ever move forward. `inserted_at` is to the
+  # second; on a tie the next cycle is the one due later.
   defp outcomes(company, type, ids) do
     owning =
       from(l in RecordLink,
@@ -708,24 +713,7 @@ defmodule FullCircle.Notes do
         where: l.company_id == ^company.id and l.from_type == "Task",
         where: l.to_type == ^type and l.to_id in ^ids,
         where: t.status == "done" and is_nil(t.deleted_at),
-        where:
-          not exists(
-            from(l2 in RecordLink,
-              join: t2 in FullCircle.Tasks.CompanyTask,
-              on: t2.id == l2.from_id,
-              where: l2.company_id == parent_as(:link).company_id and l2.from_type == "Task",
-              where:
-                l2.to_type == parent_as(:link).to_type and l2.to_id == parent_as(:link).to_id,
-              where: t2.series_id == parent_as(:task).series_id,
-              # inserted_at is to the second; on a tie, the next cycle is the
-              # one due later (next_due_date always moves forward).
-              where:
-                t2.inserted_at < parent_as(:task).inserted_at or
-                  (t2.inserted_at == parent_as(:task).inserted_at and
-                     t2.due_date < parent_as(:task).due_date),
-              select: 1
-            )
-          ),
+        where: not exists(other_cycle(Linkable.document?(type))),
         select: %{record_id: l.to_id, task_id: t.id}
       )
 
@@ -744,6 +732,38 @@ defmodule FullCircle.Notes do
       on: f.task_id == o.task_id,
       select: %{record_id: o.record_id, note_id: f.note_id}
     )
+  end
+
+  # Another cycle of the same series linking the same record that beats
+  # `parent_as(:task)` (see `outcomes/3`): for a document, any earlier cycle
+  # (it owns the link); for a lasting record, a later done one.
+  defp other_cycle(document?) do
+    same =
+      from(l2 in RecordLink,
+        join: t2 in FullCircle.Tasks.CompanyTask,
+        on: t2.id == l2.from_id,
+        where: l2.company_id == parent_as(:link).company_id and l2.from_type == "Task",
+        where: l2.to_type == parent_as(:link).to_type and l2.to_id == parent_as(:link).to_id,
+        where: t2.series_id == parent_as(:task).series_id,
+        select: 1
+      )
+
+    if document? do
+      from([_l2, t2] in same,
+        where:
+          t2.inserted_at < parent_as(:task).inserted_at or
+            (t2.inserted_at == parent_as(:task).inserted_at and
+               t2.due_date < parent_as(:task).due_date)
+      )
+    else
+      from([_l2, t2] in same,
+        where: t2.status == "done" and is_nil(t2.deleted_at),
+        where:
+          t2.inserted_at > parent_as(:task).inserted_at or
+            (t2.inserted_at == parent_as(:task).inserted_at and
+               t2.due_date > parent_as(:task).due_date)
+      )
+    end
   end
 
   defp newest(query, nil), do: query

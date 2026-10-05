@@ -409,13 +409,20 @@ task links to — the renewed licence scan on its payment (PV-008369). Tag
   never an older note standing in. Skipped, open, reopened or deleted tasks
   add nothing; reopening removes it again. Nothing is copied: computed in
   `Notes.outcomes/3` at read time.
-- **Only the cycle that owns the link.** Closing a repeating task copies its
-  links onto the next cycle (`Tasks.spawn_next`), so next year's outcome
-  would land on this year's payment. The owner is the earliest cycle in the
-  series (`series_id`) with that link: `inserted_at`, tie-broken by
-  `due_date` (timestamps are to the second; the next cycle is always due
-  later). Timestamps cannot tell a copy from a link added at task creation
-  — both are stamped with the task's own second.
+- **One done cycle per task series per record**, by record kind
+  (`Linkable.document?/1`; `Notes.other_cycle/1`). Closing a repeating task
+  copies its links onto the next cycle (`Tasks.spawn_next`):
+  - **Documents** (Payment, Invoice, …) belong to one occurrence: the cycle
+    that **owns** the link — the earliest in the series with it — so next
+    year's outcome never lands on this year's payment.
+  - **Lasting records** (FixedAsset, Contact, Employee, Good, Account — on
+    prod mostly lorries/buildings with yearly permit tasks) show the
+    **latest done** cycle with the link, so the lorry carries its current
+    permit, not the first one. Several series → one note each.
+  Order is `inserted_at`, tie-broken by `due_date` (timestamps are to the
+  second; the next cycle is always due later). Timestamps cannot tell a
+  copied link from one added at task creation — both carry the task's own
+  second — which is why ownership is by order, not by link time.
 - Priority: `:about` > `:linked` > `:task_outcome`, excluded in SQL so each
   side's `limit` stays honest; a final note that also links here is
   `:linked`, once. `count_by_records/4` includes outcomes (3 queries).

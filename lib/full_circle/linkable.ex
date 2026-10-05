@@ -42,6 +42,12 @@ defmodule FullCircle.Linkable do
 
   def type?(type), do: type in types()
 
+  @doc """
+  A posted document (Invoice, Payment, …) belongs to one occurrence; the other
+  types (a lorry, a contact) last across a repeating task's cycles.
+  """
+  def document?(type), do: match?({:document, _}, spec(type))
+
   def url(type, id, company) do
     case spec(type) do
       {:record, %{route: route}} -> "/companies/#{company.id}/#{route}/#{id}/edit"
