@@ -65,7 +65,11 @@ last). A hidden task is absent.
 `RecordAside` (see `.claude/skills/notes.md`), to the right of the notes
 panel. Rows come from `Tasks.rows/4` (shared with `list_tasks/4`) and render
 with `TaskComponents.task_row/1`, the Tasks list's row, with `new_tab`: each
-opens the task in a new tab. Rows carry `can_close` / `can_edit`; the row's
+opens the task in a new tab. The row is `data-post-open` and its text link
+`data-post-link`, so a click on empty space opens the task
+(`assets/js/post_open.js`, shared with note posts; see `.claude/skills/notes.md`).
+Dialogs and the in-place edit form must stay *outside* the `<article>`, or mark
+them `data-no-post-open`. Rows carry `can_close` / `can_edit`; the row's
 `:actions` slot shows ✓ Done / Skip (`close_buttons/1` with `target`, shared
 with the Tasks list) and ✎ Edit. The panel owns its own `close_dialog/1`
 (`target={@myself}`): open_close → confirm_close → `Tasks.close_task/5`, then

@@ -223,17 +223,19 @@ defmodule FullCircleWeb.TaskComponents do
       assign(assigns, path: "/companies/#{assigns.company.id}/tasks/#{assigns.item.task.id}")
 
     ~H"""
+    <%!-- data-post-open: a click on empty space opens the task (post_open.js). --%>
     <article
       id={@id}
-      class="flex gap-3 border-b border-gray-200 px-4 py-3 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/60"
+      data-post-open
+      class="flex cursor-pointer gap-3 border-b border-gray-200 px-4 py-3 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/60"
     >
       <.due_tile task={@item.task} group={@item.group} today={@today} company={@company} />
       <div class="min-w-0 flex-1">
         <%!-- People, title, description and rhythm are one link to the task. --%>
-        <.link :if={!@new_tab} navigate={@path} class="block">
+        <.link :if={!@new_tab} navigate={@path} data-post-link class="block">
           <.task_row_text item={@item} company={@company} />
         </.link>
-        <a :if={@new_tab} href={@path} target="_blank" class="block">
+        <a :if={@new_tab} href={@path} target="_blank" data-post-link class="block">
           <.task_row_text item={@item} company={@company} />
         </a>
         <%!-- A quoted note, so it never reads as the task's description. --%>

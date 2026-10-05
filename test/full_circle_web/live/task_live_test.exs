@@ -44,6 +44,18 @@ defmodule FullCircleWeb.TaskLiveTest do
       assert has_element?(lv, "a#new_task")
     end
 
+    test "a row opens from anywhere on it", %{conn: conn, admin: admin, comp: comp} do
+      t = task_fixture(comp, admin, %{"title" => "Fix house 3 fan"})
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks")
+
+      assert has_element?(lv, "#tasks-#{t.id}[data-post-open]")
+
+      assert has_element?(
+               lv,
+               ~s(#tasks-#{t.id} a[data-post-link][href="/companies/#{comp.id}/tasks/#{t.id}"])
+             )
+    end
+
     test "Mine hides tasks assigned to others; All shows them", %{
       conn: conn,
       admin: admin,

@@ -1,9 +1,10 @@
 // A click on a post's empty space (padding, avatar, beside the files) opens
-// the note, the way X/Twitter posts do. Without it a note with no title and no
-// text, say photos only, is nearly impossible to open: its text link is empty
-// and the file tiles open the viewer instead.
+// it, the way X/Twitter posts do. Used by note posts (`note_post`) and task
+// rows (`task_row`). Without it a note with no title and no text, say photos
+// only, is nearly impossible to open: its text link is empty and the file
+// tiles open the viewer instead.
 //
-// It clicks the post's own [data-post-link], so the feed still navigates in
+// It clicks the row's own [data-post-link], so the feed still navigates in
 // place and a record's panel still opens a new tab. Anything interactive keeps
 // its own click, and so does a click that ends a text selection.
 
