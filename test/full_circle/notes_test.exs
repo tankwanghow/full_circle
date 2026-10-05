@@ -496,6 +496,56 @@ defmodule FullCircle.NotesTest do
       assert bodies(Notes.search(company, clerk, "焊工", %{}, page: 1, per_page: 30)) == ["焊工 很好"]
     end
 
+    test "a word may match the name of a record the note is about or links to", %{
+      company: company,
+      admin: admin
+    } do
+      mei = contact_fixture(company, admin, %{"name" => "Kedai Mei Hua"})
+      bolt = good_fixture(company, admin, %{"name" => "Hex Bolt M12"})
+
+      note_fixture(company, admin, %{
+        "body" => "about her",
+        "subject_type" => "Contact",
+        "subject_id" => mei.id
+      })
+
+      linked = note_fixture(company, admin, %{"body" => "pump needs a part"})
+      {:ok, _} = Notes.add_link(linked, "Good", bolt.id, company, admin)
+
+      search = &bodies(Notes.search(company, admin, &1, %{}, page: 1, per_page: 30))
+
+      assert search.("mei hua") == ["about her"]
+      assert search.("bolt") == ["pump needs a part"]
+      # Each word may match a different place: the text, or a record's name.
+      assert search.("pump M12") == ["pump needs a part"]
+      assert search.("pump hua") == []
+    end
+
+    test "a linked document matches by its number and its contact's name", %{
+      company: company,
+      admin: admin
+    } do
+      inv = invoice_fixture(company, admin)
+      contact = FullCircle.Repo.get!(FullCircle.Accounting.Contact, inv.contact_id)
+      note = note_fixture(company, admin, %{"body" => "short-shipped"})
+      {:ok, _} = Notes.add_link(note, "Invoice", inv.id, company, admin)
+
+      search = &bodies(Notes.search(company, admin, &1, %{}, page: 1, per_page: 30))
+
+      assert search.(inv.invoice_no) == ["short-shipped"]
+      assert search.(contact.name) == ["short-shipped"]
+    end
+
+    # A linked task or note may be one the searcher cannot see; its title
+    # must not be searchable through the note that links it.
+    test "a linked task's title is not matched", %{company: company, admin: admin} do
+      task = task_fixture(company, admin, %{"title" => "Renew zebra permit"})
+      note = note_fixture(company, admin, %{"body" => "see task"})
+      {:ok, _} = Notes.add_link(note, "Task", task.id, company, admin)
+
+      assert Notes.search(company, admin, "zebra", %{}, page: 1, per_page: 30) == []
+    end
+
     test "empty terms list newest first and paginate", %{company: company, admin: admin} do
       assert length(Notes.search(company, admin, "", %{}, page: 1, per_page: 3)) == 3
       assert length(Notes.search(company, admin, "", %{}, page: 2, per_page: 3)) == 1

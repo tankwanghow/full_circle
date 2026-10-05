@@ -819,7 +819,7 @@ defmodule FullCircle.Notes do
     words = terms |> to_string() |> String.split(~r/\s+/, trim: true)
 
     visible_to(company, user)
-    |> apply_words(words)
+    |> apply_words(words, company)
     |> apply_filters(filters || %{}, company, user)
     |> order_search(words, terms)
     |> offset(^((page - 1) * per_page))
@@ -829,12 +829,38 @@ defmodule FullCircle.Notes do
   end
 
   # ILIKE decides what matches; word_similarity only orders. CJK text scores
-  # near zero on trigrams, so similarity must never be the filter.
-  defp apply_words(query, words) do
+  # near zero on trigrams, so similarity must never be the filter. A word may
+  # also match the name or document number of a record the note is about or
+  # links to (`Linkable.matching_refs/3`) — read now, so a rename or a new
+  # link counts at once; nothing is copied onto the note.
+  defp apply_words(query, words, company) do
+    refs = note_refs(company)
+
     Enum.reduce(words, query, fn w, q ->
       pattern = "%#{PaletteTypes.escape_like(w)}%"
-      from(n in q, where: ilike(n.body, ^pattern) or ilike(coalesce(n.title, ""), ^pattern))
+
+      from(n in q,
+        where:
+          ilike(n.body, ^pattern) or ilike(coalesce(n.title, ""), ^pattern) or
+            n.id in subquery(Linkable.matching_refs(refs, pattern, company))
+      )
     end)
+  end
+
+  # Every record a note points at — its subject and its links — as
+  # `%{owner_id, type, id}`.
+  defp note_refs(company) do
+    links =
+      from(l in RecordLink,
+        where: l.company_id == ^company.id and l.from_type == "Note",
+        select: %{owner_id: l.from_id, type: l.to_type, id: l.to_id}
+      )
+
+    from(n in Note,
+      where: n.company_id == ^company.id and not is_nil(n.subject_id),
+      select: %{owner_id: n.id, type: n.subject_type, id: n.subject_id}
+    )
+    |> union_all(^links)
   end
 
   defp apply_filters(query, filters, company, user) do

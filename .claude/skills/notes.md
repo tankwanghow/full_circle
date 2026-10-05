@@ -626,6 +626,18 @@ A pick reaches the box through `RecordPickerComponent`'s `notify`:
   apply immediately, so Cancel still reloads the post. A stale save keeps
   the typed text and warns.
 
+## Search (`Notes.search/5`)
+Every word must match (AND); each word may match a different place: the
+note's title, its body, or **the name of a record the note is about or links
+to** — Contact/Employee/Good/Account/FixedAsset name, or a document's number
+or its contact's name (`Linkable.matching_refs/3`, decided 2026-10-05). Read
+at search time from the note's subject + `record_links`, nothing copied, so a
+rename or a new link counts at once. **Linked Task and Note titles are never
+matched**: the searcher may not be allowed to see them (their chip shows no
+title), and matching would leak the hidden title. The query is driven from
+the note's refs through indexed ids (`transactions.doc_id`): ~3–9 ms on a
+company with 793k transactions. ILIKE filters; `word_similarity` only orders.
+
 ## Command palette (`CommandPalette.NoteSearch`)
 - `note <words>` / `notes <words>` (case-insensitive) searches **notes only**
   via `Notes.search/5` — never query `notes` directly from the palette. Hits are

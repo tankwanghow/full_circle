@@ -180,6 +180,42 @@ defmodule FullCircle.Linkable do
     FullCircle.Tasks.search_titles(terms, company, user)
   end
 
+  @doc """
+  Of `refs` — a query selecting `%{owner_id, type, id}`, the records some
+  owner points at — the `owner_id`s whose record name, or document number or
+  document contact name, matches the ILIKE `pattern`.
+
+  Records and documents only. A linked note or task may be one the searcher
+  cannot see (its chip shows no title), so its title is never matched.
+  Driven from the refs through indexed ids, so the cost follows the refs, not
+  the size of `transactions`.
+  """
+  def matching_refs(refs, pattern, company) do
+    docs =
+      from(r in subquery(refs),
+        join: t in Transaction,
+        on: t.doc_id == r.id and t.doc_type == r.type,
+        left_join: ct in Contact,
+        on: ct.id == t.contact_id,
+        where: r.type in ^Enum.map(@documents, & &1.type) and t.company_id == ^company.id,
+        where: ilike(t.doc_no, ^pattern) or ilike(ct.name, ^pattern),
+        select: r.owner_id
+      )
+
+    Enum.reduce(@records, docs, fn %{type: type, schema: schema, title: title}, acc ->
+      named =
+        from(r in subquery(refs),
+          join: x in ^schema,
+          on: x.id == r.id,
+          where: r.type == ^type and x.company_id == ^company.id,
+          where: ilike(field(x, ^title), ^pattern),
+          select: r.owner_id
+        )
+
+      union(acc, ^named)
+    end)
+  end
+
   defp doc_query(type, company, user) do
     from(t in Transaction,
       join: c in subquery(Sys.user_company(company, user)),
