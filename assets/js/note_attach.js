@@ -78,22 +78,87 @@ export async function postFile(url, file, { fields = {}, onProgress } = {}) {
   return { ok: false, error: body.error || `Upload failed (${status}).` }
 }
 
+// Desktop video/audio files (📎, drop, paste) — not recorded, not shrunk —
+// get the phone recorder's limits, from `NoteComponents.media_limits/0`.
+const VIDEO_EXT = new Set(["mp4", "m4v", "mov", "webm"])
+const AUDIO_EXT = new Set(["m4a", "mp3", "ogg", "oga", "opus"])
+
+export function mediaLimits(el) {
+  const n = key => parseInt(el.dataset[key], 10)
+  return {
+    video: { bytes: n("maxVideoBytes"), seconds: n("maxVideoSeconds") },
+    audio: { bytes: n("maxAudioBytes"), seconds: n("maxAudioSeconds") }
+  }
+}
+
+function mediaKind(file) {
+  const type = file.type || ""
+  if (type.startsWith("video/")) return "video"
+  if (type.startsWith("audio/")) return "audio"
+  if (VIDEO_EXT.has(ext(file.name))) return "video"
+  if (AUDIO_EXT.has(ext(file.name))) return "audio"
+  return null
+}
+
+// The clip's length in seconds, or null when this browser cannot tell (a
+// codec it cannot play, a WebM without a duration): the server's size cap
+// still applies then.
+function duration(file, kind) {
+  return new Promise(resolve => {
+    const el = document.createElement(kind)
+    const src = URL.createObjectURL(file)
+    const timer = setTimeout(() => done(null), 10000)
+    function done(value) {
+      clearTimeout(timer)
+      el.removeAttribute("src")
+      URL.revokeObjectURL(src)
+      resolve(value)
+    }
+    el.preload = "metadata"
+    el.onloadedmetadata = () => done(Number.isFinite(el.duration) ? el.duration : null)
+    el.onerror = () => done(null)
+    el.src = src
+  })
+}
+
+const clock = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`
+const mb = bytes => Math.floor(bytes / 1000000)
+
+// What to send for one picked file, or `{error}`: media is checked against
+// its kind's limits and sent as is with a `kind` field (so an Android .m4a
+// is stored as audio, not as a video with no picture); anything else is a
+// photo/PDF, downscaled when it is a photo.
+async function prepare(file, { maxBytes, photo, media }) {
+  const kind = media && mediaKind(file)
+  if (kind) {
+    const limit = media[kind]
+    if (file.size > limit.bytes) return { error: `larger than ${mb(limit.bytes)} MB` }
+    const secs = await duration(file, kind)
+    // A second of slack: a "1:00" clip is often 60.4 s.
+    if (secs !== null && secs > limit.seconds + 1) return { error: `longer than ${clock(limit.seconds)}` }
+    return { file, fields: { kind } }
+  }
+  const shrunk = await downscale(file, photo)
+  if (shrunk.size > maxBytes) return { error: `larger than ${mb(maxBytes)} MB` }
+  return { file: shrunk, fields: {} }
+}
+
 // One file at a time, so a slow line shows steady progress and one bad file
 // does not stop the rest.
-export async function uploadFiles(files, { url, maxBytes, photo, onMessage }) {
+export async function uploadFiles(files, { url, maxBytes, photo, media, onMessage }) {
   const list = Array.from(files)
   let ok = 0
   const failed = []
   for (let i = 0; i < list.length; i++) {
     const n = list.length > 1 ? ` ${i + 1} of ${list.length}` : ""
     onMessage(`Uploading${n}…`)
-    const file = await downscale(list[i], photo)
-    if (file.size > maxBytes) {
-      failed.push(`${list[i].name}: larger than ${Math.floor(maxBytes / 1000000)} MB`)
+    const { file, fields, error } = await prepare(list[i], { maxBytes, photo, media })
+    if (error) {
+      failed.push(`${list[i].name}: ${error}`)
       continue
     }
     // At 100% the bytes are sent; the server still checks and stores the file.
-    const res = await postFile(url, file, { onProgress: pct => onMessage(pct < 100 ? `Uploading${n}… ${pct}%` : `Saving${n}…`) })
+    const res = await postFile(url, file, { fields, onProgress: pct => onMessage(pct < 100 ? `Uploading${n}… ${pct}%` : `Saving${n}…`) })
     if (res.ok) ok++
     else failed.push(`${list[i].name}: ${res.error}`)
   }
@@ -121,7 +186,7 @@ export const NoteAttach = {
       e.preventDefault()
       const input = document.createElement("input")
       input.type = "file"
-      input.accept = "image/*,application/pdf"
+      input.accept = "image/*,application/pdf,video/*,audio/*"
       input.multiple = this.el.dataset.multiple === "true"
       input.style.display = "none"
       document.body.appendChild(input)
@@ -134,6 +199,7 @@ export const NoteAttach = {
           url: this.el.dataset.url,
           maxBytes: parseInt(this.el.dataset.maxBytes, 10),
           photo: photoOpts(this.el),
+          media: mediaLimits(this.el),
           onMessage: t => { if (msg) msg.textContent = t || "" }
         })
         if (ok > 0) announce(this)
@@ -155,6 +221,7 @@ export const NoteDrop = {
         url: this.el.dataset.url,
         maxBytes: parseInt(this.el.dataset.maxBytes, 10),
         photo: photoOpts(this.el),
+        media: mediaLimits(this.el),
         onMessage: t => { if (msgEl) msgEl.textContent = t || "" }
       })
       if (ok > 0) announce(this)

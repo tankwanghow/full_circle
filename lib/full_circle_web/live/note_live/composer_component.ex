@@ -648,6 +648,7 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
       data-max-bytes={FullCircle.Notes.Attachments.max_bytes()}
       data-max-edge={@photo.max_edge}
       data-quality={@photo.quality}
+      {media_limits()}
       class="mt-1"
     >
       <.file_grid
@@ -663,10 +664,6 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
           id={"#{@id}-attach"}
           url={~p"/companies/#{@current_company.id}/note_trays/#{@tray_id}/files"}
           company={@current_company}
-        />
-        <.record_buttons
-          id={"#{@id}-record"}
-          url={~p"/companies/#{@current_company.id}/note_trays/#{@tray_id}/files"}
         />
         <.live_component
           module={PhoneQrComponent}

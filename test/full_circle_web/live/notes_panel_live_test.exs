@@ -279,8 +279,7 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
 
       assert has_element?(lv, "#notes-panel-note-#{mine.id} [phx-hook=NoteAttach]")
       refute has_element?(lv, "#notes-panel-note-#{theirs.id} [phx-hook=NoteAttach]")
-      assert has_element?(lv, "#notes-panel-note-#{mine.id} [phx-hook=NoteRecord]")
-      refute has_element?(lv, "#notes-panel-note-#{theirs.id} [phx-hook=NoteRecord]")
+      refute has_element?(lv, "[phx-hook=NoteRecord]")
     end
   end
 

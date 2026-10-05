@@ -622,38 +622,27 @@ defmodule FullCircleWeb.NoteLiveTest do
       assert has_element?(lv, "#note-files audio")
     end
 
-    test "⏺ Video and 🎙 Audio sit beside 📎, with each kind's limits", %{
+    # Recording is the phone page's (📱); the desktop attaches media files
+    # through 📎 / drop / paste, checked against the same per-kind limits.
+    test "no recorder on the desktop; 📎 and the drop tray carry the media limits", %{
       conn: conn,
       admin: admin,
       comp: comp
     } do
-      note = note_fixture(comp, admin, %{"body" => "record here"})
+      note = note_fixture(comp, admin, %{"body" => "files here"})
+
+      limits =
+        ~s([data-max-video-bytes="15000000"][data-max-video-seconds="60"]) <>
+          ~s([data-max-audio-bytes="5000000"][data-max-audio-seconds="180"])
 
       {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{note.id}")
-      url = ~p"/companies/#{comp.id}/notes/#{note.id}/attachments"
-      rec = ~s(#record-#{note.id}[phx-hook=NoteRecord][data-url="#{url}"])
-      assert has_element?(lv, "#attach-#{note.id}")
-      assert has_element?(lv, rec)
+      assert has_element?(lv, "#attach-#{note.id}" <> limits)
+      refute has_element?(lv, "[phx-hook=NoteRecord]")
 
-      assert has_element?(
-               lv,
-               ~s(#{rec} button[data-kind=video][data-max-bytes="15000000"][data-max-seconds="60"])
-             )
-
-      assert has_element?(
-               lv,
-               ~s(#{rec} button[data-kind=audio][data-max-bytes="5000000"][data-max-seconds="180"])
-             )
-
-      # The edit box records into its tray.
       {:ok, lv, _} = live(conn, edit_path(comp, note))
-      assert has_element?(lv, "#note-tray #note-record[phx-hook=NoteRecord]")
-      [_, tray] = Regex.run(~r/id="note-tray"[^>]*data-tray-id="([^"]+)"/, render(lv))
-
-      assert has_element?(
-               lv,
-               ~s(#note-record[data-url="/companies/#{comp.id}/note_trays/#{tray}/files"])
-             )
+      assert has_element?(lv, "#note-tray" <> limits)
+      assert has_element?(lv, "#note-attach" <> limits)
+      refute has_element?(lv, "[phx-hook=NoteRecord]")
     end
 
     test "delete returns to the index", %{conn: conn, admin: admin, comp: comp} do

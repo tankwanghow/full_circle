@@ -399,6 +399,7 @@ defmodule FullCircleWeb.NoteComponents do
         data-max-bytes={FullCircle.Notes.Attachments.max_bytes()}
         data-max-edge={@photo.max_edge}
         data-quality={@photo.quality}
+        {media_limits()}
         title={gettext("Attach files")}
         class="whitespace-nowrap rounded-full border border-gray-300 px-3 py-0.5 text-sm hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
       >
@@ -413,45 +414,21 @@ defmodule FullCircleWeb.NoteComponents do
     """
   end
 
-  attr :id, :string, required: true
-  attr :url, :string, required: true, doc: "where the recording is POSTed (as attach_button)"
-
   @doc """
-  ⏺ Video and 🎙 Audio: record in the app (`NoteRecord` hook,
-  `note_record.js`) and upload like 📎. Each button carries its kind's size
-  and time limits. Hidden until the browser can record (`can-record` on
-  `<html>`, set by the script): camera and microphone need HTTPS or
-  localhost, so on plain-HTTP dev over the LAN they never show.
+  Each media kind's limits as data attributes, for every element that
+  starts a desktop upload (📎 and the write box's drop/paste tray):
+  `note_attach.js` refuses a video or audio file over its size or length
+  before sending it. The phone recorder reads the same numbers.
   """
-  def record_buttons(assigns) do
-    assigns =
-      assign(assigns,
-        kinds: [
-          {:video, "⏺", gettext("Video"), gettext("Record a video")},
-          {:audio, "🎙", gettext("Audio"), gettext("Record a voice note")}
-        ]
-      )
-
-    ~H"""
-    <span
-      id={@id}
-      phx-hook="NoteRecord"
-      data-url={@url}
-      class="hidden items-center gap-1.5 text-sm can-record:inline-flex"
-    >
-      <button
-        :for={{kind, icon, label, title} <- @kinds}
-        type="button"
-        data-kind={kind}
-        data-max-bytes={Attachments.max_bytes(kind)}
-        data-max-seconds={Attachments.max_seconds(kind)}
-        title={title}
-        class="whitespace-nowrap rounded-full border border-gray-300 px-3 py-0.5 text-sm hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
-      >
-        {icon}<span class="ml-1 hidden @[28rem]:inline">{label}</span>
-      </button>
-    </span>
-    """
+  def media_limits do
+    Map.new(
+      for kind <- [:video, :audio],
+          {what, value} <- [
+            bytes: Attachments.max_bytes(kind),
+            seconds: Attachments.max_seconds(kind)
+          ],
+          do: {"data-max-#{kind}-#{what}", value}
+    )
   end
 
   attr :count, :integer, required: true

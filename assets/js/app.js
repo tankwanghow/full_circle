@@ -22,20 +22,17 @@ import { Socket } from "phoenix"
 import { LiveSocket } from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 import { NoteAttach, NoteDrop } from "./note_attach"
-import { NoteRecord, markCanRecord } from "./note_record"
 import { installFileViewer } from "./file_viewer"
 import { installPostOpen } from "./post_open"
 
 installFileViewer()
 installPostOpen()
-markCanRecord()
 
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let Hooks = {}
 
 Hooks.NoteAttach = NoteAttach
 Hooks.NoteDrop = NoteDrop
-Hooks.NoteRecord = NoteRecord
 
 Hooks.clipCopy = {
   mounted() {

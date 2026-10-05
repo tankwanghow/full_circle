@@ -109,6 +109,15 @@ defmodule FullCircle.NotesAttachmentsTest do
       assert String.ends_with?(att.path, ".ogg")
     end
 
+    test "an mp3 (ID3 tag or bare frame) is audio/mpeg, stored as .mp3", ctx do
+      assert {:ok, att} = put(ctx, mp3_file(:id3, 64), "video")
+      assert att.content_type == "audio/mpeg"
+      assert String.ends_with?(att.path, ".mp3")
+      assert Attachments.kind(att) == :audio
+      assert {:ok, %{content_type: "audio/mpeg"}} = put(ctx, mp3_file(:frame, 64))
+      assert {:error, {:too_large, 5_000_000}} = put(ctx, mp3_file(:id3, 6_000_000))
+    end
+
     test "a hint never makes a non-media file acceptable", ctx do
       assert {:error, :unsupported_type} = put(ctx, text_file(), "video")
       assert {:error, :unsupported_type} = put(ctx, text_file(), "audio")

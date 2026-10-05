@@ -19,6 +19,15 @@ the app**, small enough to upload in seconds on a phone and to keep forever.
 
 Photos and PDFs are unchanged (10 MB, existing flow).
 
+## Amendment 2026-10-05 (user, after the first build)
+
+Recording is **only on the 📱 phone page**. The desktop shows no ⏺/🎙
+buttons; video and audio files are attached through 📎 / drop / paste like
+any other file, with **the same limits** (video ≤ 60 s and 15 MB, audio
+≤ 180 s and 5 MB), checked in the browser before upload; mp3 is accepted
+too. Raw camera video is refused by design (option A); new footage goes
+through the phone recorder.
+
 ## Size limits (per kind)
 
 | Kind | Max bytes | Why |

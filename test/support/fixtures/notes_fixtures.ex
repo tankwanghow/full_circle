@@ -37,6 +37,12 @@ defmodule FullCircle.NotesFixtures do
 
   def ogg_file(bytes \\ 64), do: tmp_file(".ogg", "OggS" <> :binary.copy(<<0>>, bytes))
 
+  # An mp3 starts with an ID3 tag, or straight at an MPEG audio frame header.
+  def mp3_file(:id3, bytes), do: tmp_file(".mp3", "ID3" <> :binary.copy(<<0>>, bytes))
+
+  def mp3_file(:frame, bytes),
+    do: tmp_file(".mp3", <<0xFF, 0xFB, 0x90>> <> :binary.copy(<<0>>, bytes))
+
   def big_file(bytes),
     do: tmp_file(".jpg", <<0xFF, 0xD8, 0xFF, 0xE0>> <> :binary.copy(<<0>>, bytes))
 

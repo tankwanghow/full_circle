@@ -1,14 +1,14 @@
-// In-app recording for notes: ⏺ Video (≤ 60 s) and 🎙 Audio (≤ 180 s).
-// Record → preview → Send / Retake / Cancel. Send uploads through the same
-// plain-HTTP path as 📎 (note_attach.js), with a `kind` field so the server
-// can type a WebM, which holds either. No transcoding and no library:
-// MediaRecorder records at the target quality (480p ~1 Mbit/s, 64 kbit/s).
+// In-app recording for notes, on the 📱 phone page only (phone_upload.js):
+// ⏺ Video (≤ 60 s) and 🎙 Audio (≤ 180 s). The desktop has no recorder; it
+// attaches media files through 📎 (note_attach.js). Record → preview → Send /
+// Retake / Cancel. Send uploads like any phone file, with a `kind` field so
+// the server can type a WebM, which holds either. No transcoding and no
+// library: MediaRecorder records at the target quality (480p ~1 Mbit/s,
+// 64 kbit/s).
 //
 // The overlay lives on document.body, outside every LiveView container, so a
 // re-render cannot destroy a recording in progress. Every exit path stops the
 // camera/mic tracks (the camera light goes off).
-import { announce, listenDone, postFile } from "./note_attach"
-
 // mp4 first: MediaRecorder's WebM has no duration or cues, so its seek bar is
 // broken in many browsers. Firefox only offers WebM/Ogg.
 const MIME = {
@@ -289,29 +289,4 @@ export function openRecorder({ kind, maxSeconds, maxBytes, send, onDone }) {
   }
 
   open()
-}
-
-// On `record_buttons/1`: one hook for both buttons, which carry their kind's
-// limits. Finishing announces `note-attach:done` like NoteAttach, so the
-// component holding the buttons refreshes its files.
-export const NoteRecord = {
-  mounted() {
-    listenDone(this)
-    this.el.addEventListener("click", e => {
-      const btn = e.target.closest("button[data-kind]")
-      if (!btn) return
-      e.preventDefault()
-      const kind = btn.dataset.kind
-      // The address as of now, like 📎: a box that is saved meanwhile
-      // forwards its tray's files to the note.
-      const url = this.el.dataset.url
-      openRecorder({
-        kind,
-        maxSeconds: parseInt(btn.dataset.maxSeconds, 10),
-        maxBytes: parseInt(btn.dataset.maxBytes, 10),
-        send: (file, onProgress) => postFile(url, file, { fields: { kind }, onProgress }),
-        onDone: () => announce(this)
-      })
-    })
-  }
 }

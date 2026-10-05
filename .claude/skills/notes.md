@@ -134,7 +134,8 @@ recordings: `docs/superpowers/specs/2026-10-05-note-video-audio-design.md`.
 
 **Types (`sniff/2`, first 32 bytes).** JPEG, PNG, WebP, PDF, and recordings:
 mp4 (`ftyp` at bytes 4..8; brand `M4A ` → `audio/mp4`), WebM (`1A 45 DF A3`),
-Ogg (`OggS` → always `audio/ogg`). mp4 and WebM hold either audio or video,
+Ogg (`OggS` → always `audio/ogg`), mp3 (`ID3`, or a bare MPEG frame header
+→ `audio/mpeg`, for desktop files). mp4 and WebM hold either audio or video,
 so the upload's `kind` form field (`"audio"`, else video) picks the type —
 Chrome's `audio/mp4` has brand `isom`, not `M4A `, so the hint is needed for
 mp4 too. The hint never makes a non-media file acceptable. HEIC/AVIF photos
@@ -154,8 +155,9 @@ video, plus overhead); then the per-kind cap `Attachments.max_bytes/1`:
 image/PDF 10 MB (`max_bytes/0`), video 15 MB, audio 5 MB. `store/4` sniffs
 first, then `File.stat/1`s against the sniffed kind's cap (422 "File is
 larger than N MB." from `{:too_large, max}`); the browser checks the same
-numbers first (`data-max-bytes` on 📎, on each record button, and on the
-phone page). Scan pages have their own literal 10 MB in
+numbers first (`data-max-bytes` on 📎 and the drop tray for photos/PDF;
+`media_limits/0`'s `data-max-{video,audio}-{bytes,seconds}` on the same two
+for media files; the recorder's own limits on the phone page). Scan pages have their own literal 10 MB in
 `Scans.add_page/3`, and the built scan PDF must fit `max_bytes/0`. Raising
 a limit means the cap, `endpoint.ex`, and checking nginx's 50M still
 covers it.
@@ -279,11 +281,21 @@ always `accept-ranges: bytes`; one `bytes=a-b` / `a-` / `-n` → 206 with
 iPhone Safari will not play a video at all without 206, and every browser
 needs it to seek. Applies to every file.
 
-**Recorder (`assets/js/note_record.js`).** `record_buttons/1` (⏺ Video,
-🎙 Audio; hook `NoteRecord`) sits beside every `attach_button/1` with the
-same `url`, and the phone page has `#pu-video`/`#pu-audio`. Each button
-carries `data-kind`, `data-max-bytes`, `data-max-seconds`
-(`Attachments.max_seconds/1`: 60 / 180). They are CSS-hidden until
+**Where media comes from (user's decision, 2026-10-05).** Recording happens
+**only on the 📱 phone page** (after the QR scan). The desktop has no
+⏺/🎙 buttons: video and audio files are attached through 📎, drop or paste
+like any other file. `note_attach.js` `prepare/2` sends them as they are
+(no shrinking) with a `kind` field taken from the file's type or extension
+(so an Android `.m4a` with brand `isom` is stored as audio), after checking
+size and length against `media_limits/0` (length read from a
+`preload=metadata` element; unreadable → only the server's size cap
+applies). Same limits as the recorder (option A): raw camera video
+(60–130 MB/min) is refused; WhatsApp-forwarded clips usually fit.
+
+**Recorder (`assets/js/note_record.js`, phone page only).** The phone page
+has `#pu-video`/`#pu-audio`, each carrying `data-kind`, `data-max-bytes`,
+`data-max-seconds` (`Attachments.max_seconds/1`: 60 / 180). They are
+CSS-hidden until
 `markCanRecord()` puts `can-record` on `<html>` (custom variant
 `can-record:` in `app.css`) — `<html>` is outside LiveView, so a re-render
 cannot hide them again. Camera/mic need a secure context: on plain-HTTP dev
@@ -301,9 +313,7 @@ over the LAN the buttons never show; `localhost` works.
   audio; no transcoding. The chosen mime is logged (`note recorder: …`).
   Headless Chrome 2026-10 picks `video/mp4` and `audio/mp4` (both brand
   `isom`).
-- Desktop Send goes through `postFile(url, file, {fields: {kind}})` in
-  `note_attach.js` with % progress, then `announce`s `note-attach:done`
-  like `NoteAttach`. On the phone, Send closes the overlay and hands the
+- On the phone, Send closes the overlay and hands the
   file to `sendFile(file, kind)`, so the sent list shows 🎬/🎙, progress
   and ↻ retry. A blob over the kind's cap gets a message and no Send.
 - Checking it without a phone: headless Chrome with

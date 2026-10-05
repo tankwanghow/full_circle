@@ -13,12 +13,13 @@ defmodule FullCircle.Notes.Attachments do
 
   @max_bytes 10_000_000
   @content_types ~w(image/jpeg image/png image/webp application/pdf
-                    video/mp4 video/webm audio/mp4 audio/webm audio/ogg)
+                    video/mp4 video/webm audio/mp4 audio/webm audio/ogg audio/mpeg)
 
-  # Recordings are made in the app (note_record.js) at 480p ~1 Mbit/s or
-  # 64 kbit/s audio; the caps are those rates times the time limits, plus
-  # encoder overshoot. The recorder enforces the time; the size cap is what
-  # protects the disk.
+  # Recordings are made on the phone page (note_record.js) at 480p ~1 Mbit/s
+  # or 64 kbit/s audio; the caps are those rates times the time limits, plus
+  # encoder overshoot. Desktop 📎 media files get the same limits, checked in
+  # the browser before upload (note_attach.js). The size cap is what protects
+  # the disk; nothing here reads a file's duration.
   @max_bytes_by_kind %{video: 15_000_000, audio: 5_000_000}
   @max_seconds %{video: 60, audio: 180}
 
@@ -289,6 +290,15 @@ defmodule FullCircle.Notes.Attachments do
       {:ok, <<"OggS", _::binary>>} ->
         {:ok, "audio/ogg"}
 
+      # mp3: an ID3 tag, or a bare MPEG audio frame (11 sync bits, layer not
+      # reserved). JPEG's FF D8 fails the sync bits, so it never lands here.
+      {:ok, <<"ID3", _::binary>>} ->
+        {:ok, "audio/mpeg"}
+
+      {:ok, <<0xFF, b, _::binary>>}
+      when Bitwise.band(b, 0xE0) == 0xE0 and Bitwise.band(b, 0x06) != 0 ->
+        {:ok, "audio/mpeg"}
+
       {:ok, _} ->
         {:error, :unsupported_type}
 
@@ -377,6 +387,7 @@ defmodule FullCircle.Notes.Attachments do
   defp ext("video/webm"), do: ".webm"
   defp ext("audio/webm"), do: ".webm"
   defp ext("audio/ogg"), do: ".ogg"
+  defp ext("audio/mpeg"), do: ".mp3"
 
   def uploads_dir, do: Application.get_env(:full_circle, :uploads_dir)
 end
