@@ -467,24 +467,35 @@ A pick reaches the box through `RecordPickerComponent`'s `notify`:
   reaches this LiveView's `remove_attachment` directly.
 - History (`#toggle-history`, `#note-history`) lists versions with the same
   per-version filter as `list_versions/3`.
-- Thread, top to bottom: `#replying-to` (reply pages only: the root as a
-  post in `#replying-to-post` with its own `#toggle-root-history` →
-  `#root-history`; `#replying-to-gone` when the root is deleted or hidden),
-  `#thread-before` (earlier replies), the note itself, `#thread-after`
-  (later replies; all replies on a root page), the reply box (composer
-  `id="reply"`, root `#reply-box`, form `#reply-form`, `reply_to` = the
-  root; hidden without `:create_note` or when the root is gone), and
-  `#linked-from` (notes that only link here, `relation: :linked`). Thread
-  items are `#thread-<id>` with `host={"Note", root_id}` so they carry no
-  "↩ reply to" tag. A posted reply sends `{:composer, "reply", …}` and the
-  page reloads the thread and 💬 count. The history markup is one private
-  `history_list/1` for both the note and the root.
-- On a reply page the note itself (post or edit box) sits in `#focus-note`
-  with `phx-hook="ScrollToNote"` (`assets/js/app.js`): it jumps the reply
-  to the middle of the screen and adds `.note-arrived` (3s amber fade,
-  `assets/css/app.css`). Root pages get no hook — the note is already on
-  top. The wrapper stays put across Edit/Cancel, so the flash plays once
-  per page load.
+- **One page per conversation: the root's.** `/notes/:reply` renders the
+  root's page (`NoteLive.Form.thread_page/3`) with `focus_id` = the reply;
+  `/notes/:reply/edit` opens that reply's edit box in place. Opening replies
+  never stacks pages (it used to: each reply had its own page with a
+  "Replying to" box, and users read it as replies nesting deeper and
+  deeper). Only a reply whose root is deleted or hidden is its own page,
+  with `#replying-to-gone` on top, no thread and no reply box.
+- Page, top to bottom: the note (`#note-post`, or the edit box), its
+  history, `#replies` ("n replies"), the reply box (composer `id="reply"`,
+  form `#reply-form`, placeholder "Reply to ‹display_title›…", hidden
+  without `:create_note` or on an orphan reply), `#linked-from` (notes that
+  only link here, `relation: :linked`).
+- Replies are compact comments, `reply_item/1` (`#reply-<id>`,
+  `data-reply`): small avatar, name · full time · "edited", title, body,
+  links of their own (a link back to the root is dropped), files. They
+  never repeat the subject chip, the visibility or "↩ reply to", because a
+  reply always shares its root's subject and visibility. Actions per reply,
+  from `Notes.rights/2` (no per-row query): `#edit-reply-<id>` (composer
+  `id="reply-edit"`, form `#reply-edit-form`, a snapshot taken at Edit as
+  with the note, so a stale save still reports), 📎, 📱,
+  `#toggle-reply-history-<id>` → `#reply-history-<id>` (one open at a
+  time), and `#delete-reply-<id>`. `remove_attachment` accepts files on the
+  note or on any reply the user may edit. The page subscribes
+  `NoteFiles.listen_self` for every reply, so a phone upload to a reply
+  shows. `Notes.thread/3` preloads `updated_by` for the "edited by" line.
+- The reply the page was opened on carries `phx-hook="ScrollToNote"`
+  (`assets/js/app.js`): it jumps the reply to the middle of the screen and
+  adds `.note-arrived` (3s amber fade, `assets/css/app.css`). A root's own
+  URL gets no hook.
   - The hook waits **two** animation frames. After a live `navigate`,
     LiveView's `Browser.pushState` calls `window.scroll(0, 0)` in a frame of
     its own; a scroll made on `mounted()` or one frame later gets undone.

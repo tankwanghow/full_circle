@@ -774,7 +774,7 @@ defmodule FullCircle.Notes do
         order_by: [asc: n.inserted_at, asc: n.id]
       )
       |> Repo.all()
-      |> Repo.preload([:author, :attachments])
+      |> Repo.preload([:author, :updated_by, :attachments])
 
     details = feed_details(notes, company, user)
     Enum.map(notes, &%{id: &1.id, note: &1, d: Map.fetch!(details, &1.id)})

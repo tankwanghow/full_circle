@@ -549,7 +549,7 @@ defmodule FullCircleWeb.NoteLiveTest do
       |> render_submit()
 
       assert render(lv) =~ "confirmed with SSM search"
-      assert has_element?(lv, "#thread-after", "confirmed with SSM search")
+      assert has_element?(lv, "#replies", "confirmed with SSM search")
       # The post's 💬 count follows the thread.
       assert has_element?(lv, "#note-post .note-replies", "1")
 
@@ -747,7 +747,7 @@ defmodule FullCircleWeb.NoteLiveTest do
       assert html =~ "v1"
     end
 
-    test "a reply's page shows the root, earlier replies, the reply, later replies",
+    test "opening a reply shows its whole thread: the root on top, every reply below in order",
          %{conn: conn, admin: admin, comp: comp} do
       root = note_fixture(comp, admin, %{"title" => "Genset", "body" => "broke down"})
 
@@ -768,16 +768,21 @@ defmodule FullCircleWeb.NoteLiveTest do
         set: [inserted_at: ~U[2099-01-01 00:00:00Z]]
       )
 
-      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{b.id}")
-      assert has_element?(lv, "#replying-to-post", "broke down")
-      assert has_element?(lv, "#thread-before #thread-#{a.id}")
-      assert has_element?(lv, "#note-post", "second")
-      assert has_element?(lv, "#thread-after #thread-#{c.id}")
-      refute has_element?(lv, "#thread-before #thread-#{b.id}")
-      refute has_element?(lv, "#thread-after #thread-#{b.id}")
+      {:ok, lv, html} = live(conn, ~p"/companies/#{comp.id}/notes/#{b.id}")
+      # The page is the root's: no separate "Replying to" box, no reply page.
+      assert has_element?(lv, "#note-post", "broke down")
+      refute has_element?(lv, "#replying-to")
+
+      ids =
+        html
+        |> LazyHTML.from_document()
+        |> LazyHTML.query("#replies [data-reply]")
+        |> Enum.map(&(LazyHTML.attribute(&1, "id") |> hd()))
+
+      assert ids == ["reply-#{a.id}", "reply-#{b.id}", "reply-#{c.id}"]
     end
 
-    test "a reply's page scrolls to and highlights the reply; a root's page does not",
+    test "the opened reply is scrolled to and highlighted; a root's page scrolls nowhere",
          %{conn: conn, admin: admin, comp: comp} do
       root = note_fixture(comp, admin, %{"body" => "genset"})
 
@@ -785,11 +790,31 @@ defmodule FullCircleWeb.NoteLiveTest do
         FullCircle.Notes.create_note(%{"body" => "fixed", "reply_to_id" => root.id}, comp, admin)
 
       {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{reply.id}")
-      assert has_element?(lv, ~s(#focus-note[phx-hook="ScrollToNote"] #note-post))
+      assert has_element?(lv, ~s(#reply-#{reply.id}[phx-hook="ScrollToNote"]))
 
       {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{root.id}")
-      assert has_element?(lv, "#note-post")
+      assert has_element?(lv, "#reply-#{reply.id}")
       refute has_element?(lv, ~s([phx-hook="ScrollToNote"]))
+    end
+
+    test "replies are compact: no record chip or reply-to tag repeated on each",
+         %{conn: conn, admin: admin, comp: comp} do
+      contact = contact_fixture(comp, admin, %{"name" => "Ah Seng"})
+
+      root =
+        note_fixture(comp, admin, %{
+          "body" => "genset",
+          "subject_type" => "Contact",
+          "subject_id" => contact.id
+        })
+
+      {:ok, reply} =
+        FullCircle.Notes.create_note(%{"body" => "fixed", "reply_to_id" => root.id}, comp, admin)
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{root.id}")
+      assert has_element?(lv, "#reply-#{reply.id}", "fixed")
+      refute has_element?(lv, "#reply-#{reply.id} .note-reply-to")
+      refute has_element?(lv, "#reply-#{reply.id}", "Ah Seng")
     end
 
     test "a reply that also links to its note shows once, in the thread",
@@ -804,12 +829,12 @@ defmodule FullCircleWeb.NoteLiveTest do
       {:ok, _} = FullCircle.Notes.add_link(other, "Note", root.id, comp, admin)
 
       {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{root.id}")
-      assert has_element?(lv, "#thread-after #thread-#{reply.id}")
+      assert has_element?(lv, "#replies #reply-#{reply.id}")
       refute has_element?(lv, "#linked-#{reply.id}")
       assert has_element?(lv, "#linked-#{other.id}")
     end
 
-    test "editing a reply keeps the root card and earlier replies; root history toggles without losing text",
+    test "a reply edits in place in the thread; the root's history toggles without losing text",
          %{conn: conn, admin: admin, comp: comp} do
       root = note_fixture(comp, admin, %{"body" => "v1"})
       {:ok, root} = FullCircle.Notes.update_note(root, %{"body" => "v2"}, comp, admin)
@@ -821,14 +846,70 @@ defmodule FullCircleWeb.NoteLiveTest do
           admin
         )
 
-      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{r.id}/edit")
-      assert has_element?(lv, "#note-form")
-      assert has_element?(lv, "#replying-to-post", "v2")
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{root.id}")
+      lv |> element("#edit-reply-#{r.id}") |> render_click()
+      assert has_element?(lv, "#reply-#{r.id} #reply-edit-form")
 
-      lv |> form("#note-form", %{"note" => %{"body" => "half typed"}}) |> render_change()
-      html = lv |> element("#toggle-root-history") |> render_click()
+      lv |> form("#reply-edit-form", %{"note" => %{"body" => "half typed"}}) |> render_change()
+      html = lv |> element("#toggle-history") |> render_click()
       assert html =~ "v1"
-      assert has_element?(lv, "#note-form textarea", "half typed")
+      assert has_element?(lv, "#reply-edit-form textarea", "half typed")
+
+      lv |> form("#reply-edit-form", %{"note" => %{"body" => "reworded"}}) |> render_submit()
+      refute has_element?(lv, "#reply-edit-form")
+      assert has_element?(lv, "#reply-#{r.id}", "reworded")
+      assert has_element?(lv, "#note-post", "v2")
+    end
+
+    test "/notes/:reply/edit opens the thread with that reply in edit mode",
+         %{conn: conn, admin: admin, comp: comp} do
+      root = note_fixture(comp, admin, %{"body" => "genset"})
+
+      {:ok, r} =
+        FullCircle.Notes.create_note(%{"body" => "fixed", "reply_to_id" => root.id}, comp, admin)
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{r.id}/edit")
+      assert has_element?(lv, "#note-post", "genset")
+      assert has_element?(lv, "#reply-#{r.id} #reply-edit-form")
+      refute has_element?(lv, "#note-form")
+    end
+
+    test "a reply's history and delete live on the reply",
+         %{conn: conn, admin: admin, comp: comp} do
+      root = note_fixture(comp, admin, %{"body" => "genset"})
+
+      {:ok, r} =
+        FullCircle.Notes.create_note(%{"body" => "r v1", "reply_to_id" => root.id}, comp, admin)
+
+      {:ok, _} = FullCircle.Notes.update_note(r, %{"body" => "r v2"}, comp, admin)
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{root.id}")
+      html = lv |> element("#toggle-reply-history-#{r.id}") |> render_click()
+      assert html =~ "r v1"
+
+      lv |> element("#delete-reply-#{r.id}") |> render_click()
+      refute has_element?(lv, "#reply-#{r.id}")
+      assert has_element?(lv, "#note-post", "genset")
+    end
+
+    test "a clerk sees no edit or delete on someone else's reply",
+         %{admin: admin, comp: comp} do
+      clerk = user_with_role(comp, admin, "clerk")
+      root = note_fixture(comp, admin, %{"body" => "genset"})
+
+      {:ok, r} =
+        FullCircle.Notes.create_note(
+          %{"body" => "admin's", "reply_to_id" => root.id},
+          comp,
+          admin
+        )
+
+      {:ok, lv, _} =
+        live(log_in_user(build_conn(), clerk), ~p"/companies/#{comp.id}/notes/#{root.id}")
+
+      assert has_element?(lv, "#reply-#{r.id}", "admin's")
+      refute has_element?(lv, "#edit-reply-#{r.id}")
+      refute has_element?(lv, "#delete-reply-#{r.id}")
     end
 
     test "a reply whose root was deleted says so and offers no reply box",

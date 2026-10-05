@@ -321,6 +321,7 @@ defmodule FullCircleWeb.NoteComponents do
   @avatar_colors ~w(bg-indigo-500 bg-teal-600 bg-amber-600 bg-rose-500 bg-sky-600 bg-emerald-600 bg-violet-500 bg-orange-500)
 
   attr :email, :string, required: true
+  attr :small, :boolean, default: false, doc: "the size used for replies in a thread"
 
   def avatar(assigns) do
     local = assigns.email |> to_string() |> String.split("@") |> hd()
@@ -334,7 +335,8 @@ defmodule FullCircleWeb.NoteComponents do
 
     ~H"""
     <div class={[
-      "flex h-10 w-10 flex-none items-center justify-center rounded-full text-sm font-bold text-white",
+      "flex flex-none items-center justify-center rounded-full font-bold text-white",
+      if(@small, do: "h-8 w-8 text-xs", else: "h-10 w-10 text-sm"),
       @color
     ]}>
       {@initials}
