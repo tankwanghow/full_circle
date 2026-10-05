@@ -2758,3 +2758,21 @@ msgstr "暂无进度。"
 
 msgid "Write progress…"
 msgstr "填写进度…"
+
+msgid "Video"
+msgstr "视频"
+
+msgid "Audio"
+msgstr "语音"
+
+msgid "Record a video"
+msgstr "录制视频"
+
+msgid "Record a voice note"
+msgstr "录制语音"
+
+msgid "File is larger than %{mb} MB."
+msgstr "文件大于 %{mb} MB。"
+
+msgid "Only JPEG, PNG, WebP images, PDF files and recordings are allowed."
+msgstr "只允许 JPEG、PNG、WebP 图片、PDF 文件和录音录像。"

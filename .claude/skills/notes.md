@@ -129,7 +129,19 @@ LiveView uploads — phones lose socket uploads when the camera backgrounds the
 page. Type sniffed from magic bytes. **Removal from a saved note hides the
 file** (`get_readable/3` filters `removed_at`) but keeps it on disk — a
 removed file is usually the wrong upload, so an old link must not keep
-serving it. Spec: `docs/superpowers/specs/2026-10-04-note-attach-from-phone-design.md`.
+serving it. Spec: `docs/superpowers/specs/2026-10-04-note-attach-from-phone-design.md`;
+recordings: `docs/superpowers/specs/2026-10-05-note-video-audio-design.md`.
+
+**Types (`sniff/2`, first 32 bytes).** JPEG, PNG, WebP, PDF, and recordings:
+mp4 (`ftyp` at bytes 4..8; brand `M4A ` → `audio/mp4`), WebM (`1A 45 DF A3`),
+Ogg (`OggS` → always `audio/ogg`). mp4 and WebM hold either audio or video,
+so the upload's `kind` form field (`"audio"`, else video) picks the type —
+Chrome's `audio/mp4` has brand `isom`, not `M4A `, so the hint is needed for
+mp4 too. The hint never makes a non-media file acceptable. HEIC/AVIF photos
+are `ftyp` too: their brands (`@image_brands`) are refused, not taken for
+video. The hint travels as `kind` in the upload map
+(`NoteAttachmentController.upload/2`, used by `create`, `create_tray` and
+the phone's `/files`).
 
 **Size limits, in the order a request meets them.** Prod nginx
 `client_max_body_size` must be set at **server** level (50M): without it
@@ -137,11 +149,16 @@ nginx's 1 MB default answers 413 before Phoenix sees the request. Photos are
 downscaled in the browser first, so they pass and only PDFs fail; this hit
 prod on 2026-10-05, whose nginx conf is hand-kept (it has a WebDAV `/docs`
 location) and not generated from `deploy_to_linode/`. Then `Plug.Parsers`
-multipart `length: 12_000_000` (`endpoint.ex`, 10 MB file plus overhead);
-then `Attachments.max_bytes/0` = 10 MB per file, checked in the browser
-(`note_attach.js`) and by `File.stat/1` on the server (422 with a message).
-Scan pages have their own literal 10 MB in `Scans.add_page/3`, and the
-built scan PDF must fit `max_bytes/0`. Raising the limit means all four.
+multipart `length: 17_000_000` (`endpoint.ex`: the largest cap, a 15 MB
+video, plus overhead); then the per-kind cap `Attachments.max_bytes/1`:
+image/PDF 10 MB (`max_bytes/0`), video 15 MB, audio 5 MB. `store/4` sniffs
+first, then `File.stat/1`s against the sniffed kind's cap (422 "File is
+larger than N MB." from `{:too_large, max}`); the browser checks the same
+numbers first (`data-max-bytes` on 📎, on each record button, and on the
+phone page). Scan pages have their own literal 10 MB in
+`Scans.add_page/3`, and the built scan PDF must fit `max_bytes/0`. Raising
+a limit means the cap, `endpoint.ex`, and checking nginx's 50M still
+covers it.
 Uploads go through `send()` in `note_attach.js` (XHR, used by the phone page
 too), because `fetch` cannot report upload progress: the box shows
 "Uploading… N%" then "Saving…", the phone row "⏳ N%".
@@ -160,7 +177,7 @@ hard-deletes the tray's files (`Trays.cancel/3`). A saved tray follows: a
 late phone upload attaches to its note; a cancelled one answers 409
 "closed". `TrayPruner` deletes trays and scan folders older than 24 h. Files
 already on a note keep the immediate soft remove (✕ on `#note-files`).
-- **Never trust the tray as read.** An upload copies the file (up to 10 MB)
+- **Never trust the tray as read.** An upload copies the file (up to 15 MB)
   *after* reading the tray, so Save/Cancel can commit in between. The insert
   goes through `Attachments.store_in_tray/4`, which re-reads the tray row
   `FOR SHARE` (claim and cancel take `FOR UPDATE`) and lands in the open
@@ -239,11 +256,59 @@ tray (`Trays.open/3`) before `attach_to_tray/4`, as the route does.
 
 **Templates never build file addresses or read `content_type`.** Get the
 address from `Attachments.url(att, :original | :thumb)` and choose how to show
-a file by `Attachments.kind(att)` (`:image | :pdf | :other`), normally via the
-`file_thumb/1` component. `:thumb` is the original for images and a PDF's
-rendered first page for PDFs (`?variant=thumb`) — that function, `kind/1`
-and `file_thumb/1` are where further renditions, video posters and audio
-slot in.
+a file by `Attachments.kind(att)` (`:image | :pdf | :video | :audio |
+:other`), normally via `file_grid/1` / `file_thumb/1`. `:thumb` is the
+original for images and a PDF's rendered first page for PDFs
+(`?variant=thumb`); video and audio have no preview (`thumb_file/1` →
+`:no_preview`, 404 — no ffmpeg on the server), so `file_thumb/1` shows a ▶
+or 🎙 tile.
+
+**Recordings play in place.** `file_grid/1` renders video/audio as players
+(`media_player/1`), not `data-viewer` links: `<video controls playsinline
+preload="metadata" src={url <> "#t=0.1"}>` (the fragment makes iPhone Safari
+show a first frame instead of black) and `<audio controls>` under a 🎙 name
+line. The player wrapper carries `data-no-post-open`, or a tap on the
+controls would open the note (`post_open.js`). A video's name bar sits at
+the top while editing (its controls fill the bottom); ✕ works as for any
+file. The tray shows the same players before Save.
+
+**Downloads honour HTTP Range** (`NoteAttachmentController.send_ranged/2`):
+always `accept-ranges: bytes`; one `bytes=a-b` / `a-` / `-n` → 206 with
+`content-range` and `send_file/5` offset+length; a start past the end (or
+`-0`) → 416 with `bytes */size`; several ranges or junk → the whole 200.
+iPhone Safari will not play a video at all without 206, and every browser
+needs it to seek. Applies to every file.
+
+**Recorder (`assets/js/note_record.js`).** `record_buttons/1` (⏺ Video,
+🎙 Audio; hook `NoteRecord`) sits beside every `attach_button/1` with the
+same `url`, and the phone page has `#pu-video`/`#pu-audio`. Each button
+carries `data-kind`, `data-max-bytes`, `data-max-seconds`
+(`Attachments.max_seconds/1`: 60 / 180). They are CSS-hidden until
+`markCanRecord()` puts `can-record` on `<html>` (custom variant
+`can-record:` in `app.css`) — `<html>` is outside LiveView, so a re-render
+cannot hide them again. Camera/mic need a secure context: on plain-HTTP dev
+over the LAN the buttons never show; `localhost` works.
+- `openRecorder` is an overlay on `document.body` (outside LiveView, so a
+  re-render cannot kill a recording): live preview → ⏺ Record → countdown,
+  auto-stop at the limit → preview with Send / ↺ Retake / Cancel. Tracks
+  stop on entering preview (Retake asks for the camera again), on Cancel,
+  Esc, errors and Send. Errors (denied, no device, busy) show in the overlay.
+- **mp4 is preferred over WebM**: MediaRecorder's WebM has no duration or
+  cues, so its seek bar is broken in many browsers. Order: video
+  `video/mp4;codecs=avc1,mp4a`, `video/mp4`, `video/webm;codecs=vp9,opus`,
+  `video/webm`; audio `audio/mp4`, `audio/webm;codecs=opus`, `audio/webm`,
+  `audio/ogg;codecs=opus`. 1 Mbit/s video at 854×480 ideal, 64 kbit/s
+  audio; no transcoding. The chosen mime is logged (`note recorder: …`).
+  Headless Chrome 2026-10 picks `video/mp4` and `audio/mp4` (both brand
+  `isom`).
+- Desktop Send goes through `postFile(url, file, {fields: {kind}})` in
+  `note_attach.js` with % progress, then `announce`s `note-attach:done`
+  like `NoteAttach`. On the phone, Send closes the overlay and hands the
+  file to `sendFile(file, kind)`, so the sent list shows 🎬/🎙, progress
+  and ↻ retry. A blob over the kind's cap gets a message and no Send.
+- Checking it without a phone: headless Chrome with
+  `--use-fake-device-for-media-stream --use-fake-ui-for-media-stream` on a
+  `localhost` page records real mp4s.
 
 **PDF previews:** `Attachments.thumb_file/1` renders page 1 with `pdftoppm`
 (poppler-utils — already in the prod Docker image) on the first request and
