@@ -131,6 +131,21 @@ file** (`get_readable/3` filters `removed_at`) but keeps it on disk — a
 removed file is usually the wrong upload, so an old link must not keep
 serving it. Spec: `docs/superpowers/specs/2026-10-04-note-attach-from-phone-design.md`.
 
+**Size limits, in the order a request meets them.** Prod nginx
+`client_max_body_size` must be set at **server** level (50M): without it
+nginx's 1 MB default answers 413 before Phoenix sees the request. Photos are
+downscaled in the browser first, so they pass and only PDFs fail; this hit
+prod on 2026-10-05, whose nginx conf is hand-kept (it has a WebDAV `/docs`
+location) and not generated from `deploy_to_linode/`. Then `Plug.Parsers`
+multipart `length: 12_000_000` (`endpoint.ex`, 10 MB file plus overhead);
+then `Attachments.max_bytes/0` = 10 MB per file, checked in the browser
+(`note_attach.js`) and by `File.stat/1` on the server (422 with a message).
+Scan pages have their own literal 10 MB in `Scans.add_page/3`, and the
+built scan PDF must fit `max_bytes/0`. Raising the limit means all four.
+Uploads go through `send()` in `note_attach.js` (XHR, used by the phone page
+too), because `fetch` cannot report upload progress: the box shows
+"Uploading… N%" then "Saving…", the phone row "⏳ N%".
+
 **Tray (hold until Save).** Every write box (`ComposerComponent`) owns a
 `tray_id`, fresh on each open/Save/Cancel (`reset/1` → `new_tray/1`). Files
 picked (📎 `#{id}-attach`, several at once), dropped or pasted (`NoteDrop`
@@ -162,6 +177,11 @@ already on a note keep the immediate soft remove (✕ on `#note-files`).
   invalid changeset *before* its "nothing changed" check: `validate_required`
   drops the blanked field from `changes`, so an invalid edit used to look
   like a no-op and returned `{:ok, current}`.
+- **Errors sit by their cause.** Title errors in `#{id}-title-errors`, body
+  in `#{id}-body-errors`, each only once touched or saved (`used_input?`,
+  via `NoteComponents.field_errors/1`). Subject/link/visibility errors and
+  `@error` (stale, picker) sit by the chips (`#{id}-record-errors`,
+  `#{id}-error`) and `@error` clears on the next edit.
 
 **Phone (`/up/:token`).** `FullCircleWeb.PhoneUpload` signs `{:tray | :note,
 id}` + company + user + label; 600 s idle — every success returns a fresh
