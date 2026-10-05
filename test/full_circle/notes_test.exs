@@ -378,6 +378,46 @@ defmodule FullCircle.NotesTest do
                [{"about", :about}, {"linked", :linked}]
     end
 
+    test "notes_for_record limit: newest n across about and linked notes",
+         %{admin: admin, company: company, contact: c} do
+      at = fn note, min ->
+        from(n in FullCircle.Notes.Note, where: n.id == ^note.id)
+        |> Repo.update_all(
+          set: [inserted_at: DateTime.add(~U[2026-10-01 00:00:00Z], min, :minute)]
+        )
+      end
+
+      about = fn body ->
+        note_fixture(company, admin, %{
+          "body" => body,
+          "subject_type" => "Contact",
+          "subject_id" => c.id
+        })
+      end
+
+      linked = fn body ->
+        n = note_fixture(company, admin, %{"body" => body})
+        {:ok, _} = Notes.add_link(n, "Contact", c.id, company, admin)
+        n
+      end
+
+      at.(about.("a1"), 1)
+      at.(linked.("l2"), 2)
+      at.(about.("a3"), 3)
+      at.(linked.("l4"), 4)
+
+      both = about.("both5")
+      {:ok, _} = Notes.add_link(both, "Contact", c.id, company, admin)
+      at.(both, 5)
+
+      rows = Notes.notes_for_record("Contact", c.id, company, admin, limit: 3)
+
+      assert Enum.map(rows, &{&1.note.body, &1.relation}) ==
+               [{"both5", :about}, {"l4", :linked}, {"a3", :about}]
+
+      assert length(Notes.notes_for_record("Contact", c.id, company, admin)) == 5
+    end
+
     test "count_by_records respects visibility and counts each note once",
          %{admin: admin, company: company, contact: c, clerk: clerk} do
       c2 = contact_fixture(company, admin)

@@ -11,6 +11,9 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
   alias FullCircle.Notes.Attachments
   alias FullCircleWeb.NoteLive.{ComposerComponent, PhoneQrComponent}
 
+  # The panel shows the newest @page notes; "Show older" adds @page more.
+  @page 20
+
   # A composer finished: the quick-add box (`id`) or a note edited in place
   # (`id-edit`). Links on a saved note apply at once, so any edit reloads.
   # A file landed on one of the shown notes (FullCircleWeb.NoteFiles).
@@ -43,19 +46,21 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
       |> assign_new(:adding, fn -> false end)
       |> assign_new(:edit_note, fn -> nil end)
       |> assign_new(:heading, fn -> nil end)
+      |> assign_new(:limit, fn -> @page end)
 
     key = {socket.assigns.record_type, socket.assigns.record_id}
 
     if socket.assigns[:loaded_for] == key do
       {:ok, socket}
     else
-      {:ok, socket |> assign(loaded_for: key, adding: false) |> load()}
+      {:ok, socket |> assign(loaded_for: key, adding: false, limit: @page) |> load()}
     end
   end
 
   defp load(socket) do
     %{record_type: t, record_id: id, current_company: com, current_user: user} = socket.assigns
-    rows = Notes.notes_for_record(t, id, com, user)
+    rows = Notes.notes_for_record(t, id, com, user, limit: socket.assigns.limit)
+    total = Notes.count_by_records(com, user, t, [id]) |> Map.get(id, 0)
     details = Notes.feed_details(Enum.map(rows, & &1.note), com, user)
     # Every row is already visible, so edit rights need no per-note query.
     rights = Notes.rights(com, user)
@@ -74,7 +79,7 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
     for item <- items,
         do: FullCircleWeb.NoteFiles.listen({:note, item.id}, __MODULE__, socket.assigns.id)
 
-    assign(socket, items: items, can_create: rights.create)
+    assign(socket, items: items, total: max(total, length(items)), can_create: rights.create)
   end
 
   defp edit_id(id), do: "#{id}-edit"
@@ -90,6 +95,9 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
   @impl true
   def handle_event("new", _, socket), do: {:noreply, assign(socket, adding: true)}
   def handle_event("cancel", _, socket), do: {:noreply, assign(socket, adding: false)}
+
+  def handle_event("older", _, socket),
+    do: {:noreply, socket |> assign(limit: socket.assigns.limit + @page) |> load()}
 
   def handle_event("attachment_uploaded", _, socket), do: {:noreply, load(socket)}
 
@@ -147,7 +155,7 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
     >
       <div class="flex items-center gap-2 border-b border-gray-200 px-4 py-2 dark:border-gray-700">
         <span class="font-semibold">{@heading || "📝 #{label(@record_type, :heading)}"}</span>
-        <span class="text-sm text-gray-500">{length(@items)}</span>
+        <span class="text-sm text-gray-500">{@total}</span>
         <button
           :if={@can_create and !@adding}
           id={"#{@id}-new"}
@@ -265,6 +273,16 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
           </:actions>
         </.note_post>
       <% end %>
+      <button
+        :if={@total > length(@items)}
+        id={"#{@id}-older"}
+        type="button"
+        phx-click="older"
+        phx-target={@myself}
+        class="block w-full px-4 py-2 text-center text-sm text-sky-600 hover:bg-gray-50 dark:text-sky-400 dark:hover:bg-gray-800"
+      >
+        {gettext("Show older (%{n})", n: @total - length(@items))}
+      </button>
       <p :if={@items == []} class="px-4 py-3 text-sm text-gray-500">
         {label(@record_type, :empty)}
       </p>

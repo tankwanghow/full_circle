@@ -38,6 +38,39 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
     assert html =~ "linked"
   end
 
+  test "shows the newest 20, then Show older reveals the rest", %{
+    conn: conn,
+    admin: admin,
+    comp: comp,
+    contact: c
+  } do
+    import Ecto.Query
+
+    for i <- 1..23 do
+      n =
+        note_fixture(comp, admin, %{
+          "body" => "entry-#{String.pad_leading("#{i}", 2, "0")}",
+          "subject_type" => "Contact",
+          "subject_id" => c.id
+        })
+
+      from(x in FullCircle.Notes.Note, where: x.id == ^n.id)
+      |> FullCircle.Repo.update_all(
+        set: [inserted_at: DateTime.add(~U[2026-10-01 00:00:00Z], i, :minute)]
+      )
+    end
+
+    {:ok, lv, html} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
+    assert html =~ "entry-23"
+    assert html =~ "entry-04"
+    refute html =~ "entry-03"
+    assert has_element?(lv, "#notes-panel-older", "Show older (3)")
+
+    html = lv |> element("#notes-panel-older") |> render_click()
+    assert html =~ "entry-01"
+    refute has_element?(lv, "#notes-panel-older")
+  end
+
   test "quick-add creates a note about the record", %{conn: conn, comp: comp, contact: c} do
     {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
     lv |> element("#notes-panel-new") |> render_click()

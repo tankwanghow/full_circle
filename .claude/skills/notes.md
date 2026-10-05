@@ -251,6 +251,13 @@ visibility applied, two queries per call (record panels' 📝 counts). The
 feed's 💬 is different: live **replies** only (`feed_details/3`), a note that
 merely links here never counts.
 
+The record notes panel shows only the newest 20
+(`notes_for_record(..., limit: n)`, limited per side in SQL, then merged).
+"Show older (n)" adds 20 more each click. Its header count is
+`count_by_records/4`, not `length(items)`. A note that is about the record and
+also links to it is excluded from the linked query in SQL, not after it, so
+the linked side's limit counts only notes that will actually show.
+
 ## Replies (`reply_to_id`)
 Spec: `docs/superpowers/specs/2026-10-02-note-replies-design.md`.
 - A reply has `reply_to_id` = its thread's **root** (a note with no

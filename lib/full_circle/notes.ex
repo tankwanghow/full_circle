@@ -619,32 +619,49 @@ defmodule FullCircle.Notes do
     |> Repo.all()
   end
 
-  def notes_for_record(type, id, company, user) do
+  @doc """
+  Visible notes about, or linking to, one record, newest first, each once
+  (`relation: :about` wins over `:linked`). `limit: n` returns only the newest
+  n; the panel pages with it and asks `count_by_records/4` for the total.
+  """
+  def notes_for_record(type, id, company, user, opts \\ []) do
+    limit = Keyword.get(opts, :limit)
+
     about =
       from(n in visible_to(company, user),
         where: n.subject_type == ^type and n.subject_id == ^id
       )
+      |> newest(limit)
       |> Repo.all()
 
-    about_ids = MapSet.new(about, & &1.id)
-
+    # A note that is about the record and also links to it counts as :about;
+    # excluding it here (not after the query) keeps each side's limit honest.
     linked =
       from(n in visible_to(company, user),
         join: l in RecordLink,
         on: l.from_type == "Note" and l.from_id == n.id,
-        where: l.company_id == ^company.id and l.to_type == ^type and l.to_id == ^id
+        where: l.company_id == ^company.id and l.to_type == ^type and l.to_id == ^id,
+        where:
+          is_nil(n.subject_type) or is_nil(n.subject_id) or
+            not (n.subject_type == ^type and n.subject_id == ^id)
       )
+      |> newest(limit)
       |> Repo.all()
-      |> Enum.reject(&MapSet.member?(about_ids, &1.id))
 
     (Enum.map(about, &%{note: &1, relation: :about}) ++
        Enum.map(linked, &%{note: &1, relation: :linked}))
-    |> Enum.sort_by(& &1.note.inserted_at, {:desc, DateTime})
+    |> Enum.sort_by(&{DateTime.to_unix(&1.note.inserted_at), &1.note.id}, :desc)
+    |> then(&if(limit, do: Enum.take(&1, limit), else: &1))
     |> then(fn rows ->
       notes = Repo.preload(Enum.map(rows, & &1.note), [:author, :attachments])
       Enum.zip_with(rows, notes, fn row, n -> %{row | note: n} end)
     end)
   end
+
+  defp newest(query, nil), do: query
+
+  defp newest(query, limit),
+    do: from(n in query, order_by: [desc: n.inserted_at, desc: n.id], limit: ^limit)
 
   @doc """
   Visible notes per record for an index page: notes about the record plus
