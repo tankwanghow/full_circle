@@ -518,6 +518,23 @@ defmodule FullCircle.NotesTest do
       assert pv_count(ctx) == %{ctx.pv.id => 1}
     end
 
+    test "several done tasks on one record each bring their own final note", ctx do
+      ctx.progress.(ctx.task, "Renewed", 1)
+      other = task_fixture(ctx.company, ctx.admin, %{"title" => "Pay MPOB fee"})
+      {:ok, _} = FullCircle.Tasks.add_link(other, "Contact", ctx.pv.id, ctx.company, ctx.admin)
+      ctx.progress.(other, "Receipt filed", 2)
+      ctx.progress.(other, "Fee paid", 3)
+      open = task_fixture(ctx.company, ctx.admin, %{"title" => "Still open"})
+      {:ok, _} = FullCircle.Tasks.add_link(open, "Contact", ctx.pv.id, ctx.company, ctx.admin)
+      ctx.progress.(open, "Waiting", 4)
+
+      {:ok, _} = FullCircle.Tasks.close_task(ctx.task, :done, nil, ctx.company, ctx.admin)
+      {:ok, _} = FullCircle.Tasks.close_task(other, :done, nil, ctx.company, ctx.admin)
+
+      assert panel(ctx) == [{"Fee paid", :task_outcome}, {"Renewed", :task_outcome}]
+      assert pv_count(ctx) == %{ctx.pv.id => 2}
+    end
+
     test "a skipped or reopened task shows nothing", ctx do
       ctx.progress.(ctx.task, "Renewed", 1)
 
