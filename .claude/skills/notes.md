@@ -228,6 +228,16 @@ itself on error. Tests needing pdftoppm are tagged `:pdftoppm` and excluded
 in `test_helper.exs` when it isn't installed. The feed shows the first 4 files
 of any kind (PDFs as tiles) then "+n more"; the note page shows every file.
 
+File tiles (`file_grid/1`) open in the in-page viewer `assets/js/file_viewer.js`,
+not a new tab. It is one delegated document click listener (no hook), and its
+overlay lives on `document.body` outside every LiveView container. Links opt in
+with `data-viewer="image"|"pdf"` plus `data-viewer-name`. ← → move through the
+links in the closest `[data-viewer-group]` (one post's grid). PDFs show in an
+`<iframe>`, which works because the file is served `inline` and is
+same-origin. Where `navigator.pdfViewerEnabled === false` (Android Chrome),
+PDFs keep `target=_blank` and are skipped by ← →. Esc does not reach the page
+while focus is inside the PDF iframe; ✕ and a backdrop click still close it.
+
 `note_attach.js`:
 - Re-encodes only photo formats to JPEG; PNG/WebP/GIF keep transparency.
 - `downscale` size/quality are per company, set by an admin under "Photo

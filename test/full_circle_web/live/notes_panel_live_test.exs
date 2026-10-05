@@ -202,6 +202,26 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
              |> Enum.count() == 4
     end
 
+    test "file tiles open in the viewer, grouped per post", %{
+      conn: conn,
+      admin: admin,
+      comp: comp,
+      contact: c
+    } do
+      note =
+        note_fixture(comp, admin, %{"subject_type" => "Contact", "subject_id" => c.id})
+
+      for {path, name} <- [{jpeg_file(), "receipt.jpg"}, {pdf_file(), "letter.pdf"}] do
+        {:ok, _} =
+          FullCircle.Notes.Attachments.attach(note, %{path: path, file_name: name}, comp, admin)
+      end
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
+      post = "#notes-panel-note-#{note.id}"
+      assert has_element?(lv, "#{post} [data-viewer-group] a[data-viewer=image]")
+      assert has_element?(lv, "#{post} a[data-viewer=pdf][data-viewer-name='letter.pdf']")
+    end
+
     test "Attach shows only on notes the viewer can edit", %{admin: admin, comp: comp, contact: c} do
       clerk = user_with_role(comp, admin, "clerk")
 

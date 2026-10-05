@@ -40,13 +40,22 @@ defmodule FullCircleWeb.NoteComponents do
     <div
       :if={@attachments != []}
       id={@id}
+      data-viewer-group
       class={[
         "mt-2 grid gap-0.5 overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-700",
         length(@attachments) > 1 && "grid-cols-2"
       ]}
     >
       <div :for={a <- @attachments} id={@removable && "att-#{a.id}"} class="relative">
-        <a href={Attachments.url(a)} target="_blank" title={a.file_name} class="note-thumb block">
+        <%!-- Opens in the file viewer (file_viewer.js); target=_blank is the fallback. --%>
+        <a
+          href={Attachments.url(a)}
+          target="_blank"
+          title={a.file_name}
+          data-viewer={Attachments.kind(a) in [:image, :pdf] && Attachments.kind(a)}
+          data-viewer-name={a.file_name}
+          class="note-thumb block"
+        >
           <.file_thumb
             att={a}
             class={["w-full", if(length(@attachments) > 1, do: "h-32", else: "h-56")]}
