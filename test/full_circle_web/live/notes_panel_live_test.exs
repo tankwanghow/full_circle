@@ -176,6 +176,38 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
       assert has_element?(lv, "#notes-panel-note-#{note.id} .note-linked")
     end
 
+    test "a done linked task's final note shows here, tagged and with its files", %{
+      conn: conn,
+      admin: admin,
+      comp: comp,
+      contact: c
+    } do
+      task = FullCircle.TasksFixtures.task_fixture(comp, admin, %{"title" => "JPV Ayam Lesen"})
+      {:ok, _} = FullCircle.Tasks.add_link(task, "Contact", c.id, comp, admin)
+
+      final =
+        note_fixture(comp, admin, %{
+          "body" => "Renewed",
+          "subject_type" => "Task",
+          "subject_id" => task.id
+        })
+
+      {:ok, _} =
+        FullCircle.Notes.Attachments.attach(
+          final,
+          %{path: big_file(1000), file_name: "Scan renewed.jpg"},
+          comp,
+          admin
+        )
+
+      {:ok, _} = FullCircle.Tasks.close_task(task, :done, nil, comp, admin)
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
+      post = "#notes-panel-note-#{final.id}"
+      assert has_element?(lv, post <> ".note-progress .note-task-outcome", "done task")
+      assert has_element?(lv, post <> ~s( a[title="Scan renewed.jpg"]))
+    end
+
     test "at most 4 file thumbnails per post", %{conn: conn, admin: admin, comp: comp, contact: c} do
       note =
         note_fixture(comp, admin, %{

@@ -548,7 +548,12 @@ defmodule FullCircleWeb.NoteComponents do
   attr :item, :map, required: true, doc: "%{note: Note, d: Notes.feed_details/3 entry}"
   attr :current_company, :map, required: true
   attr :host, :any, default: nil, doc: "{type, id} of the record whose page shows this post"
-  attr :relation, :atom, default: nil, doc: ":linked tags a note that only links to the host"
+
+  attr :relation, :atom,
+    default: nil,
+    doc:
+      ":linked tags a note that only links to the host; :task_outcome a done linked task's final note"
+
   attr :new_tab, :boolean, default: false, doc: "open the note in a new tab (panels)"
   attr :target, :any, default: nil
   attr :detail, :boolean, default: false, doc: "the post page: full text, all files, no links"
@@ -706,6 +711,13 @@ defmodule FullCircleWeb.NoteComponents do
         title={gettext("This note links here; it is about something else.")}
       >
         ↩ {gettext("linked")}
+      </span>
+      <span
+        :if={@relation == :task_outcome}
+        class="note-task-outcome ml-1 rounded-full border border-amber-500 px-2 text-xs text-amber-800 dark:border-amber-400 dark:text-amber-200"
+        title={gettext("The final note of a done task that links here.")}
+      >
+        ✓ {gettext("done task")}
       </span>
       <span
         :if={@show_visibility and @note.visibility}

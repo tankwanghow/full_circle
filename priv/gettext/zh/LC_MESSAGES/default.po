@@ -2776,3 +2776,13 @@ msgstr "文件大于 %{mb} MB。"
 
 msgid "Only JPEG, PNG, WebP images, PDF files and recordings are allowed."
 msgstr "只允许 JPEG、PNG、WebP 图片、PDF 文件和录音录像。"
+
+#: lib/full_circle_web/components/note_components.ex
+#, elixir-autogen, elixir-format
+msgid "done task"
+msgstr "已完成任务"
+
+#: lib/full_circle_web/components/note_components.ex
+#, elixir-autogen, elixir-format
+msgid "The final note of a done task that links here."
+msgstr "链接到这里的已完成任务的最后一条备注。"

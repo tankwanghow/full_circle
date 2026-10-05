@@ -621,8 +621,12 @@ defmodule FullCircle.Notes do
 
   @doc """
   Visible notes about, or linking to, one record, newest first, each once
-  (`relation: :about` wins over `:linked`). `limit: n` returns only the newest
-  n; the panel pages with it and asks `count_by_records/4` for the total.
+  (`relation: :about` wins over `:linked`, which wins over `:task_outcome`).
+  `limit: n` returns only the newest n; the panel pages with it and asks
+  `count_by_records/4` for the total.
+
+  `:task_outcome` is the final note of a **done** task that links the record
+  (see `outcomes/3`) — the renewed licence on the payment for it.
 
   A reply follows its root both ways: it is about what the root is about (the
   column is copied), and it is `:linked` where the root links (read here, not
@@ -659,8 +663,23 @@ defmodule FullCircle.Notes do
       |> newest(limit)
       |> Repo.all()
 
+    # Excluded in SQL like :linked above: a final note already about or
+    # linking here shows once, under the stronger relation.
+    outcome =
+      from(n in visible_to(company, user),
+        join: o in subquery(outcomes(company, type, [id])),
+        on: o.note_id == n.id,
+        where: n.id not in subquery(linking),
+        where:
+          is_nil(n.subject_type) or is_nil(n.subject_id) or
+            not (n.subject_type == ^type and n.subject_id == ^id)
+      )
+      |> newest(limit)
+      |> Repo.all()
+
     (Enum.map(about, &%{note: &1, relation: :about}) ++
-       Enum.map(linked, &%{note: &1, relation: :linked}))
+       Enum.map(linked, &%{note: &1, relation: :linked}) ++
+       Enum.map(outcome, &%{note: &1, relation: :task_outcome}))
     |> Enum.sort_by(&{DateTime.to_unix(&1.note.inserted_at), &1.note.id}, :desc)
     |> then(&if(limit, do: Enum.take(&1, limit), else: &1))
     |> then(fn rows ->
@@ -669,15 +688,73 @@ defmodule FullCircle.Notes do
     end)
   end
 
+  # `%{record_id, note_id}`: for each **done** task linking one of `ids`, its
+  # final note — the latest note about it that is not a reply. Visibility is
+  # applied by the caller, to the final note itself: a user who cannot read it
+  # sees nothing, never an older note standing in.
+  #
+  # Only the cycle that owns the link counts: the earliest in its series with
+  # that link. Closing a repeating task copies its links onto the next cycle
+  # (`Tasks.spawn_next`); without this, next year's outcome would land on this
+  # year's payment. Timestamps cannot tell a copy from a link added when the
+  # task was created (same second), but copies only ever move forward.
+  defp outcomes(company, type, ids) do
+    owning =
+      from(l in RecordLink,
+        as: :link,
+        join: t in FullCircle.Tasks.CompanyTask,
+        as: :task,
+        on: t.id == l.from_id,
+        where: l.company_id == ^company.id and l.from_type == "Task",
+        where: l.to_type == ^type and l.to_id in ^ids,
+        where: t.status == "done" and is_nil(t.deleted_at),
+        where:
+          not exists(
+            from(l2 in RecordLink,
+              join: t2 in FullCircle.Tasks.CompanyTask,
+              on: t2.id == l2.from_id,
+              where: l2.company_id == parent_as(:link).company_id and l2.from_type == "Task",
+              where:
+                l2.to_type == parent_as(:link).to_type and l2.to_id == parent_as(:link).to_id,
+              where: t2.series_id == parent_as(:task).series_id,
+              # inserted_at is to the second; on a tie, the next cycle is the
+              # one due later (next_due_date always moves forward).
+              where:
+                t2.inserted_at < parent_as(:task).inserted_at or
+                  (t2.inserted_at == parent_as(:task).inserted_at and
+                     t2.due_date < parent_as(:task).due_date),
+              select: 1
+            )
+          ),
+        select: %{record_id: l.to_id, task_id: t.id}
+      )
+
+    finals =
+      from(n in Note,
+        where: n.company_id == ^company.id and n.subject_type == "Task",
+        where: n.subject_id in subquery(from(o in subquery(owning), select: o.task_id)),
+        where: is_nil(n.deleted_at) and is_nil(n.reply_to_id),
+        distinct: n.subject_id,
+        order_by: [asc: n.subject_id, desc: n.inserted_at, desc: n.id],
+        select: %{task_id: n.subject_id, note_id: n.id}
+      )
+
+    from(o in subquery(owning),
+      join: f in subquery(finals),
+      on: f.task_id == o.task_id,
+      select: %{record_id: o.record_id, note_id: f.note_id}
+    )
+  end
+
   defp newest(query, nil), do: query
 
   defp newest(query, limit),
     do: from(n in query, order_by: [desc: n.inserted_at, desc: n.id], limit: ^limit)
 
   @doc """
-  Visible notes per record for an index page: notes about the record plus
-  notes linking to it, each note counted once. Two queries per call, whatever
-  the number of ids.
+  Visible notes per record for an index page: notes about the record, notes
+  linking to it, and done linked tasks' final notes (`notes_for_record/5`),
+  each note counted once. Three queries per call, whatever the number of ids.
   """
   def count_by_records(_company, _user, _type, []), do: %{}
 
@@ -699,7 +776,15 @@ defmodule FullCircle.Notes do
       )
       |> Repo.all()
 
-    (pairs ++ linked)
+    outcome =
+      from(n in visible_to(company, user),
+        join: o in subquery(outcomes(company, type, ids)),
+        on: o.note_id == n.id,
+        select: {o.record_id, n.id}
+      )
+      |> Repo.all()
+
+    (pairs ++ linked ++ outcome)
     |> Enum.uniq()
     |> Enum.frequencies_by(fn {record_id, _} -> record_id end)
   end

@@ -83,7 +83,10 @@ task form in place (`TaskFormComponent`, id `tasks-panel-new-task`); ✎ Edit
 hides that record's chip (✕ would drop the task from this page). There is no
 "Full form" link; `/tasks/new?link_type=&link_id=` still works and prefills
 the chip. A task's progress stays on the task page (decided 2026-10-03): the
-row shows the latest progress as a quote and the 📝 count only.
+row shows the latest progress as a quote and the 📝 count only. One exception
+(2026-10-05): once the task is **done**, its final note also shows in each
+linked record's *notes* panel, tagged "✓ done task" — see notes.md "Done task
+outcomes".
 
 ## Task write box: `TaskFormComponent`
 `TaskLive.TaskFormComponent` is the only task form: the task page's

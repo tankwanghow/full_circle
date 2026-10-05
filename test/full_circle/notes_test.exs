@@ -463,6 +463,131 @@ defmodule FullCircle.NotesTest do
     end
   end
 
+  # A done task's final progress note shows on the records the task links to
+  # (user, 2026-10-05: the renewed lesen scan on its payment, PV-008369).
+  describe "done task outcomes on linked records" do
+    setup %{admin: admin, company: company} do
+      pv = contact_fixture(company, admin, %{"name" => "Stands in for PV-008369"})
+
+      task =
+        task_fixture(company, admin, %{
+          "title" => "JPV Ayam Lesen",
+          "due_date" => "2026-06-30",
+          "recur_unit" => "year",
+          "recur_every" => "1"
+        })
+
+      {:ok, _} = FullCircle.Tasks.add_link(task, "Contact", pv.id, company, admin)
+
+      progress = fn task, body, minute ->
+        n =
+          note_fixture(company, admin, %{
+            "body" => body,
+            "subject_type" => "Task",
+            "subject_id" => task.id
+          })
+
+        from(x in FullCircle.Notes.Note, where: x.id == ^n.id)
+        |> Repo.update_all(
+          set: [inserted_at: DateTime.add(~U[2026-10-01 00:00:00Z], minute, :minute)]
+        )
+
+        n
+      end
+
+      %{pv: pv, task: task, progress: progress}
+    end
+
+    defp panel(ctx, user \\ nil) do
+      Notes.notes_for_record("Contact", ctx.pv.id, ctx.company, user || ctx.admin)
+      |> Enum.map(&{&1.note.body, &1.relation})
+    end
+
+    defp pv_count(ctx, user \\ nil),
+      do: Notes.count_by_records(ctx.company, user || ctx.admin, "Contact", [ctx.pv.id])
+
+    test "only once done, and only the final note — not earlier ones, not replies", ctx do
+      ctx.progress.(ctx.task, "Application sent", 1)
+      final = ctx.progress.(ctx.task, "Renewed", 2)
+      assert panel(ctx) == []
+
+      {:ok, _} = FullCircle.Tasks.close_task(ctx.task, :done, nil, ctx.company, ctx.admin)
+      note_fixture(ctx.company, ctx.admin, %{"body" => "nice", "reply_to_id" => final.id})
+
+      assert panel(ctx) == [{"Renewed", :task_outcome}]
+      assert pv_count(ctx) == %{ctx.pv.id => 1}
+    end
+
+    test "a skipped or reopened task shows nothing", ctx do
+      ctx.progress.(ctx.task, "Renewed", 1)
+
+      {:ok, %{closed: closed}} =
+        FullCircle.Tasks.close_task(ctx.task, :skipped, nil, ctx.company, ctx.admin)
+
+      assert panel(ctx) == []
+
+      {:ok, _} = FullCircle.Tasks.reopen_task(closed, ctx.company, ctx.admin)
+
+      {:ok, %{closed: done}} =
+        FullCircle.Tasks.close_task(ctx.task, :done, nil, ctx.company, ctx.admin)
+
+      assert panel(ctx) == [{"Renewed", :task_outcome}]
+
+      {:ok, _} = FullCircle.Tasks.reopen_task(done, ctx.company, ctx.admin)
+      assert panel(ctx) == []
+      assert pv_count(ctx) == %{}
+    end
+
+    # The next cycle copies the links; the copy must not put next year's
+    # outcome on this year's payment. The earliest cycle with the link owns it.
+    test "a later cycle's copied link does not show its outcome", ctx do
+      ctx.progress.(ctx.task, "Renewed 2026", 1)
+
+      {:ok, %{next: next}} =
+        FullCircle.Tasks.close_task(ctx.task, :done, nil, ctx.company, ctx.admin)
+
+      assert next.series_id == ctx.task.series_id
+
+      pv_2027 = contact_fixture(ctx.company, ctx.admin, %{"name" => "PV 2027"})
+      {:ok, _} = FullCircle.Tasks.add_link(next, "Contact", pv_2027.id, ctx.company, ctx.admin)
+      ctx.progress.(next, "Renewed 2027", 2)
+      {:ok, _} = FullCircle.Tasks.close_task(next, :done, nil, ctx.company, ctx.admin)
+
+      assert panel(ctx) == [{"Renewed 2026", :task_outcome}]
+
+      assert Notes.notes_for_record("Contact", pv_2027.id, ctx.company, ctx.admin)
+             |> Enum.map(&{&1.note.body, &1.relation}) == [{"Renewed 2027", :task_outcome}]
+    end
+
+    test "a final note the user cannot read shows nothing, not an older one", ctx do
+      clerk = user_with_role(ctx.company, ctx.admin, "clerk")
+      ctx.progress.(ctx.task, "Application sent", 1)
+      hidden = ctx.progress.(ctx.task, "Renewed", 2)
+
+      # Task notes follow the task's visibility; make only the final one private.
+      from(x in FullCircle.Notes.Note, where: x.id == ^hidden.id)
+      |> Repo.update_all(set: [visibility: ["admin"]])
+
+      from(t in FullCircle.Tasks.CompanyTask, where: t.id == ^ctx.task.id)
+      |> Repo.update_all(set: [visibility: ["admin"]])
+
+      {:ok, _} = FullCircle.Tasks.close_task(ctx.task, :done, nil, ctx.company, ctx.admin)
+
+      assert panel(ctx) == [{"Renewed", :task_outcome}]
+      assert panel(ctx, clerk) == []
+      assert pv_count(ctx, clerk) == %{}
+    end
+
+    test "a final note that is also about or linked to the record shows once", ctx do
+      final = ctx.progress.(ctx.task, "Renewed", 1)
+      {:ok, _} = Notes.add_link(final, "Contact", ctx.pv.id, ctx.company, ctx.admin)
+      {:ok, _} = FullCircle.Tasks.close_task(ctx.task, :done, nil, ctx.company, ctx.admin)
+
+      assert panel(ctx) == [{"Renewed", :linked}]
+      assert pv_count(ctx) == %{ctx.pv.id => 1}
+    end
+  end
+
   describe "search/5" do
     setup %{admin: admin, company: company} do
       clerk = user_with_role(company, admin, "clerk")

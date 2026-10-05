@@ -370,8 +370,8 @@ while focus is inside the PDF iframe; ✕ and a backdrop click still close it.
 - Never forces a reload when the socket is down (it would lose unsaved input).
 
 ## Counts
-`Notes.count_by_records/4` = notes about ∪ notes linking (or replying to a root that links), each note once,
-visibility applied, two queries per call (record panels' 📝 counts). The
+`Notes.count_by_records/4` = notes about ∪ notes linking (or replying to a root that links) ∪ done linked tasks' final notes, each note once,
+visibility applied, three queries per call (record panels' 📝 counts). The
 feed's 💬 is different: live **replies** only (`feed_details/3`), a note that
 merely links here never counts.
 
@@ -396,8 +396,29 @@ Spec: `docs/superpowers/specs/2026-10-02-note-replies-design.md`.
   n.reply_to_id in subquery(linking)`; `count_by_records/4` joins on either).
   Unlinking the root drops its replies from that panel; a reply's own links
   still count, once. Decided 2026-10-05: copying links would drift and need a
-  sync. Task progress notes do **not** follow the task's links: the record's
-  tasks panel shows the task with its latest progress instead.
+  sync. Task progress notes do **not** follow the task's links (the record's
+  tasks panel shows the task with its latest progress), except a done task's
+  final note — see "Done task outcomes".
+
+## Done task outcomes (`:task_outcome`, decided 2026-10-05)
+The final note of a **done** task shows in the notes panel of each record the
+task links to — the renewed licence scan on its payment (PV-008369). Tag
+"✓ done task" (`.note-task-outcome`, amber), amber progress bar as usual.
+- **Final note** = the latest note about the task that is not a reply.
+  Visibility applies to that note: a user who cannot read it sees nothing,
+  never an older note standing in. Skipped, open, reopened or deleted tasks
+  add nothing; reopening removes it again. Nothing is copied: computed in
+  `Notes.outcomes/3` at read time.
+- **Only the cycle that owns the link.** Closing a repeating task copies its
+  links onto the next cycle (`Tasks.spawn_next`), so next year's outcome
+  would land on this year's payment. The owner is the earliest cycle in the
+  series (`series_id`) with that link: `inserted_at`, tie-broken by
+  `due_date` (timestamps are to the second; the next cycle is always due
+  later). Timestamps cannot tell a copy from a link added at task creation
+  — both are stamped with the task's own second.
+- Priority: `:about` > `:linked` > `:task_outcome`, excluded in SQL so each
+  side's `limit` stays honest; a final note that also links here is
+  `:linked`, once. `count_by_records/4` includes outcomes (3 queries).
 - A root's save that changes subject or visibility updates its live replies
   in the same transaction (`sync_replies/3`). A task's visibility sync
   reaches replies too (they are about the task).
