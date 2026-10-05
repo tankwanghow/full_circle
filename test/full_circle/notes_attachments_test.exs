@@ -59,14 +59,93 @@ defmodule FullCircle.NotesAttachmentsTest do
     assert Repo.aggregate(NoteAttachment, :count) == 0
   end
 
-  test "oversize is refused before reading", ctx do
-    assert {:error, :too_large} =
+  test "an image over the image limit is refused", ctx do
+    assert {:error, {:too_large, 10_000_000}} =
              Attachments.attach(
                ctx.note,
                %{path: big_file(Attachments.max_bytes()), file_name: "big.jpg"},
                ctx.company,
                ctx.admin
              )
+  end
+
+  describe "recordings" do
+    defp put(ctx, path, kind \\ nil) do
+      Attachments.attach(
+        ctx.note,
+        %{path: path, file_name: "clip", kind: kind},
+        ctx.company,
+        ctx.admin
+      )
+    end
+
+    test "an mp4 is a video, stored as .mp4", ctx do
+      assert {:ok, att} = put(ctx, mp4_file(), "video")
+      assert att.content_type == "video/mp4"
+      assert String.ends_with?(att.path, ".mp4")
+    end
+
+    test "an M4A-branded mp4 is audio whatever the hint says", ctx do
+      assert {:ok, att} = put(ctx, mp4_file("M4A "), "video")
+      assert att.content_type == "audio/mp4"
+      assert String.ends_with?(att.path, ".m4a")
+    end
+
+    test "a plain mp4 honours the audio hint (Chrome's audio/mp4)", ctx do
+      assert {:ok, %{content_type: "audio/mp4"}} = put(ctx, mp4_file(), "audio")
+    end
+
+    test "webm follows the hint; no hint or a bad one makes it video", ctx do
+      assert {:ok, %{content_type: "audio/webm", path: path}} = put(ctx, webm_file(), "audio")
+      assert String.ends_with?(path, ".webm")
+      assert {:ok, %{content_type: "video/webm"}} = put(ctx, webm_file(), "video")
+      assert {:ok, %{content_type: "video/webm"}} = put(ctx, webm_file())
+      assert {:ok, %{content_type: "video/webm"}} = put(ctx, webm_file(), "application")
+    end
+
+    test "ogg is always audio", ctx do
+      assert {:ok, att} = put(ctx, ogg_file(), "video")
+      assert att.content_type == "audio/ogg"
+      assert String.ends_with?(att.path, ".ogg")
+    end
+
+    test "a hint never makes a non-media file acceptable", ctx do
+      assert {:error, :unsupported_type} = put(ctx, text_file(), "video")
+      assert {:error, :unsupported_type} = put(ctx, text_file(), "audio")
+    end
+
+    # HEIC/AVIF photos are ISO-BMFF too: `ftyp` must not turn them into video.
+    test "an HEIC or AVIF photo is not taken for a video", ctx do
+      assert {:error, :unsupported_type} = put(ctx, mp4_file("heic"), "video")
+      assert {:error, :unsupported_type} = put(ctx, mp4_file("mif1"), "video")
+      assert {:error, :unsupported_type} = put(ctx, mp4_file("avif"), "video")
+    end
+
+    test "each kind has its own size cap", ctx do
+      assert {:ok, %{content_type: "video/mp4"}} = put(ctx, mp4_file("isom", 12_000_000), "video")
+
+      assert {:error, {:too_large, 15_000_000}} =
+               put(ctx, mp4_file("isom", 15_000_001), "video")
+
+      assert {:error, {:too_large, 5_000_000}} = put(ctx, webm_file(6_000_000), "audio")
+      assert {:error, {:too_large, 10_000_000}} = put(ctx, big_file(11_000_000))
+    end
+
+    test "max_bytes/1 and max_seconds/1 per kind" do
+      assert Attachments.max_bytes(:image) == 10_000_000
+      assert Attachments.max_bytes(:pdf) == 10_000_000
+      assert Attachments.max_bytes(:video) == 15_000_000
+      assert Attachments.max_bytes(:audio) == 5_000_000
+      assert Attachments.max_seconds(:video) == 60
+      assert Attachments.max_seconds(:audio) == 180
+    end
+
+    test "recordings have no preview", ctx do
+      {:ok, video} = put(ctx, mp4_file(), "video")
+      {:ok, audio} = put(ctx, ogg_file())
+      assert {:error, :no_preview} = Attachments.thumb_file(video)
+      assert {:error, :no_preview} = Attachments.thumb_file(audio)
+    end
   end
 
   test "only someone who can edit the note may attach", ctx do
@@ -144,6 +223,10 @@ defmodule FullCircle.NotesAttachmentsTest do
       assert Attachments.kind(%NoteAttachment{content_type: "image/jpeg"}) == :image
       assert Attachments.kind(%NoteAttachment{content_type: "image/webp"}) == :image
       assert Attachments.kind(%NoteAttachment{content_type: "application/pdf"}) == :pdf
+      assert Attachments.kind(%NoteAttachment{content_type: "video/mp4"}) == :video
+      assert Attachments.kind(%NoteAttachment{content_type: "video/webm"}) == :video
+      assert Attachments.kind(%NoteAttachment{content_type: "audio/mp4"}) == :audio
+      assert Attachments.kind(%NoteAttachment{content_type: "audio/ogg"}) == :audio
       assert Attachments.kind(%NoteAttachment{content_type: "application/zip"}) == :other
     end
   end

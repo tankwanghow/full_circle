@@ -27,6 +27,16 @@ defmodule FullCircle.NotesFixtures do
 
   def text_file, do: tmp_file(".jpg", "this is not an image at all")
 
+  # Recorder containers: only the header the sniffer reads is real. `bytes`
+  # pads the file out for the per-kind size caps.
+  def mp4_file(brand \\ "isom", bytes \\ 64),
+    do: tmp_file(".mp4", <<0, 0, 0, 0x20>> <> "ftyp" <> brand <> :binary.copy(<<0>>, bytes))
+
+  def webm_file(bytes \\ 64),
+    do: tmp_file(".webm", <<0x1A, 0x45, 0xDF, 0xA3>> <> :binary.copy(<<0>>, bytes))
+
+  def ogg_file(bytes \\ 64), do: tmp_file(".ogg", "OggS" <> :binary.copy(<<0>>, bytes))
+
   def big_file(bytes),
     do: tmp_file(".jpg", <<0xFF, 0xD8, 0xFF, 0xE0>> <> :binary.copy(<<0>>, bytes))
 

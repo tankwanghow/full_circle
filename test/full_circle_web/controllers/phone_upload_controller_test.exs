@@ -53,6 +53,17 @@ defmodule FullCircleWeb.PhoneUploadControllerTest do
     assert [%{file_name: "wa.jpg"}] = Trays.list(ctx.tray.id, ctx.comp, ctx.admin)
   end
 
+  test "a recording from the phone is typed by its kind field", ctx do
+    conn =
+      post(ctx.conn, ~p"/up/#{tok(ctx, {:tray, ctx.tray.id})}/files", %{
+        "file" => upload(webm_file(), "Audio.webm"),
+        "kind" => "audio"
+      })
+
+    assert %{"id" => _} = json_response(conn, 200)
+    assert [%{content_type: "audio/webm"}] = Trays.list(ctx.tray.id, ctx.comp, ctx.admin)
+  end
+
   test "a file goes straight onto a saved note", ctx do
     conn =
       post(ctx.conn, ~p"/up/#{tok(ctx, {:note, ctx.note.id})}/files", %{

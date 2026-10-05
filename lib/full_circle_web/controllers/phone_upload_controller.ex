@@ -20,6 +20,7 @@ defmodule FullCircleWeb.PhoneUploadController do
           label: ctx.label,
           target_key: target_key(ctx.target),
           max_bytes: Attachments.max_bytes(),
+          record: record_limits(),
           photo: Attachments.photo_settings(ctx.company)
         )
 
@@ -39,9 +40,9 @@ defmodule FullCircleWeb.PhoneUploadController do
     end)
   end
 
-  def file(conn, %{"token" => token, "file" => %Plug.Upload{} = file}) do
+  def file(conn, %{"token" => token, "file" => %Plug.Upload{} = file} = params) do
     with_ctx(conn, token, fn ctx ->
-      upload = %{path: file.path, file_name: file.filename}
+      upload = NoteAttachmentController.upload(file, params)
       reply(conn, ctx, store(ctx, upload), &%{id: &1.id})
     end)
   end
@@ -133,6 +134,13 @@ defmodule FullCircleWeb.PhoneUploadController do
     do: conn |> put_status(status) |> json(%{error: msg, code: code})
 
   defp target_key({kind, id}), do: "#{kind}:#{id}"
+
+  defp record_limits do
+    Map.new([:video, :audio], fn kind ->
+      {kind,
+       %{max_bytes: Attachments.max_bytes(kind), max_seconds: Attachments.max_seconds(kind)}}
+    end)
+  end
 
   # The phone names the PDF from its own clock ("Scan 2026-10-04 1432.pdf");
   # only a sane basename ending in .pdf is kept.

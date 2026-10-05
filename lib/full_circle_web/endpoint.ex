@@ -45,8 +45,8 @@ defmodule FullCircleWeb.Endpoint do
   plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
 
   plug Plug.Parsers,
-    # 10 MB note attachments plus multipart overhead.
-    parsers: [:urlencoded, {:multipart, length: 12_000_000}, :json],
+    # The largest note attachment (a 15 MB video) plus multipart overhead.
+    parsers: [:urlencoded, {:multipart, length: 17_000_000}, :json],
     pass: ["*/*"],
     json_decoder: Phoenix.json_library()
 

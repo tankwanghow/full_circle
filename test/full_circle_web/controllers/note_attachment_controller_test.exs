@@ -159,4 +159,118 @@ defmodule FullCircleWeb.NoteAttachmentControllerTest do
     assert %{"ok" => true, "id" => _} = json_response(conn, 200)
     assert [_] = FullCircle.Notes.Trays.list(tray_id, comp, admin)
   end
+
+  test "the recorder's kind field types a WebM, on a note and in a tray", %{
+    conn: conn,
+    admin: admin,
+    comp: comp,
+    note: note
+  } do
+    conn = log_in_user(conn, admin)
+
+    resp =
+      post(conn, ~p"/companies/#{comp.id}/notes/#{note.id}/attachments", %{
+        "file" => upload(webm_file(), "Audio.webm"),
+        "kind" => "audio"
+      })
+
+    assert %{"id" => id} = json_response(resp, 200)
+    assert FullCircle.Repo.get!(FullCircle.Notes.NoteAttachment, id).content_type == "audio/webm"
+
+    tray_id = Ecto.UUID.generate()
+
+    resp =
+      post(conn, ~p"/companies/#{comp.id}/note_trays/#{tray_id}/files", %{
+        "file" => upload(webm_file(), "Audio.webm"),
+        "kind" => "audio"
+      })
+
+    assert %{"ok" => true} = json_response(resp, 200)
+    assert [%{content_type: "audio/webm"}] = FullCircle.Notes.Trays.list(tray_id, comp, admin)
+  end
+
+  test "an oversize recording names its own kind's limit", %{
+    conn: conn,
+    admin: admin,
+    comp: comp,
+    note: note
+  } do
+    conn =
+      conn
+      |> log_in_user(admin)
+      |> post(~p"/companies/#{comp.id}/notes/#{note.id}/attachments", %{
+        "file" => upload(webm_file(5_000_001), "Audio.webm"),
+        "kind" => "audio"
+      })
+
+    assert %{"error" => msg} = json_response(conn, 422)
+    assert msg =~ "5 MB"
+  end
+
+  describe "Range requests" do
+    setup %{conn: conn, admin: admin, comp: comp, note: note} do
+      # An mp4 header and padding, then 32 known bytes at the end.
+      path = mp4_file("isom", 56)
+      File.write!(path, :binary.copy("ABCDEFGH", 4), [:append])
+      body = File.read!(path)
+      {:ok, att} = Attachments.attach(note, %{path: path, file_name: "v.mp4"}, comp, admin)
+      url = ~p"/companies/#{comp.id}/note_attachments/#{att.id}"
+      %{conn: log_in_user(conn, admin), url: url, body: body}
+    end
+
+    defp ranged(conn, url, range),
+      do: conn |> put_req_header("range", range) |> get(url)
+
+    test "no Range: the whole file, saying ranges are accepted", %{
+      conn: conn,
+      url: url,
+      body: body
+    } do
+      conn = get(conn, url)
+      assert response(conn, 200) == body
+      assert get_resp_header(conn, "accept-ranges") == ["bytes"]
+      assert get_resp_header(conn, "content-type") |> hd() =~ "video/mp4"
+    end
+
+    test "bytes=a-b is a 206 with that slice", %{conn: conn, url: url, body: body} do
+      conn = ranged(conn, url, "bytes=10-19")
+      assert response(conn, 206) == binary_part(body, 10, 10)
+      assert get_resp_header(conn, "content-range") == ["bytes 10-19/#{byte_size(body)}"]
+      assert get_resp_header(conn, "accept-ranges") == ["bytes"]
+    end
+
+    test "an end past EOF is clipped", %{conn: conn, url: url, body: body} do
+      size = byte_size(body)
+      conn = ranged(conn, url, "bytes=90-5000")
+      assert response(conn, 206) == binary_part(body, 90, size - 90)
+      assert get_resp_header(conn, "content-range") == ["bytes 90-#{size - 1}/#{size}"]
+    end
+
+    test "open range bytes=a-", %{conn: conn, url: url, body: body} do
+      size = byte_size(body)
+      conn = ranged(conn, url, "bytes=0-")
+      assert response(conn, 206) == body
+      assert get_resp_header(conn, "content-range") == ["bytes 0-#{size - 1}/#{size}"]
+    end
+
+    test "suffix range bytes=-n", %{conn: conn, url: url, body: body} do
+      size = byte_size(body)
+      conn = ranged(conn, url, "bytes=-8")
+      assert response(conn, 206) == "ABCDEFGH"
+      assert get_resp_header(conn, "content-range") == ["bytes #{size - 8}-#{size - 1}/#{size}"]
+    end
+
+    test "a start beyond EOF is 416", %{conn: conn, url: url, body: body} do
+      conn = ranged(conn, url, "bytes=#{byte_size(body)}-")
+      assert response(conn, 416)
+      assert get_resp_header(conn, "content-range") == ["bytes */#{byte_size(body)}"]
+    end
+
+    test "multiple ranges or junk get the whole file", %{conn: conn, url: url, body: body} do
+      assert response(ranged(conn, url, "bytes=0-1,5-6"), 200) == body
+      assert response(ranged(conn, url, "bytes=abc"), 200) == body
+      assert response(ranged(conn, url, "items=0-5"), 200) == body
+      assert response(ranged(conn, url, "bytes=9-3"), 200) == body
+    end
+  end
 end

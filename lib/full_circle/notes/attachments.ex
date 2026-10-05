@@ -12,9 +12,24 @@ defmodule FullCircle.Notes.Attachments do
   alias FullCircle.Notes.{Note, NoteAttachment, NoteTray, Trays}
 
   @max_bytes 10_000_000
-  @content_types ~w(image/jpeg image/png image/webp application/pdf)
+  @content_types ~w(image/jpeg image/png image/webp application/pdf
+                    video/mp4 video/webm audio/mp4 audio/webm audio/ogg)
 
+  # Recordings are made in the app (note_record.js) at 480p ~1 Mbit/s or
+  # 64 kbit/s audio; the caps are those rates times the time limits, plus
+  # encoder overshoot. The recorder enforces the time; the size cap is what
+  # protects the disk.
+  @max_bytes_by_kind %{video: 15_000_000, audio: 5_000_000}
+  @max_seconds %{video: 60, audio: 180}
+
+  @doc "The image/PDF limit. Recordings have their own: `max_bytes/1`."
   def max_bytes, do: @max_bytes
+
+  def max_bytes(kind), do: Map.get(@max_bytes_by_kind, kind, @max_bytes)
+
+  @doc "How long the in-app recorder runs before it stops itself."
+  def max_seconds(kind) when kind in [:video, :audio], do: Map.fetch!(@max_seconds, kind)
+
   def content_types, do: @content_types
 
   # Photos are shrunk in the browser before upload (`downscale` in
@@ -102,7 +117,8 @@ defmodule FullCircle.Notes.Attachments do
     case kind(att) do
       :image -> {:ok, abs_path(att), att.content_type}
       :pdf -> pdf_thumb(att)
-      :other -> {:error, :no_preview}
+      # No poster frames: that would need ffmpeg on the server.
+      _video_audio_other -> {:error, :no_preview}
     end
   end
 
@@ -146,12 +162,15 @@ defmodule FullCircle.Notes.Attachments do
 
   @doc """
   What kind of file this is, from its sniffed content type. Pages choose how
-  to show a file from this, not from content-type strings. `:video` and
-  `:audio` join here when those types are allowed.
+  to show a file from this, not from content-type strings.
   """
-  def kind(%NoteAttachment{content_type: "image/" <> _}), do: :image
-  def kind(%NoteAttachment{content_type: "application/pdf"}), do: :pdf
-  def kind(%NoteAttachment{}), do: :other
+  def kind(%NoteAttachment{content_type: ct}), do: kind_of(ct)
+
+  defp kind_of("image/" <> _), do: :image
+  defp kind_of("application/pdf"), do: :pdf
+  defp kind_of("video/" <> _), do: :video
+  defp kind_of("audio/" <> _), do: :audio
+  defp kind_of(_), do: :other
 
   def attach(%Note{} = note, upload, company, user) do
     with %Note{} = note <- Notes.get_note(note.id, company, user) || {:error, :note_not_found},
@@ -189,9 +208,11 @@ defmodule FullCircle.Notes.Attachments do
   defp store(owner, upload, company, user) do
     src = upload[:path] || upload["path"]
     file_name = upload[:file_name] || upload["file_name"] || "file"
+    hint = upload[:kind] || upload["kind"]
 
-    with {:ok, size} <- assert_size(src),
-         {:ok, content_type} <- sniff(src) do
+    # Sniff first (32 bytes), then size: the cap depends on the kind.
+    with {:ok, content_type} <- sniff(src, hint),
+         {:ok, size} <- assert_size(src, max_bytes(kind_of(content_type))) do
       # file_name is display only; cap it under the varchar(255) column.
       name = file_name |> Path.basename() |> String.slice(0, 200)
       write(owner, src, name, size, content_type, company, user)
@@ -227,24 +248,57 @@ defmodule FullCircle.Notes.Attachments do
     end
   end
 
-  defp assert_size(src) do
-    case File.stat(src || "") do
-      {:ok, %{size: size}} when size <= @max_bytes -> {:ok, size}
-      {:ok, _} -> {:error, :too_large}
+  defp assert_size(src, max) do
+    case File.stat(src) do
+      {:ok, %{size: size}} when size <= max -> {:ok, size}
+      {:ok, _} -> {:error, {:too_large, max}}
       {:error, _} -> {:error, :not_found}
     end
   end
 
-  defp sniff(src) do
-    case File.open(src, [:read, :binary], &IO.binread(&1, 16)) do
-      {:ok, <<0xFF, 0xD8, 0xFF, _::binary>>} -> {:ok, "image/jpeg"}
-      {:ok, <<0x89, "PNG\r\n", 0x1A, 0x0A, _::binary>>} -> {:ok, "image/png"}
-      {:ok, <<"RIFF", _::binary-size(4), "WEBP", _::binary>>} -> {:ok, "image/webp"}
-      {:ok, <<"%PDF-", _::binary>>} -> {:ok, "application/pdf"}
-      {:ok, _} -> {:error, :unsupported_type}
-      {:error, _} -> {:error, :not_found}
+  # HEIC/AVIF photos are ISO-BMFF (`ftyp`) like mp4; they are not recordings.
+  @image_brands ~w(heic heix hevc hevx heim heis mif1 msf1 avif avis)
+
+  # `hint` is the recorder's `kind` form field. It only picks between two
+  # inert media types for a container already verified here (mp4 and webm
+  # carry either); it never makes another file acceptable.
+  defp sniff(src, hint) do
+    case File.open(src || "", [:read, :binary], &IO.binread(&1, 32)) do
+      {:ok, <<0xFF, 0xD8, 0xFF, _::binary>>} ->
+        {:ok, "image/jpeg"}
+
+      {:ok, <<0x89, "PNG\r\n", 0x1A, 0x0A, _::binary>>} ->
+        {:ok, "image/png"}
+
+      {:ok, <<"RIFF", _::binary-size(4), "WEBP", _::binary>>} ->
+        {:ok, "image/webp"}
+
+      {:ok, <<"%PDF-", _::binary>>} ->
+        {:ok, "application/pdf"}
+
+      {:ok, <<_::binary-size(4), "ftyp", "M4A ", _::binary>>} ->
+        {:ok, "audio/mp4"}
+
+      {:ok, <<_::binary-size(4), "ftyp", brand::binary-size(4), _::binary>>}
+      when brand not in @image_brands ->
+        {:ok, media(hint) <> "/mp4"}
+
+      {:ok, <<0x1A, 0x45, 0xDF, 0xA3, _::binary>>} ->
+        {:ok, media(hint) <> "/webm"}
+
+      {:ok, <<"OggS", _::binary>>} ->
+        {:ok, "audio/ogg"}
+
+      {:ok, _} ->
+        {:error, :unsupported_type}
+
+      {:error, _} ->
+        {:error, :not_found}
     end
   end
+
+  defp media("audio"), do: "audio"
+  defp media(_), do: "video"
 
   defp write(owner, src, file_name, size, content_type, company, user) do
     {dir, owner_attrs, target} =
@@ -318,6 +372,11 @@ defmodule FullCircle.Notes.Attachments do
   defp ext("image/png"), do: ".png"
   defp ext("image/webp"), do: ".webp"
   defp ext("application/pdf"), do: ".pdf"
+  defp ext("video/mp4"), do: ".mp4"
+  defp ext("audio/mp4"), do: ".m4a"
+  defp ext("video/webm"), do: ".webm"
+  defp ext("audio/webm"), do: ".webm"
+  defp ext("audio/ogg"), do: ".ogg"
 
   def uploads_dir, do: Application.get_env(:full_circle, :uploads_dir)
 end
