@@ -183,14 +183,16 @@ defmodule FullCircle.Linkable do
   @doc """
   Of `refs` — a query selecting `%{owner_id, type, id}`, the records some
   owner points at — the `owner_id`s whose record name, or document number or
-  document contact name, matches the ILIKE `pattern`.
+  document contact name, or linked task / note title, matches the ILIKE
+  `pattern`.
 
-  Records and documents only. A linked note or task may be one the searcher
-  cannot see (its chip shows no title), so its title is never matched.
-  Driven from the refs through indexed ids, so the cost follows the refs, not
-  the size of `transactions`.
+  A linked task or note counts only when `user` may see it (`Tasks.visible_to`,
+  `Notes.visible_to`): its chip shows them no title, and a search must not
+  reveal one either. A note's title is its `title`, else its body (what
+  `Note.display_title/1` shows). Driven from the refs through indexed ids, so
+  the cost follows the refs, not the size of `transactions`.
   """
-  def matching_refs(refs, pattern, company) do
+  def matching_refs(refs, pattern, company, user) do
     docs =
       from(r in subquery(refs),
         join: t in Transaction,
@@ -214,6 +216,26 @@ defmodule FullCircle.Linkable do
 
       union(acc, ^named)
     end)
+    |> union(^titled_task(refs, pattern, company, user))
+    |> union(^titled_note(refs, pattern, company, user))
+  end
+
+  defp titled_task(refs, pattern, company, user) do
+    from(r in subquery(refs),
+      join: t in subquery(FullCircle.Tasks.visible_to(company, user)),
+      on: t.id == r.id,
+      where: r.type == "Task" and ilike(t.title, ^pattern),
+      select: r.owner_id
+    )
+  end
+
+  defp titled_note(refs, pattern, company, user) do
+    from(r in subquery(refs),
+      join: n in subquery(FullCircle.Notes.visible_to(company, user)),
+      on: n.id == r.id,
+      where: r.type == "Note" and ilike(coalesce(n.title, n.body), ^pattern),
+      select: r.owner_id
+    )
   end
 
   defp doc_query(type, company, user) do

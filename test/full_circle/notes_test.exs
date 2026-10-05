@@ -536,14 +536,76 @@ defmodule FullCircle.NotesTest do
       assert search.(contact.name) == ["short-shipped"]
     end
 
+    test "a progress note is found by its task's title, open or done", %{
+      company: company,
+      admin: admin
+    } do
+      task = task_fixture(company, admin, %{"title" => "JPV Ayam Lesen"})
+
+      note_fixture(company, admin, %{
+        "body" => "Renewed",
+        "subject_type" => "Task",
+        "subject_id" => task.id
+      })
+
+      {:ok, _} = FullCircle.Tasks.close_task(task, :done, nil, company, admin)
+
+      assert "Renewed" in bodies(Notes.search(company, admin, "ayam", %{}, page: 1, per_page: 30))
+    end
+
+    test "a linked note is found by the title of the note it links to", %{
+      company: company,
+      admin: admin
+    } do
+      target = note_fixture(company, admin, %{"title" => "Gate zebra policy", "body" => "x"})
+      note = note_fixture(company, admin, %{"body" => "see policy"})
+      {:ok, _} = Notes.add_link(note, "Note", target.id, company, admin)
+
+      assert bodies(Notes.search(company, admin, "zebra", %{}, page: 1, per_page: 30)) ==
+               ["see policy", "x"]
+    end
+
     # A linked task or note may be one the searcher cannot see; its title
     # must not be searchable through the note that links it.
-    test "a linked task's title is not matched", %{company: company, admin: admin} do
-      task = task_fixture(company, admin, %{"title" => "Renew zebra permit"})
-      note = note_fixture(company, admin, %{"body" => "see task"})
-      {:ok, _} = Notes.add_link(note, "Task", task.id, company, admin)
+    test "a linked task's title counts only for those who may see the task", %{
+      company: company,
+      admin: admin,
+      clerk: clerk
+    } do
+      private =
+        task_fixture(company, admin, %{"title" => "Renew zebra permit", "visibility" => ["admin"]})
 
-      assert Notes.search(company, admin, "zebra", %{}, page: 1, per_page: 30) == []
+      note = note_fixture(company, admin, %{"body" => "see task"})
+      {:ok, _} = Notes.add_link(note, "Task", private.id, company, admin)
+
+      assert bodies(Notes.search(company, admin, "zebra", %{}, page: 1, per_page: 30)) ==
+               ["see task"]
+
+      assert Notes.search(company, clerk, "zebra", %{}, page: 1, per_page: 30) == []
+      # The clerk does see the note itself.
+      assert "see task" in bodies(Notes.search(company, clerk, "see", %{}, page: 1, per_page: 30))
+    end
+
+    test "a linked note's title counts only for those who may read that note", %{
+      company: company,
+      admin: admin,
+      clerk: clerk
+    } do
+      hidden =
+        note_fixture(company, admin, %{
+          "title" => "Zebra pay review",
+          "body" => "x",
+          "visibility" => ["manager"]
+        })
+
+      note = note_fixture(company, admin, %{"body" => "see hidden"})
+      {:ok, _} = Notes.add_link(note, "Note", hidden.id, company, admin)
+
+      assert "see hidden" in bodies(
+               Notes.search(company, admin, "zebra", %{}, page: 1, per_page: 30)
+             )
+
+      assert Notes.search(company, clerk, "zebra", %{}, page: 1, per_page: 30) == []
     end
 
     test "empty terms list newest first and paginate", %{company: company, admin: admin} do

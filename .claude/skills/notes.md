@@ -629,12 +629,15 @@ A pick reaches the box through `RecordPickerComponent`'s `notify`:
 ## Search (`Notes.search/5`)
 Every word must match (AND); each word may match a different place: the
 note's title, its body, or **the name of a record the note is about or links
-to** — Contact/Employee/Good/Account/FixedAsset name, or a document's number
-or its contact's name (`Linkable.matching_refs/3`, decided 2026-10-05). Read
-at search time from the note's subject + `record_links`, nothing copied, so a
-rename or a new link counts at once. **Linked Task and Note titles are never
-matched**: the searcher may not be allowed to see them (their chip shows no
-title), and matching would leak the hidden title. The query is driven from
+to** — Contact/Employee/Good/Account/FixedAsset name, a document's number
+or its contact's name, or a Task's / Note's title (`Linkable.matching_refs/4`,
+decided 2026-10-05). So a progress note is found by its task's name, open or
+done. Read at search time from the note's subject + `record_links`, nothing
+copied, so a rename or a new link counts at once. **A task or note title
+counts only if the searcher may see that task/note** (joined through
+`Tasks.visible_to` / `Notes.visible_to`): their chip shows no title, and
+search must not leak one. A note's title there is `title`, else its body
+(as `Note.display_title/1`). The query is driven from
 the note's refs through indexed ids (`transactions.doc_id`): ~3–9 ms on a
 company with 793k transactions. ILIKE filters; `word_similarity` only orders.
 

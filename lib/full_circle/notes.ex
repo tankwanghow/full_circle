@@ -819,7 +819,7 @@ defmodule FullCircle.Notes do
     words = terms |> to_string() |> String.split(~r/\s+/, trim: true)
 
     visible_to(company, user)
-    |> apply_words(words, company)
+    |> apply_words(words, company, user)
     |> apply_filters(filters || %{}, company, user)
     |> order_search(words, terms)
     |> offset(^((page - 1) * per_page))
@@ -830,10 +830,10 @@ defmodule FullCircle.Notes do
 
   # ILIKE decides what matches; word_similarity only orders. CJK text scores
   # near zero on trigrams, so similarity must never be the filter. A word may
-  # also match the name or document number of a record the note is about or
-  # links to (`Linkable.matching_refs/3`) — read now, so a rename or a new
-  # link counts at once; nothing is copied onto the note.
-  defp apply_words(query, words, company) do
+  # also match the name, document number or (visible) task/note title of what
+  # the note is about or links to (`Linkable.matching_refs/4`) — read now, so
+  # a rename or a new link counts at once; nothing is copied onto the note.
+  defp apply_words(query, words, company, user) do
     refs = note_refs(company)
 
     Enum.reduce(words, query, fn w, q ->
@@ -842,7 +842,7 @@ defmodule FullCircle.Notes do
       from(n in q,
         where:
           ilike(n.body, ^pattern) or ilike(coalesce(n.title, ""), ^pattern) or
-            n.id in subquery(Linkable.matching_refs(refs, pattern, company))
+            n.id in subquery(Linkable.matching_refs(refs, pattern, company, user))
       )
     end)
   end
