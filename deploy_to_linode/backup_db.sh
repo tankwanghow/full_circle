@@ -36,12 +36,13 @@
 # note's files keep their upload path. Nothing is pruned remotely.
 #
 # Google Drive setup (once, as root — cron reads /root/.config/rclone):
-#   1. On a PC with a browser:  rclone authorize "drive" "drive.file"
-#      (drive.file: the server sees only files rclone made, not the rest of
-#      the Drive). Copy the token JSON it prints.
-#   2. On the server:  sudo rclone config
-#      n) new remote "gdrive", type drive, scope 3 (drive.file), no auto
-#         config, paste the token. Default client id is fine at this volume.
+#   1. On the server:  sudo rclone config
+#      n) new remote "gdrive", type drive, client id blank (default is fine at
+#         this volume), scope "drive.file" (the server sees only files rclone
+#         made, not the rest of the Drive), "Use auto config?" n. It prints
+#         `rclone authorize "drive" "<blob>"`: run that on a PC with a
+#         browser, sign in, paste the token it prints back into the server.
+#   2. Still in rclone config:
 #      n) new remote "gcrypt", type crypt, remote "gdrive:fullcircle_backup",
 #         filename encryption standard, generate a password AND a salt.
 #      Put both crypt passwords in a password manager: without them the
