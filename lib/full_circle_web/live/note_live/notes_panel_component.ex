@@ -215,7 +215,6 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
             <:header :let={roles_editable}>
               <.post_header
                 note={item.note}
-                progress={item.note.subject_type == "Task" and @record_type != "Task"}
                 reply_to={item.d[:reply_to]}
                 relation={item.relation}
                 show_visibility={!roles_editable}

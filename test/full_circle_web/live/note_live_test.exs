@@ -233,7 +233,9 @@ defmodule FullCircleWeb.NoteLiveTest do
     plain = note_fixture(comp, admin, %{"body" => "just a note"})
 
     {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes")
-    assert has_element?(lv, ~s(#notes-#{progress.id}.note-progress [title="Progress"]), "✅")
+    assert has_element?(lv, "#notes-#{progress.id}.note-progress")
+    # The amber bar says it; no ✅ tick (user, 2026-10-05).
+    refute has_element?(lv, "#notes-#{progress.id}", "✅")
     refute has_element?(lv, "#notes-#{plain.id}.note-progress")
 
     {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/#{task.id}")

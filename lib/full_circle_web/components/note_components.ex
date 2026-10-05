@@ -602,7 +602,6 @@ defmodule FullCircleWeb.NoteComponents do
       <div class="min-w-0 flex-1">
         <.post_header
           note={@note}
-          progress={@progress}
           reply_to={@reply_to}
           relation={@relation}
           detail={@detail}
@@ -659,7 +658,6 @@ defmodule FullCircleWeb.NoteComponents do
 
   attr :note, Note, required: true
   attr :reply_to, :any, default: nil
-  attr :progress, :boolean, default: false, doc: "a ✅ tick: the note is progress on a task"
   attr :relation, :atom, default: nil
   attr :detail, :boolean, default: false
   attr :new_tab, :boolean, default: false
@@ -683,7 +681,6 @@ defmodule FullCircleWeb.NoteComponents do
           do: FullCircleWeb.Helpers.format_datetime(@note.inserted_at, @current_company),
           else: "· " <> ago(@note.inserted_at, @current_company)}
       </span>
-      <span :if={@progress} class="note-progress-tick ml-1" title={gettext("Progress")}>✅</span>
       <span
         :if={@reply_to}
         class="note-reply-to ml-1 rounded-full border border-slate-300 px-2 text-xs text-slate-600 dark:border-slate-600 dark:text-slate-300"

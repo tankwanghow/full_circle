@@ -623,7 +623,6 @@ defmodule FullCircleWeb.NoteLive.Form do
               <:header :let={roles_editable}>
                 <.post_header
                   note={@note}
-                  progress={@note.subject_type == "Task"}
                   reply_to={@item.d[:reply_to]}
                   detail
                   show_visibility={!roles_editable}

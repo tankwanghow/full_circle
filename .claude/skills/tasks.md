@@ -24,7 +24,7 @@ Notes about the task). The notes panel picks the words from `record_type ==
 "Write progress…"; the close dialog's box reads "Progress (optional)"; 📝
 counts carry a "Progress" tooltip. In the notes feed (and any panel other
 than the task's own) a note about a task wears the Tasks amber
-(`.note-progress`: `#f59e0b` inset bar, amber tint, a ✅ tick titled "Progress").
+(`.note-progress`: `#f59e0b` inset bar, amber tint; no ✅ tick since 2026-10-05).
 
 Notes with `subject_type "Task"`. `Notes.visible_to/3` lets anyone who can see the task read them. `list_versions/3` applies the task rule **per version**, using each version's own `subject_type`/`subject_id` (not the note's current subject), so re-pointing a restricted note at a task never exposes its old text.
 A task note does not ask for a visibility role. `Notes.create_note/3` and `update_note/4` copy the task's `visibility` onto the note (`follow_task_visibility/2`), including a closing note; any `visibility` the client sends is overridden. Changing the task's visibility updates those notes (`sync_task_note_visibility/3`, no new note version) — only the task's own live notes in its company.

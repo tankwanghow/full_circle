@@ -441,8 +441,9 @@ looks the same everywhere. Options:
   something else).
 - `new_tab` — body and counts open the note in a new tab (panels).
 - Progress: a note whose subject is a Task gets `.note-progress` (amber
-  `#f59e0b` inset bar, amber tint) and a ✅ tick (tooltip "Progress") in `post_header`
-  (`progress` attr), except where `host` is that task. Edit headers pass it too.
+  `#f59e0b` inset bar, amber tint; `note_post/1`'s `progress` attr), except
+  where `host` is that task. No ✅ tick — removed 2026-10-05 at the user's
+  request; the bar says it.
 - Files: the feed, panels and the note page all draw `file_grid/1` (the large
   X-style grid). Feed and panels show the first 4, then "+ N more files"; the
   note page (`detail`) shows all. There is no small-thumbnail panel mode.
