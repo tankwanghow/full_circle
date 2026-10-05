@@ -234,7 +234,9 @@ overlay lives on `document.body` outside every LiveView container. Links opt in
 with `data-viewer="image"|"pdf"` plus `data-viewer-name`. ← → move through the
 links in the closest `[data-viewer-group]` (one post's grid). PDFs show in an
 `<iframe>`, which works because the file is served `inline` and is
-same-origin. Where `navigator.pdfViewerEnabled === false` (Android Chrome),
+same-origin. For a PDF the viewer's own bar shows only the counter and ✕,
+because the browser's PDF toolbar already has the name, download and print,
+and two toolbars confused users. Where `navigator.pdfViewerEnabled === false` (Android Chrome),
 PDFs keep `target=_blank` and are skipped by ← →. Esc does not reach the page
 while focus is inside the PDF iframe; ✕ and a backdrop click still close it.
 

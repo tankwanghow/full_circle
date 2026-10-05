@@ -57,14 +57,18 @@ function show(i) {
   const link = group[index]
   const url = link.getAttribute("href")
   const name = link.dataset.viewerName || link.title || ""
+  const pdf = link.dataset.viewer === "pdf"
   const stage = part("stage")
   stage.replaceChildren(
-    link.dataset.viewer === "pdf"
+    pdf
       ? el("iframe", { src: url, title: name, class: "h-full w-full max-w-5xl rounded bg-white" })
       : el("img", { src: url, alt: name, class: "max-h-full max-w-full object-contain" })
   )
-  part("name").textContent = name
+  // The browser's PDF toolbar already shows the name, download and print, so
+  // a PDF keeps only the counter and ✕ here; two toolbars read as a muddle.
+  part("name").textContent = pdf ? "" : name
   part("count").textContent = group.length > 1 ? `${index + 1} / ${group.length}` : ""
+  part("tab").hidden = part("download").hidden = pdf
   part("tab").href = url
   part("download").href = url
   part("download").setAttribute("download", name)
