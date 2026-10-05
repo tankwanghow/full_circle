@@ -537,7 +537,7 @@ defmodule FullCircle.Tasks do
       visible_to(company, user)
       |> scope(filters["scope"] || "all", user)
       |> state(filters["state"] || "open", today)
-      |> terms(filters["terms"])
+      |> terms(filters["terms"], company, user)
       |> offset(^((page - 1) * per_page))
       |> limit(^per_page)
       |> Repo.all()
@@ -636,9 +636,12 @@ defmodule FullCircle.Tasks do
     )
   end
 
-  defp terms(q, nil), do: q
+  defp terms(q, nil, _company, _user), do: q
 
-  defp terms(q, terms) do
+  # Each word may match the title, descriptions, assignee email, or the name
+  # of a linked record (`Linkable.matching_refs/4`: names, document numbers,
+  # and task/note titles the user may see) — read now, nothing copied.
+  defp terms(q, terms, company, user) do
     words = String.split(terms, ~r/\s+/, trim: true)
 
     if words == [] do
@@ -646,13 +649,20 @@ defmodule FullCircle.Tasks do
     else
       q = from(t in q, left_join: a in assoc(t, :assignee), as: :assignee)
 
+      refs =
+        from(l in RecordLink,
+          where: l.company_id == ^company.id and l.from_type == "Task",
+          select: %{owner_id: l.from_id, type: l.to_type, id: l.to_id}
+        )
+
       Enum.reduce(words, q, fn w, q ->
         pattern = "%#{FullCircle.CommandPalette.Types.escape_like(w)}%"
 
         from([t, assignee: a] in q,
           where:
             ilike(t.title, ^pattern) or ilike(coalesce(t.descriptions, ""), ^pattern) or
-              ilike(coalesce(a.email, ""), ^pattern)
+              ilike(coalesce(a.email, ""), ^pattern) or
+              t.id in subquery(Linkable.matching_refs(refs, pattern, company, user))
         )
       end)
     end

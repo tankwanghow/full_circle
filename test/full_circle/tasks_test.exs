@@ -884,6 +884,42 @@ defmodule FullCircle.TasksTest do
       assert rows(ctx, ctx.admin, %{"scope" => "all", "terms" => "%"}) == []
     end
 
+    test "terms also match the names of linked records and documents", ctx do
+      mei = contact_fixture(ctx.company, ctx.admin, %{"name" => "Kedai Mei Hua"})
+      inv = invoice_fixture(ctx.company, ctx.admin)
+      {:ok, _} = Tasks.add_link(ctx.soon, "Contact", mei.id, ctx.company, ctx.admin)
+      {:ok, _} = Tasks.add_link(ctx.upcoming, "Invoice", inv.id, ctx.company, ctx.admin)
+
+      titles = fn terms ->
+        rows(ctx, ctx.admin, %{"scope" => "all", "terms" => terms}) |> Enum.map(& &1.task.title)
+      end
+
+      assert titles.("mei hua") == ["soon"]
+      assert titles.(inv.invoice_no) == ["upcoming"]
+      # Each word may match a different place: the title, or a linked name.
+      assert titles.("soon mei") == ["soon"]
+      assert titles.("upcoming mei") == []
+    end
+
+    test "a linked note's title counts only for those who may read it", ctx do
+      hidden =
+        note_fixture(ctx.company, ctx.admin, %{
+          "title" => "Zebra pay review",
+          "body" => "x",
+          "visibility" => ["manager"]
+        })
+
+      {:ok, _} = Tasks.add_link(ctx.for_clerk, "Note", hidden.id, ctx.company, ctx.admin)
+
+      titles = fn user ->
+        rows(ctx, user, %{"scope" => "all", "terms" => "zebra"}) |> Enum.map(& &1.task.title)
+      end
+
+      assert titles.(ctx.admin) == ["for clerk"]
+      # The clerk sees the task (assignee) but not the note it links to.
+      assert titles.(ctx.clerk) == []
+    end
+
     test "rows carry the latest visible note and the note count", ctx do
       first =
         note_fixture(ctx.company, ctx.admin, %{
