@@ -44,14 +44,17 @@ defmodule FullCircleWeb.TaskLiveTest do
       assert has_element?(lv, "a#new_task")
     end
 
-    test "a dated tile shows the due year small; someday shows none",
+    test "only a date tile shows the year; late and someday tiles do not",
          %{conn: conn, admin: admin, comp: comp} do
+      today = FullCircle.Tasks.today(comp)
+      later = Date.add(today, 60)
+      upcoming = task_fixture(comp, admin, %{"title" => "Later", "due_date" => later})
       late = task_fixture(comp, admin, %{"title" => "Late one", "due_date" => past(comp, 3)})
       someday = task_fixture(comp, admin, %{"title" => "Someday one"})
       {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks")
 
-      year = to_string(FullCircle.Tasks.today(comp) |> Date.add(-3) |> Map.get(:year))
-      assert has_element?(lv, "#tasks-#{late.id} .due-tile-year", year)
+      assert has_element?(lv, "#tasks-#{upcoming.id} .due-tile-year", to_string(later.year))
+      refute has_element?(lv, "#tasks-#{late.id} .due-tile-year")
       refute has_element?(lv, "#tasks-#{someday.id} .due-tile-year")
     end
 

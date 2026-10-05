@@ -47,7 +47,7 @@ defmodule FullCircleWeb.TaskComponents do
   @doc """
   Due tile for the task column. Overdue is rose ("3d" / "late"), today is amber,
   a later date is the day and month, someday is "—", and a closed task says
-  Done or Skipped. Every dated open tile adds the due year, small, underneath. The full phrase stays in the markup so "3d late" still matches.
+  Done or Skipped. A date tile adds its year, small, underneath. The full phrase stays in the markup so "3d late" still matches.
   """
   def due_tile(assigns) do
     assigns =
@@ -55,14 +55,15 @@ defmodule FullCircleWeb.TaskComponents do
         label: tile_label(assigns.task, assigns.group, assigns.today),
         lines: tile_lines(assigns.task, assigns.group, assigns.today),
         title: tile_title(assigns.task, assigns.company),
-        # The due date's year, small, under any dated open tile.
-        year: assigns.group != :closed && assigns.task.due_date && assigns.task.due_date.year
+        # A tile showing a date (day + month) adds its year, small; "3d late",
+        # "today" and "in 3d" are not dates and show none.
+        year: assigns.group == :upcoming && assigns.task.due_date && assigns.task.due_date.year
       )
 
     ~H"""
     <div
       class={[
-        "flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg px-0.5 text-center leading-none",
+        "flex h-14 w-11 shrink-0 flex-col items-center justify-center rounded-lg px-0.5 text-center leading-none",
         tile_class(@group, @task)
       ]}
       title={@title}
