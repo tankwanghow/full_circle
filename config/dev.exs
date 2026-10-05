@@ -35,7 +35,13 @@ config :full_circle, FullCircleWeb.Endpoint,
   http: [ip: {0, 0, 0, 0}, port: 4000],
   # Absolute links (the note "📱 From phone" QR) use this host. To test from
   # a phone on the same Wi-Fi: PHX_HOST=<this machine's LAN IP> iex -S mix phx.server
-  url: [host: System.get_env("PHX_HOST") || "localhost", port: 4000, scheme: "http"],
+  # With PHX_HOST set the links go to https :4001: phones allow camera and mic
+  # (the ⏺ / 🎙 recorders) only on HTTPS. Accept the self-signed cert once.
+  url:
+    if(System.get_env("PHX_HOST"),
+      do: [host: System.get_env("PHX_HOST"), port: 4001, scheme: "https"],
+      else: [host: "localhost", port: 4000, scheme: "http"]
+    ),
   https: [
     ip: {0, 0, 0, 0},
     port: 4001,
