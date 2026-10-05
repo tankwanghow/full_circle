@@ -96,6 +96,6 @@ committed in the same session, but it did not reach production until someone app
 | Script | Purpose |
 |---|---|
 | `scripts/restore_backup.sh` | Drop/recreate local `full_circle_dev`, restore a `pg_dump -Ft` archive, optionally `mix ecto.migrate`. Prefer this over `pg_restore -c` when local has tables newer than the dump (e.g. `trading_*`). |
-| `deploy_to_linode/backup_db.sh` | Prod nightly backup (root crontab `0 13 * * *`, installed as `/usr/local/bin/fullcircle_backup_db.sh`). Dumps to `.partial`, verifies with `pg_restore -l`, keeps newest 14 + first-of-month ×12 in `monthly/`, optional `RCLONE_REMOTE` off-site copy. Password from `/root/.pgpass`. Log: `db_backup/backup.log`. Install steps in the script header. |
+| `deploy_to_linode/backup_db.sh` | Prod nightly backup (root crontab `0 13 * * *`, installed as `/usr/local/bin/fullcircle_backup_db.sh`). Dumps to `.partial`, verifies with `pg_restore -l`, keeps newest 14 + first-of-month ×12 in `monthly/`, optional off-site copies to Google Drive through an rclone `crypt` remote: `RCLONE_REMOTE` (dump gzipped, 30 days) and `RCLONE_UPLOADS_REMOTE` (note attachments, add-only, never pruned). Password from `/root/.pgpass`; crypt passwords live only in rclone.conf and the password manager. Log: `db_backup/backup.log`. Install, Drive setup and restore steps in the script header. |
 
 Cert renewal is the `certbot.timer` systemd unit — there is no certbot crontab line (the old one in root's crontab never ran and was removed 2026-09-25).

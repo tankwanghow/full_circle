@@ -17,9 +17,43 @@
 # month hard-linked into BACKUP_DIR/monthly (newest KEEP_MONTHLY kept).
 # Rotation is by count, never by age: if dumps start failing, nothing is deleted.
 #
-# Off-site: set RCLONE_REMOTE (e.g. gdrive:fullcircle_backups) to copy each
-# verified dump there; remote copies older than OFFSITE_DAYS are pruned.
-# Leave it empty to skip.
+# Off-site: set RCLONE_REMOTE (e.g. gcrypt:db) to copy each verified dump
+# there, gzipped (a -Ft dump is uncompressed: 741 MB -> 140 MB in Oct 2026,
+# which is what makes 30 days fit Google Drive's free 15 GB). Remote copies
+# older than OFFSITE_DAYS are pruned (on Google Drive a delete goes to its
+# trash for 30 more days). Leave it empty to skip.
+#
+# Uploads: set RCLONE_UPLOADS_REMOTE (e.g. gcrypt:uploads) to copy note
+# attachments from UPLOADS_DIR after the dump. `copy`, never `sync`: files are
+# only added, so a wiped or damaged server folder never empties the backup.
+# `--ignore-existing`: an upload is never rewritten (UUID names), so a file
+# already backed up is never sent again — a damaged server copy (bad disk,
+# ransomware) cannot replace the good one. Not `--immutable`: through crypt
+# rclone has no hashes and compares mtimes, so a `chown -R` or a server move
+# that resets mtimes would fail every night's run.
+# Skipped: scans/ (half-finished phone scans, pruned after 24 h) and PDF
+# *.thumb.* previews (rebuilt on demand). tray/ folders must stay: a saved
+# note's files keep their upload path. Nothing is pruned remotely.
+#
+# Google Drive setup (once, as root — cron reads /root/.config/rclone):
+#   1. On a PC with a browser:  rclone authorize "drive" "drive.file"
+#      (drive.file: the server sees only files rclone made, not the rest of
+#      the Drive). Copy the token JSON it prints.
+#   2. On the server:  sudo rclone config
+#      n) new remote "gdrive", type drive, scope 3 (drive.file), no auto
+#         config, paste the token. Default client id is fine at this volume.
+#      n) new remote "gcrypt", type crypt, remote "gdrive:fullcircle_backup",
+#         filename encryption standard, generate a password AND a salt.
+#      Put both crypt passwords in a password manager: without them the
+#      backup cannot be read, by anyone, including you.
+#   3. Set RCLONE_REMOTE=gcrypt:db and RCLONE_UPLOADS_REMOTE=gcrypt:uploads in
+#      the crontab line (or edit the defaults below), run the script once by
+#      hand and read backup.log.
+#
+# Restore (any machine with the same rclone.conf):
+#   rclone copy gcrypt:db/backup_at_<stamp>.tar.gz . && gunzip backup_at_<stamp>.tar.gz
+#   scripts/restore_backup.sh backup_at_<stamp>.tar
+#   rclone copy gcrypt:uploads /home/fullcircle/uploads   # or one file's path
 set -euo pipefail
 
 DB_NAME="${DB_NAME:-fullcircle}"
@@ -29,7 +63,9 @@ BACKUP_DIR="${BACKUP_DIR:-/home/fullcircle/db_backup}"
 KEEP_DAILY="${KEEP_DAILY:-14}"
 KEEP_MONTHLY="${KEEP_MONTHLY:-12}"
 RCLONE_REMOTE="${RCLONE_REMOTE:-}"
-OFFSITE_DAYS="${OFFSITE_DAYS:-60}"
+UPLOADS_DIR="${UPLOADS_DIR:-/home/fullcircle/uploads}"
+RCLONE_UPLOADS_REMOTE="${RCLONE_UPLOADS_REMOTE:-}"
+OFFSITE_DAYS="${OFFSITE_DAYS:-30}"
 LOG_FILE="${LOG_FILE:-$BACKUP_DIR/backup.log}"
 
 mkdir -p "$BACKUP_DIR/monthly"
@@ -45,7 +81,8 @@ flock -n 9 || fail "another backup is still running"
 stamp="$(date +%Y%m%d%H%M%S)"
 final="$BACKUP_DIR/backup_at_${stamp}.tar"
 partial="$final.partial"
-trap 'rm -f "$partial"' EXIT
+gz="$final.gz"
+trap 'rm -f "$partial" "$gz"' EXIT
 
 log "dump $DB_NAME -> $final"
 pg_dump -w -U "$DB_USER" -h "$DB_HOST" -d "$DB_NAME" -Ft -f "$partial" \
@@ -77,10 +114,27 @@ prune "$BACKUP_DIR" "$KEEP_DAILY"
 prune "$BACKUP_DIR/monthly" "$KEEP_MONTHLY"
 
 if [ -n "$RCLONE_REMOTE" ]; then
-  rclone copy "$final" "$RCLONE_REMOTE" || fail "off-site copy to $RCLONE_REMOTE"
-  rclone delete "$RCLONE_REMOTE" --min-age "${OFFSITE_DAYS}d" --include 'backup_at_*.tar' \
+  # Compressed for the trip only: the local dump stays a plain .tar for
+  # scripts/restore_backup.sh (gunzip an off-site copy first).
+  gzip -c "$final" >"$gz" || fail "gzip for off-site copy"
+  rclone copy "$gz" "$RCLONE_REMOTE" || fail "off-site copy to $RCLONE_REMOTE"
+  rm -f "$gz"
+  rclone delete "$RCLONE_REMOTE" --min-age "${OFFSITE_DAYS}d" --include 'backup_at_*.tar*' \
     || log "WARN: off-site prune failed (copy succeeded)"
   log "off-site: copied to $RCLONE_REMOTE"
+fi
+
+# After the dump: a file is written before its row, so a restored dump never
+# names a file this copy is missing.
+if [ -n "$RCLONE_UPLOADS_REMOTE" ]; then
+  [ -d "$UPLOADS_DIR" ] || fail "uploads dir $UPLOADS_DIR not found"
+  # -v for the closing stats line; rclone's own exit code decides success.
+  if ! out="$(rclone copy "$UPLOADS_DIR" "$RCLONE_UPLOADS_REMOTE" --ignore-existing \
+    --exclude '*/scans/**' --exclude '*.thumb.*' --stats-one-line -v 2>&1)"; then
+    grep -E 'ERROR' <<<"$out" | tail -n 5 || true
+    fail "uploads copy to $RCLONE_UPLOADS_REMOTE"
+  fi
+  log "uploads: copied to $RCLONE_UPLOADS_REMOTE ($(grep -c 'Copied (new)' <<<"$out" || true) new files)"
 fi
 
 log "done"
