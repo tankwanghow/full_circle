@@ -65,6 +65,7 @@ defmodule FullCircleWeb.NoteLive.PhoneQrComponent do
       <div
         :if={@qr}
         id={"#{@id}-qr"}
+        data-no-post-open
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
       >
         <div

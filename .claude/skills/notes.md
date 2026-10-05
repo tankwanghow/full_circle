@@ -228,6 +228,15 @@ itself on error. Tests needing pdftoppm are tagged `:pdftoppm` and excluded
 in `test_helper.exs` when it isn't installed. The feed shows the first 4 files
 of any kind (PDFs as tiles) then "+n more"; the note page shows every file.
 
+A click on a post's empty space opens the note (`assets/js/post_open.js`):
+`note_post` marks the `<article data-post-open>` (not in detail mode), and the
+script clicks the post's first `a[data-post-link]`, so feed and panel keep
+their own navigation (same tab vs new tab). Clicks on a, button, input,
+label, `[phx-click]` or `[data-no-post-open]` (the 📱 QR modal, which renders
+*inside* the post) keep their own action, and so does a click that ends a text
+selection. Without this, a files-only note (empty body is allowed with
+`files?: true`) has a 0 px text link and is nearly impossible to open.
+
 File tiles (`file_grid/1`) open in the in-page viewer `assets/js/file_viewer.js`,
 not a new tab. It is one delegated document click listener (no hook), and its
 overlay lives on `document.body` outside every LiveView container. Links opt in

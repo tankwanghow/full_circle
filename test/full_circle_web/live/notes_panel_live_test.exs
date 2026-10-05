@@ -202,6 +202,41 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
              |> Enum.count() == 4
     end
 
+    test "a photo-only post opens from anywhere on it", %{
+      conn: conn,
+      admin: admin,
+      comp: comp,
+      contact: c
+    } do
+      note =
+        note_fixture(comp, admin, %{
+          "body" => "x",
+          "subject_type" => "Contact",
+          "subject_id" => c.id
+        })
+
+      # A files-only note saves with an empty body (Note.changeset files?: true).
+      import Ecto.Query
+      FullCircle.Repo.update_all(where(FullCircle.Notes.Note, id: ^note.id), set: [body: ""])
+
+      {:ok, _} =
+        FullCircle.Notes.Attachments.attach(
+          note,
+          %{path: jpeg_file(), file_name: "only.jpg"},
+          comp,
+          admin
+        )
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts/#{c.id}/edit")
+      post = "#notes-panel-note-#{note.id}"
+      assert has_element?(lv, "#{post}[data-post-open]")
+
+      assert has_element?(
+               lv,
+               ~s(#{post} a[data-post-link][href="/companies/#{comp.id}/notes/#{note.id}"])
+             )
+    end
+
     test "file tiles open in the viewer, grouped per post", %{
       conn: conn,
       admin: admin,

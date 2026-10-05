@@ -446,10 +446,13 @@ defmodule FullCircleWeb.NoteComponents do
       )
 
     ~H"""
+    <%!-- data-post-open: a click on empty space opens the note (post_open.js). --%>
     <article
       id={@id}
+      data-post-open={!@detail}
       class={[
         "flex gap-3 border-b border-gray-200 px-4 py-3 dark:border-gray-700",
+        !@detail && "cursor-pointer",
         if(@progress,
           do:
             "note-progress bg-amber-50/70 shadow-[inset_3px_0_0_#f59e0b] hover:bg-amber-100/60 dark:bg-amber-950/25 dark:hover:bg-amber-950/40",
@@ -590,13 +593,13 @@ defmodule FullCircleWeb.NoteComponents do
   # opens in a new one so the record stays put (see "Navigation" in the skill).
   defp post_link(%{new_tab: true} = assigns) do
     ~H"""
-    <a href={@path} target="_blank" class={@class}>{render_slot(@inner_block)}</a>
+    <a href={@path} target="_blank" data-post-link class={@class}>{render_slot(@inner_block)}</a>
     """
   end
 
   defp post_link(assigns) do
     ~H"""
-    <.link navigate={@path} class={@class}>{render_slot(@inner_block)}</.link>
+    <.link navigate={@path} data-post-link class={@class}>{render_slot(@inner_block)}</.link>
     """
   end
 end
