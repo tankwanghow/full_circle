@@ -435,6 +435,32 @@ defmodule FullCircle.NotesTest do
       assert Notes.count_by_records(company, clerk, "Contact", [c.id, c2.id]) == %{c.id => 2}
       assert Notes.count_by_records(company, admin, "Contact", [c.id, c2.id]) == %{c.id => 3}
     end
+
+    test "a reply shows where its root links, as a reply shows where its root is about",
+         %{admin: admin, company: company, contact: c} do
+      root = note_fixture(company, admin, %{"body" => "root"})
+      {:ok, link} = Notes.add_link(root, "Contact", c.id, company, admin)
+      note_fixture(company, admin, %{"body" => "reply", "reply_to_id" => root.id})
+
+      # Linking the record itself as well must not show the reply twice.
+      also = note_fixture(company, admin, %{"body" => "also links", "reply_to_id" => root.id})
+      {:ok, _} = Notes.add_link(also, "Contact", c.id, company, admin)
+
+      rows = Notes.notes_for_record("Contact", c.id, company, admin)
+
+      assert Enum.map(rows, &{&1.note.body, &1.relation}) |> Enum.sort() ==
+               [{"also links", :linked}, {"reply", :linked}, {"root", :linked}]
+
+      assert Notes.count_by_records(company, admin, "Contact", [c.id]) == %{c.id => 3}
+
+      # Nothing is copied: unlinking the root takes its plain reply with it.
+      {:ok, _} = Notes.remove_link(root, link.id, company, admin)
+
+      assert [%{note: %{body: "also links"}}] =
+               Notes.notes_for_record("Contact", c.id, company, admin)
+
+      assert Notes.count_by_records(company, admin, "Contact", [c.id]) == %{c.id => 1}
+    end
   end
 
   describe "search/5" do

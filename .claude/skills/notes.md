@@ -295,7 +295,7 @@ while focus is inside the PDF iframe; ✕ and a backdrop click still close it.
 - Never forces a reload when the socket is down (it would lose unsaved input).
 
 ## Counts
-`Notes.count_by_records/4` = notes about ∪ notes linking, each note once,
+`Notes.count_by_records/4` = notes about ∪ notes linking (or replying to a root that links), each note once,
 visibility applied, two queries per call (record panels' 📝 counts). The
 feed's 💬 is different: live **replies** only (`feed_details/3`), a note that
 merely links here never counts.
@@ -316,6 +316,13 @@ Spec: `docs/superpowers/specs/2026-10-02-note-replies-design.md`.
   root's: `create_note/3` copies them (client values ignored) and
   `update_note/4` drops them from a reply's attrs; `reply_to_id` never changes
   after create. So a reply about a record shows in that record's panel.
+- **A reply also shows where its root links** — read at query time, never
+  copied (`notes_for_record/5` linked side: `n.id in subquery(linking) or
+  n.reply_to_id in subquery(linking)`; `count_by_records/4` joins on either).
+  Unlinking the root drops its replies from that panel; a reply's own links
+  still count, once. Decided 2026-10-05: copying links would drift and need a
+  sync. Task progress notes do **not** follow the task's links: the record's
+  tasks panel shows the task with its latest progress instead.
 - A root's save that changes subject or visibility updates its live replies
   in the same transaction (`sync_replies/3`). A task's visibility sync
   reaches replies too (they are about the task).

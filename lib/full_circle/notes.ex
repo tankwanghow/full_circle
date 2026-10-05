@@ -623,6 +623,10 @@ defmodule FullCircle.Notes do
   Visible notes about, or linking to, one record, newest first, each once
   (`relation: :about` wins over `:linked`). `limit: n` returns only the newest
   n; the panel pages with it and asks `count_by_records/4` for the total.
+
+  A reply follows its root both ways: it is about what the root is about (the
+  column is copied), and it is `:linked` where the root links (read here, not
+  copied, so unlinking the root takes its replies with it).
   """
   def notes_for_record(type, id, company, user, opts \\ []) do
     limit = Keyword.get(opts, :limit)
@@ -636,11 +640,18 @@ defmodule FullCircle.Notes do
 
     # A note that is about the record and also links to it counts as :about;
     # excluding it here (not after the query) keeps each side's limit honest.
+    # `in subquery`, not a join: a reply linking here under a root that also
+    # does would otherwise come back twice.
+    linking =
+      from(l in RecordLink,
+        where: l.company_id == ^company.id and l.from_type == "Note",
+        where: l.to_type == ^type and l.to_id == ^id,
+        select: l.from_id
+      )
+
     linked =
       from(n in visible_to(company, user),
-        join: l in RecordLink,
-        on: l.from_type == "Note" and l.from_id == n.id,
-        where: l.company_id == ^company.id and l.to_type == ^type and l.to_id == ^id,
+        where: n.id in subquery(linking) or n.reply_to_id in subquery(linking),
         where:
           is_nil(n.subject_type) or is_nil(n.subject_id) or
             not (n.subject_type == ^type and n.subject_id == ^id)
@@ -678,10 +689,11 @@ defmodule FullCircle.Notes do
       )
       |> Repo.all()
 
+    # A reply counts where its root links (see `notes_for_record/5`).
     linked =
       from(n in visible_to(company, user),
         join: l in RecordLink,
-        on: l.from_type == "Note" and l.from_id == n.id,
+        on: l.from_type == "Note" and (l.from_id == n.id or l.from_id == n.reply_to_id),
         where: l.company_id == ^company.id and l.to_type == ^type and l.to_id in ^ids,
         select: {l.to_id, n.id}
       )
