@@ -31,7 +31,7 @@ defmodule FullCircleWeb.ContactLive.IndexComponent do
         <span :if={FullCircle.Accounting.is_default_account?(@obj)} class="min-w-0 truncate">
           {@obj.name}
         </span>
-        <.row_notes_badge count={@note_count} id={@obj.id} />
+        <.row_notes_badge count={@note_count} tasks={@task_count} id={@obj.id} />
       </div>
       <div class="w-[11%] shrink-0 truncate">{@obj.category}</div>
       <div class={["flex-1 min-w-0 truncate", muted_class()]} title={address(@obj)}>

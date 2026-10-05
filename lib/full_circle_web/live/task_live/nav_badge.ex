@@ -1,6 +1,6 @@
 defmodule FullCircleWeb.TaskLive.NavBadge do
   @moduledoc """
-  "✅ Tasks (n)" in the nav, n = open tasks overdue or due soon that I can
+  "👷 Tasks (n)" in the nav, n = open tasks overdue or due soon that I can
   see (the All tab's count). The nav lives in the root layout, which LiveView
   does not re-render on live navigation, so this is a sticky nested LiveView
   that stays mounted across pages and recounts on `{:tasks_changed, _}`.
@@ -51,7 +51,7 @@ defmodule FullCircleWeb.TaskLive.NavBadge do
       navigate={~p"/companies/#{@company.id}/tasks"}
       class="rounded hover:bg-gray-400 p-2 whitespace-nowrap"
     >
-      ✅{gettext("Tasks")}<span
+      👷{gettext("Tasks")}<span
         :if={@count > 0}
         id="task-badge-count"
         class="ml-1 rounded-full bg-rose-600 px-1.5 text-xs font-bold text-white"

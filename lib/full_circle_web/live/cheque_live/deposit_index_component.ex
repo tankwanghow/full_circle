@@ -31,7 +31,12 @@ defmodule FullCircleWeb.ChequeLive.DepositIndexComponent do
         <.link navigate={~p"/companies/#{@company.id}/Deposit/#{@obj.deposit_id}/edit"}>
           {@obj.deposit_no}
         </.link>
-        <.row_notes_badge :if={@obj.deposit_id} count={@note_count} id={@obj.deposit_id} />
+        <.row_notes_badge
+          :if={@obj.deposit_id}
+          count={@note_count}
+          tasks={@task_count}
+          id={@obj.deposit_id}
+        />
       </div>
 
       <div :if={@obj.old_data} class="w-[15%] shrink-0 min-w-0 truncate px-1">

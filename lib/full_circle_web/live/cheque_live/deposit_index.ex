@@ -148,6 +148,7 @@ defmodule FullCircleWeb.ChequeLive.DepositIndex do
             <.live_component
               module={FullCircleWeb.ChequeLive.DepositIndexComponent}
               note_count={Map.get(@note_counts, obj.deposit_id, 0)}
+              task_count={Map.get(@task_counts, obj.deposit_id, 0)}
               id={obj_id}
               obj={obj}
               company={@current_company}

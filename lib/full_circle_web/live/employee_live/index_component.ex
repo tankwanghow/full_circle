@@ -44,7 +44,7 @@ defmodule FullCircleWeb.EmployeeLive.IndexComponent do
         >
           {@obj.name}
         </.link>
-        <.row_notes_badge count={@note_count} id={@obj.id} />
+        <.row_notes_badge count={@note_count} tasks={@task_count} id={@obj.id} />
       </div>
       <div class="w-[18%] shrink-0 truncate">{@obj.id_no}</div>
       <div class="w-[16%] shrink-0 truncate">{@obj.nationality}</div>

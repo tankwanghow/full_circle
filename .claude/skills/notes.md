@@ -91,24 +91,32 @@ noting journals and cashiers noting credit/debit notes and return cheques.
    card and the `:edit and @id != "new"` guard. The aside is notes on the
    left and tasks linked to the record on the right; the columns sit side by
    side once the row is 56rem wide (`@4xl`), and stack on a narrower card.
-   The index notes modal stays the notes panel alone. The task page's
+   The index modal (`NotesIndex.modal`) shows the notes panel with the
+   record's tasks panel (`id="notes-modal-tasks"`) below it. The task page's
    progress notes stay the notes panel under the task, inside the task
    column, not this aside.
 4. Index: alias + `NotesIndex.init(type, RowComponent, key: …, stream: …)` in
    mount (`key`/`stream` default to `:id`/`:objects`), `NotesIndex.count/3`
-   before `stream(`, `note_count=` on the row component, `<NotesIndex.modal>`.
-   `init` attaches the `open_notes`/`close_notes` event and
-   `{:notes_changed, ...}` info hooks itself — **no handler clauses in the
-   index**. Row component gets `assign_new(:note_count, ...)` and
-   `<.notes_count_badge>`.
+   before `stream(`, `note_count=` and `task_count=` (from `@task_counts`) on
+   the row component, `<NotesIndex.modal>`. `init` attaches the
+   `open_notes`/`open_tasks`/`close_notes` events and the
+   `{:notes_changed, ...}` / `{:tasks_changed, _}` info hooks itself, and
+   subscribes to `Tasks.topic/1` — **no handler clauses in the index**. Rows
+   render `<.row_notes_badge count={@note_count} tasks={@task_count} id=…>`:
+   📝 always, plus an amber 👷 n (open tasks, `Tasks.open_count_by_records/4`)
+   when n > 0. Both open the modal; 👷 uses `open_tasks` so test selectors on
+   `open_notes` still match one button.
 
 ## Index-page gotchas (LiveView streams)
 - **Drop the list's `:if={Enum.count(@streams.objects) > 0 or @page > 1}`.**
   Once rows read `@note_counts`, any re-render re-evaluates that `:if` against
   an already-flushed stream (count 0) and removes the whole list from the page.
-- **`NotesIndex.changed/4` must not assign `@note_counts`.** Re-rendering the
-  stream comprehension drops the row's `send_update`. It recounts and
-  `send_update`s the row only; row components must `assign(assigns)` (merge).
+- **`NotesIndex.changed/4` must not assign `@note_counts`** (nor
+  `tasks_changed/3` `@task_counts`). Re-rendering the stream comprehension
+  drops the row's `send_update`. They recount and `send_update` the rows
+  only; row components must `assign(assigns)` (merge). `tasks_changed/3`
+  recounts every record on the page in one query, because a task broadcast
+  does not say which record it touched.
 - Rows that are not the record (Deposit/ReturnCheque rows are transactions):
   `NotesIndex.init(type, RowComponent, key: :deposit_id | :return_id)`; `notes_rows` maps each
   document id to its row ids for updates; hide the badge when the key is nil.

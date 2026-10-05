@@ -125,14 +125,32 @@ defmodule FullCircleWeb.ListComponents do
     """
   end
 
-  @doc "Empty notes button shows on row hover only; a count always shows."
+  @doc """
+  📝 notes count, plus 👷 open tasks when there are any. Both open the index's
+  notes modal (notes and tasks panels). With no notes and no tasks the 📝
+  button shows on row hover only.
+  """
   attr :count, :integer, required: true
+  attr :tasks, :integer, default: 0, doc: "open tasks linked to the record"
   attr :id, :string, required: true
 
   def row_notes_badge(assigns) do
     ~H"""
-    <span class={["shrink-0 whitespace-nowrap", @count == 0 && "opacity-0 group-hover:opacity-100"]}>
+    <span class={[
+      "inline-flex shrink-0 gap-0.5 whitespace-nowrap",
+      (@count == 0 and @tasks == 0) && "opacity-0 group-hover:opacity-100"
+    ]}>
       <FullCircleWeb.NoteComponents.notes_count_badge count={@count} id={@id} />
+      <button
+        :if={@tasks > 0}
+        type="button"
+        phx-click="open_tasks"
+        phx-value-id={@id}
+        class="rounded bg-amber-500 px-1 text-xs text-white dark:bg-amber-600"
+        title={ngettext("1 open task", "%{count} open tasks", @tasks)}
+      >
+        👷 {@tasks}
+      </button>
     </span>
     """
   end

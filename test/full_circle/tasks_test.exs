@@ -994,5 +994,37 @@ defmodule FullCircle.TasksTest do
                "Someday"
              ]
     end
+
+    test "open_count_by_records: open visible tasks per record, closed ones not counted", %{
+      company: company,
+      admin: admin
+    } do
+      a = contact_fixture(company, admin, %{"name" => "A"})
+      b = contact_fixture(company, admin, %{"name" => "B"})
+      c = contact_fixture(company, admin, %{"name" => "C"})
+      clerk = user_with_role(company, admin, "clerk")
+      link = fn r -> [%{"type" => "Contact", "id" => r.id}] end
+
+      task_fixture(company, admin, %{"title" => "1", "links" => link.(a)})
+      task_fixture(company, admin, %{"title" => "2", "links" => link.(a)})
+      done = task_fixture(company, admin, %{"title" => "3", "links" => link.(a)})
+      {:ok, _} = Tasks.close_task(done, :done, nil, company, admin)
+
+      task_fixture(company, admin, %{
+        "title" => "secret",
+        "visibility" => ["admin"],
+        "links" => link.(b)
+      })
+
+      ids = [a.id, b.id, c.id]
+
+      assert Tasks.open_count_by_records(company, admin, "Contact", ids) == %{
+               a.id => 2,
+               b.id => 1
+             }
+
+      assert Tasks.open_count_by_records(company, clerk, "Contact", ids) == %{a.id => 2}
+      assert Tasks.open_count_by_records(company, admin, "Contact", []) == %{}
+    end
   end
 end

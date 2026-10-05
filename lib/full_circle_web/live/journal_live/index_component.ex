@@ -50,7 +50,7 @@ defmodule FullCircleWeb.JournalLive.IndexComponent do
             current_company={@company}
             doc_obj={%{doc_type: "Journal", doc_id: @obj.id, doc_no: @obj.journal_no}}
           />
-          <.row_notes_badge count={@note_count} id={@obj.id} />
+          <.row_notes_badge count={@note_count} tasks={@task_count} id={@obj.id} />
         <% end %>
       </div>
       <div class="w-[40%] shrink-0 min-w-0 truncate px-1">

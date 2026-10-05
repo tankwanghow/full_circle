@@ -147,7 +147,7 @@ defmodule FullCircleWeb.PurInvoiceLive.IndexComponent do
               current_company={@company}
               doc_obj={%{doc_type: "PurInvoice", doc_id: @obj.id, doc_no: @obj.pur_invoice_no}}
             />
-            <.row_notes_badge count={@note_count} id={@obj.id} />
+            <.row_notes_badge count={@note_count} tasks={@task_count} id={@obj.id} />
             <span
               :if={@obj.e_inv_internal_id && @obj.pur_invoice_no != @obj.e_inv_internal_id}
               class="min-w-0 truncate text-xs text-slate-500"

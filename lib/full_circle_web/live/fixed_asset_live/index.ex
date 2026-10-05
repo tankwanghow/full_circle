@@ -53,6 +53,7 @@ defmodule FullCircleWeb.FixedAssetLive.Index do
             <.live_component
               module={IndexComponent}
               note_count={Map.get(@note_counts, obj.id, 0)}
+              task_count={Map.get(@task_counts, obj.id, 0)}
               id={"#{obj_id}"}
               obj={obj}
               current_company={@current_company}

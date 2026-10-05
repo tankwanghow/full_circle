@@ -31,7 +31,12 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeIndexComponent do
         <.link navigate={~p"/companies/#{@company.id}/ReturnCheque/#{@obj.return_id}/edit"}>
           {@obj.doc_no}
         </.link>
-        <.row_notes_badge :if={@obj.return_id} count={@note_count} id={@obj.return_id} />
+        <.row_notes_badge
+          :if={@obj.return_id}
+          count={@note_count}
+          tasks={@task_count}
+          id={@obj.return_id}
+        />
       </div>
 
       <div :if={@obj.old_data} class="w-[12%] shrink-0 min-w-0 truncate px-1">

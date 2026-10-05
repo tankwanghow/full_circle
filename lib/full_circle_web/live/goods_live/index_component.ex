@@ -25,7 +25,7 @@ defmodule FullCircleWeb.GoodLive.IndexComponent do
           {@obj.name}
         </.link>
         <span class={["text-xs", muted_class()]}>{@obj.unit}</span>
-        <.row_notes_badge count={@note_count} id={@obj.id} />
+        <.row_notes_badge count={@note_count} tasks={@task_count} id={@obj.id} />
       </div>
       <div class="w-[11%] shrink-0 truncate">{@obj.category}</div>
       <div

@@ -22,7 +22,7 @@ feed, Punch Ingest Log, Punch (time attendance) index.
   container. Rows: `class={row_class(@ex_class)}` + an inner
   `class={line_class()}` (or one div with both).
 - `amount_cell` (right, tabular, "—" for zero), `overdue_cell` (rose "27d",
-  due date in tooltip), `row_notes_badge` (empty button on hover only),
+  due date in tooltip), `row_notes_badge` (📝, plus 👷 open tasks; empty 📝 on hover only),
   `chip kind={:ok | :todo | :bad | :muted}`, `money/1`, `muted_class/0`.
 
 ## Column rules

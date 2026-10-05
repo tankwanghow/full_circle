@@ -733,6 +733,25 @@ defmodule FullCircle.Tasks do
     |> Repo.all()
   end
 
+  @doc """
+  Open visible tasks per record for an index page (`%{record_id => n}`, records
+  with none left out): the 👷 badge beside 📝. Same link rule as
+  `for_record/4`; one query per call, whatever the number of ids.
+  """
+  def open_count_by_records(_company, _user, _type, []), do: %{}
+
+  def open_count_by_records(company, user, type, ids) do
+    from(t in visible_to(company, user),
+      join: l in RecordLink,
+      on: l.from_type == "Task" and l.from_id == t.id and l.company_id == ^company.id,
+      where: l.to_type == ^type and l.to_id in ^ids and t.status == "open",
+      group_by: l.to_id,
+      select: {l.to_id, count(t.id, :distinct)}
+    )
+    |> Repo.all()
+    |> Map.new()
+  end
+
   def list_links(%CompanyTask{} = task, company, user) do
     rows =
       from(l in RecordLink,

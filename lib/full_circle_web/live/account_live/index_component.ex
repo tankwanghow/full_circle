@@ -36,7 +36,7 @@ defmodule FullCircleWeb.AccountLive.IndexComponent do
           <% true -> %>
             <span class="min-w-0 truncate font-bold text-rose-600">{@obj.name}</span>
         <% end %>
-        <.row_notes_badge count={@note_count} id={@obj.id} />
+        <.row_notes_badge count={@note_count} tasks={@task_count} id={@obj.id} />
       </div>
       <div class="w-[20%] shrink-0 truncate">{@obj.account_type}</div>
       <div class={["flex-1 min-w-0 truncate", muted_class()]} title={@obj.descriptions}>

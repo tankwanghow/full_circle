@@ -440,6 +440,56 @@ defmodule FullCircleWeb.NotesPanelLiveTest do
       assert html =~ "pays late"
     end
 
+    test "a row shows its open task count; the badge opens notes and tasks together",
+         %{conn: conn, admin: admin, comp: comp, contact: c} do
+      link = [%{"type" => "Contact", "id" => c.id}]
+
+      FullCircle.TasksFixtures.task_fixture(comp, admin, %{
+        "title" => "Call back",
+        "links" => link
+      })
+
+      done =
+        FullCircle.TasksFixtures.task_fixture(comp, admin, %{"title" => "Old", "links" => link})
+
+      {:ok, _} = FullCircle.Tasks.close_task(done, :done, nil, comp, admin)
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts")
+      badge = "button[phx-click=open_tasks][phx-value-id='#{c.id}']"
+      assert has_element?(lv, badge, "👷 1")
+
+      html = lv |> element(badge) |> render_click()
+      assert html =~ "Call back"
+      assert has_element?(lv, "#notes-modal #notes-modal-panel")
+      assert has_element?(lv, "#notes-modal #notes-modal-tasks")
+    end
+
+    test "no open tasks, no task badge", %{conn: conn, comp: comp, contact: c} do
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts")
+      refute has_element?(lv, "button[phx-click=open_tasks][phx-value-id='#{c.id}']")
+    end
+
+    test "closing a task in the modal updates the row's task count",
+         %{conn: conn, admin: admin, comp: comp, contact: c} do
+      link = [%{"type" => "Contact", "id" => c.id}]
+
+      t =
+        FullCircle.TasksFixtures.task_fixture(comp, admin, %{
+          "title" => "Call back",
+          "links" => link
+        })
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/contacts")
+      badge = "button[phx-click=open_tasks][phx-value-id='#{c.id}']"
+      assert has_element?(lv, badge, "👷 1")
+
+      # Any task write broadcasts {:tasks_changed, company_id}; the index recounts.
+      {:ok, _} = FullCircle.Tasks.close_task(t, :done, nil, comp, admin)
+      :sys.get_state(lv.pid)
+      :sys.get_state(lv.pid)
+      refute has_element?(lv, badge)
+    end
+
     test "count excludes notes a clerk cannot read", %{admin: admin, comp: comp, contact: c} do
       note_fixture(comp, admin, %{
         "subject_type" => "Contact",

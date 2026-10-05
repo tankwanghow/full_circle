@@ -47,6 +47,7 @@ defmodule FullCircleWeb.ContactLive.Index do
               current_company={@current_company}
               module={IndexComponent}
               note_count={Map.get(@note_counts, obj.id, 0)}
+              task_count={Map.get(@task_counts, obj.id, 0)}
               id={obj_id}
               obj={obj}
               ex_class=""

@@ -85,6 +85,7 @@ defmodule FullCircleWeb.JournalLive.Index do
             <.live_component
               module={IndexComponent}
               note_count={Map.get(@note_counts, obj.id, 0)}
+              task_count={Map.get(@task_counts, obj.id, 0)}
               id={
                 if(obj_id == "objects-",
                   do: "objects-#{FullCircle.Helpers.gen_temp_id(10)}",

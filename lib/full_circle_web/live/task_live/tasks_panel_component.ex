@@ -133,7 +133,7 @@ defmodule FullCircleWeb.TaskLive.TasksPanelComponent do
       ]}
     >
       <div class="flex items-center gap-2 border-b border-gray-200 px-4 py-2 dark:border-gray-700">
-        <span class="font-semibold">✅ {gettext("Tasks")}</span>
+        <span class="font-semibold">👷 {gettext("Tasks")}</span>
         <span class="text-sm text-gray-500">{length(@rows)}</span>
         <button
           :if={@can_create and !@adding}
@@ -194,17 +194,17 @@ defmodule FullCircleWeb.TaskLive.TasksPanelComponent do
           new_tab
         >
           <:actions :if={row.can_edit or row.can_close}>
-          <button
-            :if={row.can_edit}
-            type="button"
-            id={"#{@id}-edit-#{row.task.id}"}
-            phx-click="edit_task"
-            phx-value-id={row.task.id}
-            phx-target={@myself}
-            class="mr-10 rounded-full border border-gray-300 px-2.5 py-0.5 text-xs hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
-          >
-            ✎ {gettext("Edit")}
-          </button>
+            <button
+              :if={row.can_edit}
+              type="button"
+              id={"#{@id}-edit-#{row.task.id}"}
+              phx-click="edit_task"
+              phx-value-id={row.task.id}
+              phx-target={@myself}
+              class="mr-10 rounded-full border border-gray-300 px-2.5 py-0.5 text-xs hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
+            >
+              ✎ {gettext("Edit")}
+            </button>
             <.close_buttons :if={row.can_close} task_id={row.task.id} target={@myself} />
           </:actions>
         </.task_row>

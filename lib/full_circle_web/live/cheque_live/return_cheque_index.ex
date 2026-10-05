@@ -148,6 +148,7 @@ defmodule FullCircleWeb.ChequeLive.ReturnChequeIndex do
             <.live_component
               module={FullCircleWeb.ChequeLive.ReturnChequeIndexComponent}
               note_count={Map.get(@note_counts, obj.return_id, 0)}
+              task_count={Map.get(@task_counts, obj.return_id, 0)}
               id={obj_id}
               obj={obj}
               company={@current_company}
