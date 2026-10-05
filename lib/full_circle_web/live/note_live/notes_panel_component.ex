@@ -252,6 +252,7 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
             <.attach_button
               id={"attach-#{item.id}"}
               url={~p"/companies/#{@current_company.id}/notes/#{item.id}/attachments"}
+              company={@current_company}
             />
             <.live_component
               module={PhoneQrComponent}

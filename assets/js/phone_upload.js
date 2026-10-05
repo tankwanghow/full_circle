@@ -4,7 +4,7 @@
 // fresh token; it replaces the one in the URL so a reload keeps working
 // within the 10-minute idle window. A scan in progress is remembered in
 // localStorage and resumed from the server's page count after a reload.
-import { downscale } from "./note_attach"
+import { downscale, photoOpts } from "./note_attach"
 
 const root = document.getElementById("phone-upload")
 if (root) start(root)
@@ -23,6 +23,7 @@ function uuid() {
 function start(root) {
   let token = root.dataset.token
   const maxBytes = parseInt(root.dataset.maxBytes, 10)
+  const photo = photoOpts(root)
   const scanKey = `phoneUpload:scan:${root.dataset.targetKey}`
   const sentKey = `phoneUpload:sent:${root.dataset.targetKey}`
   const $ = id => document.getElementById(id)
@@ -138,7 +139,7 @@ function start(root) {
   }
 
   async function sendFile(file) {
-    const ready = await downscale(file)
+    const ready = await downscale(file, photo)
     const li = addSent(file.name, thumbFor(ready))
     const attempt = async () => {
       if (ready.size > maxBytes) return { ok: false, error: `Larger than ${Math.floor(maxBytes / 1000000)} MB.` }

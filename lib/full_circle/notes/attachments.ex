@@ -17,6 +17,48 @@ defmodule FullCircle.Notes.Attachments do
   def max_bytes, do: @max_bytes
   def content_types, do: @content_types
 
+  # Photos are shrunk in the browser before upload (`downscale` in
+  # note_attach.js); these are its knobs, per company, in
+  # `companies.settings["photo"]`. Default = WhatsApp "standard" quality.
+  @photo_defaults %{"max_edge" => 1600, "quality" => 75}
+  @photo_ranges %{"max_edge" => 640..4096, "quality" => 50..95}
+
+  @doc """
+  The company's photo downscale settings: `%{max_edge: px, quality: 50..95}`.
+  `quality` is a JPEG percentage; the browser divides it by 100.
+  """
+  def photo_settings(company) do
+    saved = FullCircle.Sys.get_company_settings(company, "photo")
+    %{"max_edge" => edge, "quality" => q} = clean_photo_settings(saved)
+    %{max_edge: edge, quality: q}
+  end
+
+  @doc "Form params (or a stored map) → the map to store, clamped to sane ranges."
+  def clean_photo_settings(params) do
+    Map.new(@photo_defaults, fn {key, default} ->
+      lo..hi//_ = Map.fetch!(@photo_ranges, key)
+
+      value =
+        case to_int(params[key]) do
+          nil -> default
+          n -> n |> max(lo) |> min(hi)
+        end
+
+      {key, value}
+    end)
+  end
+
+  defp to_int(n) when is_integer(n), do: n
+
+  defp to_int(s) when is_binary(s) do
+    case Integer.parse(String.trim(s)) do
+      {n, ""} -> n
+      _ -> nil
+    end
+  end
+
+  defp to_int(_), do: nil
+
   @doc "PubSub topic for \"a file landed\" in this company (see FullCircleWeb.NoteFiles)."
   def topic(company_id), do: "note_files:#{company_id}"
 

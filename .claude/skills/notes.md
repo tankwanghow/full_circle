@@ -230,6 +230,15 @@ of any kind (PDFs as tiles) then "+n more"; the note page shows every file.
 
 `note_attach.js`:
 - Re-encodes only photo formats to JPEG; PNG/WebP/GIF keep transparency.
+- `downscale` size/quality are per company, set by an admin under "Photo
+  Upload" on the company edit page and stored as `companies.settings["photo"]`
+  (`max_edge` 640..4096 px, `quality` 50..95 %; default 1600/75, which is
+  WhatsApp standard). `Attachments.photo_settings/1` reads them and
+  `clean_photo_settings/1` clamps them. Every place that starts an upload must
+  carry `data-max-edge`/`data-quality`: `attach_button` (needs `company=`), the
+  composer tray, and the phone page. Without them JS falls back to 1600/75.
+  Phone *scans* (`enhance()`) ignore these: they stay at 1920 px with
+  per-look quality.
 - Announces a finished upload by dispatching `note-attach:done` to the element
   carrying the button's id *now*, whose hook pushes to its own component.
   Pushing from the original (possibly re-rendered, detached) element reaches

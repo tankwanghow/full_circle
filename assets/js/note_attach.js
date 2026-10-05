@@ -13,7 +13,16 @@ function ext(name) {
   return i >= 0 ? name.slice(i + 1).toLowerCase() : ""
 }
 
-export async function downscale(file, maxEdge = 1920, quality = 0.85) {
+// maxEdge/quality come from the company's photo settings via data-max-edge
+// and data-quality (quality as a percentage). See Attachments.photo_settings/1.
+export function photoOpts(el) {
+  return {
+    maxEdge: parseInt(el.dataset.maxEdge, 10) || 1600,
+    quality: (parseInt(el.dataset.quality, 10) || 75) / 100
+  }
+}
+
+export async function downscale(file, { maxEdge = 1600, quality = 0.75 } = {}) {
   const isPhoto = PHOTO_EXT.has(ext(file.name)) || PHOTO_TYPES.has(file.type || "")
   if (!isPhoto || file.size < 50000) return file
   let bitmap
@@ -49,13 +58,13 @@ function post(url, file) {
 
 // One file at a time, so a slow line shows steady progress and one bad file
 // does not stop the rest.
-export async function uploadFiles(files, { url, maxBytes, onMessage }) {
+export async function uploadFiles(files, { url, maxBytes, photo, onMessage }) {
   const list = Array.from(files)
   let ok = 0
   const failed = []
   for (let i = 0; i < list.length; i++) {
     onMessage(list.length > 1 ? `Uploading ${i + 1} of ${list.length}…` : "Uploading…")
-    const file = await downscale(list[i])
+    const file = await downscale(list[i], photo)
     if (file.size > maxBytes) {
       failed.push(`${list[i].name}: larger than ${Math.floor(maxBytes / 1000000)} MB`)
       continue
@@ -100,6 +109,7 @@ export const NoteAttach = {
         const { ok } = await uploadFiles(files, {
           url: this.el.dataset.url,
           maxBytes: parseInt(this.el.dataset.maxBytes, 10),
+          photo: photoOpts(this.el),
           onMessage: t => { if (msg) msg.textContent = t || "" }
         })
         if (ok > 0) announce(this)
@@ -120,6 +130,7 @@ export const NoteDrop = {
       const { ok } = await uploadFiles(files, {
         url: this.el.dataset.url,
         maxBytes: parseInt(this.el.dataset.maxBytes, 10),
+        photo: photoOpts(this.el),
         onMessage: t => { if (msgEl) msgEl.textContent = t || "" }
       })
       if (ok > 0) announce(this)

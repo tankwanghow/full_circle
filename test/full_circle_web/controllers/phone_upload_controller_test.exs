@@ -30,6 +30,18 @@ defmodule FullCircleWeb.PhoneUploadControllerTest do
     assert ctx.conn |> get(~p"/up/garbage") |> html_response(410) =~ "expired"
   end
 
+  test "the page carries the company's photo settings", ctx do
+    {:ok, _} =
+      FullCircle.Sys.update_company_settings(ctx.comp, "photo", %{
+        "max_edge" => 1920,
+        "quality" => 85
+      })
+
+    html = ctx.conn |> get(~p"/up/#{tok(ctx, {:note, ctx.note.id})}") |> html_response(200)
+    assert html =~ ~s(data-max-edge="1920")
+    assert html =~ ~s(data-quality="85")
+  end
+
   test "a file goes into the tray and a fresh token comes back", ctx do
     conn =
       post(ctx.conn, ~p"/up/#{tok(ctx, {:tray, ctx.tray.id})}/files", %{

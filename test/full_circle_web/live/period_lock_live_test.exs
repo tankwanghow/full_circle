@@ -65,4 +65,35 @@ defmodule FullCircleWeb.PeriodLockLiveTest do
     company = FullCircle.Sys.get_company!(company.id)
     assert Sys.period_closed_through(company) == ~D[2025-12-31]
   end
+
+  describe "photo upload settings" do
+    test "an admin can change max edge and quality", %{conn: conn} do
+      %{admin: admin, company: company} = billing_setup()
+      conn = conn |> log_in_user(admin) |> put_session(:current_role, "admin")
+
+      {:ok, view, html} = live(conn, ~p"/edit_company/#{company.id}")
+      assert html =~ "Photo Upload"
+
+      view
+      |> form("#photo-form", photo: %{max_edge: "1920", quality: "85"})
+      |> render_submit()
+
+      company = Sys.get_company!(company.id)
+
+      assert FullCircle.Notes.Attachments.photo_settings(company) == %{
+               max_edge: 1920,
+               quality: 85
+             }
+    end
+
+    test "a clerk does not see them", %{conn: conn} do
+      %{admin: admin, company: company} = billing_setup()
+      clerk = FullCircle.UserAccountsFixtures.user_fixture()
+      {:ok, _} = Sys.allow_user_to_access(company, clerk, "clerk", admin)
+      conn = conn |> log_in_user(clerk) |> put_session(:current_role, "clerk")
+
+      {:ok, _view, html} = live(conn, ~p"/edit_company/#{company.id}")
+      refute html =~ "Photo Upload"
+    end
+  end
 end

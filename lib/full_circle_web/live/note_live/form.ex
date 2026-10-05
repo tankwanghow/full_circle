@@ -434,6 +434,7 @@ defmodule FullCircleWeb.NoteLive.Form do
                 :if={@can_edit}
                 id={"attach-#{@note.id}"}
                 url={~p"/companies/#{@current_company.id}/notes/#{@note.id}/attachments"}
+                company={@current_company}
               />
               <.live_component
                 :if={@can_edit}

@@ -2,6 +2,7 @@ defmodule FullCircleWeb.CompanyLive.Form do
   use FullCircleWeb, :live_view
   alias FullCircle.Sys
   alias FullCircle.Sys.Company
+  alias FullCircle.Notes.Attachments
 
   @impl true
   def render(assigns) do
@@ -216,6 +217,50 @@ defmodule FullCircleWeb.CompanyLive.Form do
         </button>
       </.form>
     </div>
+    <div
+      :if={@live_action == :edit and @current_role == "admin"}
+      class="max-w-2xl mx-auto mt-6 rounded border border-gray-300 p-4 dark:border-gray-600"
+    >
+      <div class="font-medium text-lg">{gettext("Photo Upload")}</div>
+      <p class="text-sm mb-2">
+        {gettext(
+          "Photos attached to notes are shrunk on the device before upload. Smaller numbers give smaller files. WhatsApp standard is 1600 px at 75%."
+        )}
+      </p>
+      <.form
+        id="photo-form"
+        for={%{}}
+        as={:photo}
+        phx-submit="save_photo"
+        class="flex flex-wrap items-end gap-2"
+      >
+        <label class="text-sm">
+          {gettext("Longest side (px)")}
+          <input
+            type="number"
+            name="photo[max_edge]"
+            value={@photo.max_edge}
+            min="640"
+            max="4096"
+            step="1"
+            class="block w-32 rounded border p-2"
+          />
+        </label>
+        <label class="text-sm">
+          {gettext("JPEG quality (%)")}
+          <input
+            type="number"
+            name="photo[quality]"
+            value={@photo.quality}
+            min="50"
+            max="95"
+            step="1"
+            class="block w-32 rounded border p-2"
+          />
+        </label>
+        <button class="button blue">{gettext("Save")}</button>
+      </.form>
+    </div>
     """
   end
 
@@ -268,6 +313,7 @@ defmodule FullCircleWeb.CompanyLive.Form do
      |> assign(:trigger_method, "post")
      |> assign(:company, company)
      |> assign(:llm_settings, llm_settings)
+     |> assign(:photo, Attachments.photo_settings(company))
      |> assign(closing_days: closing_days(company.closing_month))
      |> assign(:closed_through, Sys.period_closed_through(company))}
   end
@@ -328,6 +374,22 @@ defmodule FullCircleWeb.CompanyLive.Form do
 
       :not_authorise ->
         {:noreply, put_flash(socket, :warn, gettext("Not authorised."))}
+    end
+  end
+
+  @impl true
+  def handle_event("save_photo", %{"photo" => params}, socket) do
+    if socket.assigns.current_role == "admin" do
+      values = Attachments.clean_photo_settings(params)
+      {:ok, company} = Sys.update_company_settings(socket.assigns.company, "photo", values)
+
+      {:noreply,
+       socket
+       |> assign(:company, company)
+       |> assign(:photo, Attachments.photo_settings(company))
+       |> put_flash(:info, gettext("Photo upload settings saved."))}
+    else
+      {:noreply, put_flash(socket, :warn, gettext("Not authorised."))}
     end
   end
 

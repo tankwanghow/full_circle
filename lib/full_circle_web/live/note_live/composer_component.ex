@@ -614,6 +614,13 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
   end
 
   defp tray(assigns) do
+    assigns =
+      assign(
+        assigns,
+        :photo,
+        FullCircle.Notes.Attachments.photo_settings(assigns.current_company)
+      )
+
     ~H"""
     <div
       id={"#{@id}-tray"}
@@ -621,6 +628,8 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
       phx-hook="NoteDrop"
       data-url={~p"/companies/#{@current_company.id}/note_trays/#{@tray_id}/files"}
       data-max-bytes={FullCircle.Notes.Attachments.max_bytes()}
+      data-max-edge={@photo.max_edge}
+      data-quality={@photo.quality}
       class="mt-1"
     >
       <.file_grid
@@ -635,6 +644,7 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
         <.attach_button
           id={"#{@id}-attach"}
           url={~p"/companies/#{@current_company.id}/note_trays/#{@tray_id}/files"}
+          company={@current_company}
         />
         <.live_component
           module={PhoneQrComponent}

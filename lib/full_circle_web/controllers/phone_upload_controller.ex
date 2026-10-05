@@ -19,7 +19,8 @@ defmodule FullCircleWeb.PhoneUploadController do
           token: ctx.token,
           label: ctx.label,
           target_key: target_key(ctx.target),
-          max_bytes: Attachments.max_bytes()
+          max_bytes: Attachments.max_bytes(),
+          photo: Attachments.photo_settings(ctx.company)
         )
 
       _ ->

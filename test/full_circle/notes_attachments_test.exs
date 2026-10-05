@@ -194,4 +194,32 @@ defmodule FullCircle.NotesAttachmentsTest do
       assert {:ok, ^path, "image/jpeg"} = Attachments.thumb_file(att)
     end
   end
+
+  describe "photo_settings/1" do
+    test "defaults to WhatsApp standard when the company has none", ctx do
+      assert Attachments.photo_settings(ctx.company) == %{max_edge: 1600, quality: 75}
+    end
+
+    test "reads what was saved", ctx do
+      {:ok, company} =
+        FullCircle.Sys.update_company_settings(
+          ctx.company,
+          "photo",
+          Attachments.clean_photo_settings(%{"max_edge" => "1920", "quality" => "85"})
+        )
+
+      assert Attachments.photo_settings(company) == %{max_edge: 1920, quality: 85}
+    end
+
+    test "clamps out-of-range and junk input" do
+      assert Attachments.clean_photo_settings(%{"max_edge" => "99999", "quality" => "5"}) ==
+               %{"max_edge" => 4096, "quality" => 50}
+
+      assert Attachments.clean_photo_settings(%{"max_edge" => "10", "quality" => "100"}) ==
+               %{"max_edge" => 640, "quality" => 95}
+
+      assert Attachments.clean_photo_settings(%{"max_edge" => "abc", "quality" => ""}) ==
+               %{"max_edge" => 1600, "quality" => 75}
+    end
+  end
 end

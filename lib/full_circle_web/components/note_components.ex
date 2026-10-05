@@ -253,10 +253,14 @@ defmodule FullCircleWeb.NoteComponents do
 
   attr :id, :string, required: true
   attr :url, :string, required: true, doc: "where the file is POSTed (a note's or a tray's route)"
+  attr :company, :map, required: true, doc: "whose photo downscale settings apply"
   attr :multiple, :boolean, default: true
   attr :label, :string, default: nil
 
   def attach_button(assigns) do
+    assigns =
+      assign(assigns, :photo, FullCircle.Notes.Attachments.photo_settings(assigns.company))
+
     ~H"""
     <span class="inline-flex items-center gap-1.5 text-sm">
       <button
@@ -266,6 +270,8 @@ defmodule FullCircleWeb.NoteComponents do
         data-url={@url}
         data-multiple={to_string(@multiple)}
         data-max-bytes={FullCircle.Notes.Attachments.max_bytes()}
+        data-max-edge={@photo.max_edge}
+        data-quality={@photo.quality}
         title={gettext("Attach files")}
         class="whitespace-nowrap rounded-full border border-gray-300 px-3 py-0.5 text-sm hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
       >
