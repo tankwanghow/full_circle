@@ -65,9 +65,11 @@ export function send(method, url, { body, headers = {}, onProgress } = {}) {
   })
 }
 
-async function post(url, file, onProgress) {
+// `fields` go with the file (the recorder sends `kind`).
+export async function postFile(url, file, { fields = {}, onProgress } = {}) {
   const form = new FormData()
   form.append("file", file, file.name)
+  for (const [k, v] of Object.entries(fields)) form.append(k, v)
   const csrf = document.querySelector("meta[name='csrf-token']").content
   const { status, body } = await send("POST", url, { body: form, headers: { "x-csrf-token": csrf }, onProgress })
   if (status === 200) return { ok: true, body }
@@ -91,7 +93,7 @@ export async function uploadFiles(files, { url, maxBytes, photo, onMessage }) {
       continue
     }
     // At 100% the bytes are sent; the server still checks and stores the file.
-    const res = await post(url, file, pct => onMessage(pct < 100 ? `Uploading${n}… ${pct}%` : `Saving${n}…`))
+    const res = await postFile(url, file, { onProgress: pct => onMessage(pct < 100 ? `Uploading${n}… ${pct}%` : `Saving${n}…`) })
     if (res.ok) ok++
     else failed.push(`${list[i].name}: ${res.error}`)
   }
@@ -103,12 +105,12 @@ export async function uploadFiles(files, { url, maxBytes, photo, onMessage }) {
 // re-render, and pushing from a detached element would reach the host
 // LiveView instead of the component, which has no handler and would crash.
 // No forced reload when the socket is down: that would lose unsaved input.
-function announce(hook) {
+export function announce(hook) {
   const current = document.getElementById(hook.el.id)
   if (current && hook.liveSocket.isConnected()) current.dispatchEvent(new CustomEvent(DONE_EVENT))
 }
 
-function listenDone(hook) {
+export function listenDone(hook) {
   hook.el.addEventListener(DONE_EVENT, () => hook.pushEventTo(hook.el, "attachment_uploaded", {}))
 }
 

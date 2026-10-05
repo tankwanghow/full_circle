@@ -50,6 +50,26 @@
         >
           📎 {gettext("Files (WhatsApp, Downloads…)")}
         </button>
+        <%!-- Shown by phone_upload.js only where the browser can record
+             (HTTPS or localhost). --%>
+        <div class="hidden grid-cols-2 gap-3 can-record:grid">
+          <button
+            :for={
+              {kind, label} <- [
+                {:video, "⏺ " <> gettext("Video")},
+                {:audio, "🎙 " <> gettext("Audio")}
+              ]
+            }
+            id={"pu-#{kind}"}
+            type="button"
+            data-kind={kind}
+            data-max-bytes={@record[kind].max_bytes}
+            data-max-seconds={@record[kind].max_seconds}
+            class="rounded-xl bg-gray-200 p-4 text-lg font-bold disabled:opacity-40 dark:bg-gray-800"
+          >
+            {label}
+          </button>
+        </div>
       </div>
 
       <section

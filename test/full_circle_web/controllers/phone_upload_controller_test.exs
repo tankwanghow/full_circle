@@ -64,6 +64,19 @@ defmodule FullCircleWeb.PhoneUploadControllerTest do
     assert [%{content_type: "audio/webm"}] = Trays.list(ctx.tray.id, ctx.comp, ctx.admin)
   end
 
+  test "the page offers the recorder with each kind's limits", ctx do
+    html = ctx.conn |> get(~p"/up/#{tok(ctx, {:note, ctx.note.id})}") |> html_response(200)
+    doc = LazyHTML.from_document(html)
+
+    assert [video] = doc |> LazyHTML.query(~s(#pu-video[data-kind="video"])) |> Enum.to_list()
+    assert LazyHTML.attribute(video, "data-max-bytes") == ["15000000"]
+    assert LazyHTML.attribute(video, "data-max-seconds") == ["60"]
+
+    assert [audio] = doc |> LazyHTML.query(~s(#pu-audio[data-kind="audio"])) |> Enum.to_list()
+    assert LazyHTML.attribute(audio, "data-max-bytes") == ["5000000"]
+    assert LazyHTML.attribute(audio, "data-max-seconds") == ["180"]
+  end
+
   test "a file goes straight onto a saved note", ctx do
     conn =
       post(ctx.conn, ~p"/up/#{tok(ctx, {:note, ctx.note.id})}/files", %{

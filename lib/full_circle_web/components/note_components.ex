@@ -47,8 +47,17 @@ defmodule FullCircleWeb.NoteComponents do
       ]}
     >
       <div :for={a <- @attachments} id={@removable && "att-#{a.id}"} class="relative">
+        <%!-- Recordings play in place; data-no-post-open keeps a tap on the
+             controls from opening the note (post_open.js). --%>
+        <.media_player
+          :if={Attachments.kind(a) in [:video, :audio]}
+          att={a}
+          class={if(length(@attachments) > 1, do: "h-32", else: "h-56")}
+          removable={@removable}
+        />
         <%!-- Opens in the file viewer (file_viewer.js); target=_blank is the fallback. --%>
         <a
+          :if={Attachments.kind(a) not in [:video, :audio]}
           href={Attachments.url(a)}
           target="_blank"
           title={a.file_name}
@@ -88,6 +97,45 @@ defmodule FullCircleWeb.NoteComponents do
     """
   end
 
+  attr :att, :map, required: true
+  attr :class, :string, required: true, doc: "the video's height in the grid"
+  attr :removable, :boolean, default: false
+
+  # A video's name sits on top (its controls fill the bottom) and only while
+  # editing, like a photo's; a voice note always shows its name, since a bare
+  # audio bar says nothing about what it is.
+  defp media_player(assigns) do
+    assigns = assign(assigns, kind: Attachments.kind(assigns.att))
+
+    ~H"""
+    <div data-no-post-open title={@att.file_name} class="h-full">
+      <%= if @kind == :video do %>
+        <%!-- #t=0.1 makes iPhone Safari show a first frame instead of black. --%>
+        <video
+          src={Attachments.url(@att) <> "#t=0.1"}
+          controls
+          playsinline
+          preload="metadata"
+          class={["block w-full bg-black object-contain", @class]}
+        ></video>
+        <span
+          :if={@removable}
+          class="pointer-events-none absolute inset-x-0 top-0 truncate bg-black/55 py-0.5 pl-2 pr-10 text-xs text-white"
+        >
+          {@att.file_name}
+        </span>
+      <% else %>
+        <div class="flex h-full min-h-24 flex-col justify-center gap-2 bg-sky-50 p-3 dark:bg-sky-950">
+          <span class="truncate pr-8 text-sm text-gray-700 dark:text-gray-200">
+            🎙 {@att.file_name}
+          </span>
+          <audio src={Attachments.url(@att)} controls preload="metadata" class="w-full"></audio>
+        </div>
+      <% end %>
+    </div>
+    """
+  end
+
   @doc """
   True when `field` has an error the user should see now: they have typed in
   it, or the form was submitted. Before that a new box stays clean.
@@ -108,7 +156,8 @@ defmodule FullCircleWeb.NoteComponents do
 
   attr :fields, :list,
     required: true,
-    doc: "`{form_field, label | nil}`, or `{form_field, label, show?}` to override `show_errors?/1`"
+    doc:
+      "`{form_field, label | nil}`, or `{form_field, label, show?}` to override `show_errors?/1`"
 
   @doc """
   The errors of the fields on one row, directly under that row. A row of
@@ -130,7 +179,10 @@ defmodule FullCircleWeb.NoteComponents do
     ~H"""
     <div :if={@msgs != []} id={@id}>
       <p :for={msg <- @msgs} class="mt-0.5 text-xs leading-snug text-rose-600 dark:text-rose-400">
-        <.icon name="hero-exclamation-circle-mini" class="mr-0.5 inline h-3.5 w-3.5 align-text-bottom" />{msg}
+        <.icon
+          name="hero-exclamation-circle-mini"
+          class="mr-0.5 inline h-3.5 w-3.5 align-text-bottom"
+        />{msg}
       </p>
     </div>
     """
@@ -265,9 +317,10 @@ defmodule FullCircleWeb.NoteComponents do
 
   @doc """
   A file's preview, sized by `class`: the image itself for images, a type
-  tile otherwise. Chooses by `Attachments.kind/1` and points at
-  `Attachments.url(att, :thumb)`, so generated thumbnails and new kinds
-  (video posters, audio) slot in here.
+  tile otherwise (▶ for video, 🎙 for audio — no posters, the server has no
+  ffmpeg). Chooses by `Attachments.kind/1` and points at
+  `Attachments.url(att, :thumb)`, so generated thumbnails slot in here.
+  `file_grid/1` plays recordings in place rather than using these tiles.
   """
   def file_thumb(assigns) do
     assigns = assign(assigns, kind: Attachments.kind(assigns.att))
@@ -281,7 +334,21 @@ defmodule FullCircleWeb.NoteComponents do
       class={["object-cover", @class]}
     />
     <span
-      :if={@kind != :image}
+      :if={@kind in [:video, :audio]}
+      class={[
+        "flex flex-col items-center justify-center gap-1 overflow-hidden",
+        if(@kind == :video,
+          do: "bg-gray-900 text-white dark:bg-black",
+          else: "bg-sky-50 text-sky-800 dark:bg-sky-950 dark:text-sky-200"
+        ),
+        @class
+      ]}
+    >
+      <span class="text-2xl">{if @kind == :video, do: "▶", else: "🎙"}</span>
+      <span :if={@show_name} class="max-w-full truncate px-2 text-xs">{@att.file_name}</span>
+    </span>
+    <span
+      :if={@kind in [:pdf, :other]}
       class={[
         "relative flex flex-col items-center justify-center gap-1 overflow-hidden bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-200",
         @class
@@ -342,6 +409,47 @@ defmodule FullCircleWeb.NoteComponents do
         phx-update="ignore"
         class="text-rose-600 empty:hidden dark:text-rose-400"
       ></span>
+    </span>
+    """
+  end
+
+  attr :id, :string, required: true
+  attr :url, :string, required: true, doc: "where the recording is POSTed (as attach_button)"
+
+  @doc """
+  ⏺ Video and 🎙 Audio: record in the app (`NoteRecord` hook,
+  `note_record.js`) and upload like 📎. Each button carries its kind's size
+  and time limits. Hidden until the browser can record (`can-record` on
+  `<html>`, set by the script): camera and microphone need HTTPS or
+  localhost, so on plain-HTTP dev over the LAN they never show.
+  """
+  def record_buttons(assigns) do
+    assigns =
+      assign(assigns,
+        kinds: [
+          {:video, "⏺", gettext("Video"), gettext("Record a video")},
+          {:audio, "🎙", gettext("Audio"), gettext("Record a voice note")}
+        ]
+      )
+
+    ~H"""
+    <span
+      id={@id}
+      phx-hook="NoteRecord"
+      data-url={@url}
+      class="hidden items-center gap-1.5 text-sm can-record:inline-flex"
+    >
+      <button
+        :for={{kind, icon, label, title} <- @kinds}
+        type="button"
+        data-kind={kind}
+        data-max-bytes={Attachments.max_bytes(kind)}
+        data-max-seconds={Attachments.max_seconds(kind)}
+        title={title}
+        class="whitespace-nowrap rounded-full border border-gray-300 px-3 py-0.5 text-sm hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
+      >
+        {icon}<span class="ml-1 hidden @[28rem]:inline">{label}</span>
+      </button>
     </span>
     """
   end

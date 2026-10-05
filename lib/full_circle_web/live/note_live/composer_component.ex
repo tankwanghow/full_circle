@@ -664,6 +664,10 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
           url={~p"/companies/#{@current_company.id}/note_trays/#{@tray_id}/files"}
           company={@current_company}
         />
+        <.record_buttons
+          id={"#{@id}-record"}
+          url={~p"/companies/#{@current_company.id}/note_trays/#{@tray_id}/files"}
+        />
         <.live_component
           module={PhoneQrComponent}
           id={"#{@id}-phone"}

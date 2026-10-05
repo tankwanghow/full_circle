@@ -4,7 +4,9 @@
 // fresh token; it replaces the one in the URL so a reload keeps working
 // within the 10-minute idle window. A scan in progress is remembered in
 // localStorage and resumed from the server's page count after a reload.
+// ⏺ Video / 🎙 Audio record in the page (note_record.js) and send like a file.
 import { downscale, photoOpts, send } from "./note_attach"
+import { markCanRecord, openRecorder } from "./note_record"
 
 const root = document.getElementById("phone-upload")
 if (root) start(root)
@@ -44,7 +46,7 @@ function start(root) {
   function banner(text) {
     $("pu-banner").textContent = text
     $("pu-banner").classList.remove("hidden")
-    for (const id of ["pu-scan", "pu-photo", "pu-files", "pu-next", "pu-retake", "pu-done"]) $(id).disabled = true
+    for (const id of ["pu-scan", "pu-photo", "pu-files", "pu-video", "pu-audio", "pu-next", "pu-retake", "pu-done"]) $(id).disabled = true
   }
 
   function refresh(body) {
@@ -65,19 +67,21 @@ function start(root) {
 
   // --- sent list -----------------------------------------------------------
 
-  // `thumb`: an image URL (photo, scan page), "pdf" for a 📄 tile, or none
-  // (names restored after a reload have no picture left).
+  // `thumb`: an image URL (photo, scan page), "pdf"/"video"/"audio" for an
+  // icon tile, or none (names restored after a reload have no picture left).
+  const ICONS = { pdf: "📄", video: "🎬", audio: "🎙" }
+
   function addSent(name, thumb) {
     const li = document.createElement("li")
     li.className = "flex items-center gap-2 rounded bg-white p-2 dark:bg-gray-900"
     li.innerHTML = `<span class="pu-mark">⏳</span><span class="pu-name truncate"></span><span class="pu-err ml-auto text-rose-600 dark:text-rose-400"></span>`
     li.querySelector(".pu-name").textContent = name
     if (thumb) {
-      const tile = document.createElement(thumb === "pdf" ? "span" : "img")
+      const tile = document.createElement(ICONS[thumb] ? "span" : "img")
       tile.className = "h-12 w-12 shrink-0 rounded border border-gray-300 object-cover dark:border-gray-600"
-      if (thumb === "pdf") {
+      if (ICONS[thumb]) {
         tile.className += " flex items-center justify-center text-2xl"
-        tile.textContent = "📄"
+        tile.textContent = ICONS[thumb]
       } else {
         tile.src = thumb
         tile.alt = ""
@@ -91,6 +95,8 @@ function start(root) {
   function thumbFor(file) {
     if ((file.type || "").startsWith("image/")) return URL.createObjectURL(file)
     if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) return "pdf"
+    if ((file.type || "").startsWith("video/")) return "video"
+    if ((file.type || "").startsWith("audio/")) return "audio"
     return null
   }
 
@@ -133,13 +139,17 @@ function start(root) {
     input.click()
   }
 
-  async function sendFile(file) {
-    const ready = await downscale(file, photo)
+  // `kind` ("video"/"audio") marks a recording: its own size limit, no
+  // downscale, and the `kind` field the server types a WebM by.
+  async function sendFile(file, kind) {
+    const ready = kind ? file : await downscale(file, photo)
+    const limit = kind ? parseInt($(`pu-${kind}`).dataset.maxBytes, 10) : maxBytes
     const li = addSent(file.name, thumbFor(ready))
     const attempt = async () => {
-      if (ready.size > maxBytes) return { ok: false, error: `Larger than ${Math.floor(maxBytes / 1000000)} MB.` }
+      if (ready.size > limit) return { ok: false, error: `Larger than ${Math.floor(limit / 1000000)} MB.` }
       const form = new FormData()
       form.append("file", ready, ready.name)
+      if (kind) form.append("kind", kind)
       const mark = li.querySelector(".pu-mark")
       return call("POST", "/files", form, pct => { mark.textContent = pct < 100 ? `⏳ ${pct}%` : "⏳" })
     }
@@ -149,6 +159,19 @@ function start(root) {
   $("pu-photo").onclick = () => pick({ capture: true, accept: "image/*" }, files => sendFile(files[0]))
   $("pu-files").onclick = () =>
     pick({ multiple: true, accept: "image/*,application/pdf" }, async files => { for (const f of files) await sendFile(f) })
+
+  // The recorder closes on Send; the sent list shows progress and ↻ retry.
+  markCanRecord()
+  for (const kind of ["video", "audio"]) {
+    const b = $(`pu-${kind}`)
+    b.onclick = () =>
+      openRecorder({
+        kind,
+        maxSeconds: parseInt(b.dataset.maxSeconds, 10),
+        maxBytes: parseInt(b.dataset.maxBytes, 10),
+        send: async file => { sendFile(file, kind); return { ok: true } }
+      })
+  }
 
   // --- scanning ------------------------------------------------------------
 
@@ -253,7 +276,7 @@ function start(root) {
     scan = null
     showScan()
     $("pu-finished").classList.remove("hidden")
-    for (const id of ["pu-scan", "pu-photo", "pu-files", "pu-next", "pu-retake", "pu-done", "pu-close"]) $(id).disabled = true
+    for (const id of ["pu-scan", "pu-photo", "pu-files", "pu-video", "pu-audio", "pu-next", "pu-retake", "pu-done", "pu-close"]) $(id).disabled = true
     $("pu-finished").scrollIntoView({ behavior: "smooth", block: "center" })
   }
 

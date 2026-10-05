@@ -11,6 +11,8 @@
 @custom-variant phx-submit-loading (".phx-submit-loading&", ".phx-submit-loading &");
 @custom-variant phx-change-loading (".phx-change-loading&", ".phx-change-loading &");
 @custom-variant dark (&:where(.dark, .dark *));
+/* Set on <html> by note_record.js when the browser can record camera/mic. */
+@custom-variant can-record (.can-record &);
 
 @theme {
   --color-brand: #FD4F00;

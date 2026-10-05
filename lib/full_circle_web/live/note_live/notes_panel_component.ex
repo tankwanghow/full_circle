@@ -262,6 +262,10 @@ defmodule FullCircleWeb.NoteLive.NotesPanelComponent do
               url={~p"/companies/#{@current_company.id}/notes/#{item.id}/attachments"}
               company={@current_company}
             />
+            <.record_buttons
+              id={"record-#{item.id}"}
+              url={~p"/companies/#{@current_company.id}/notes/#{item.id}/attachments"}
+            />
             <.live_component
               module={PhoneQrComponent}
               id={"#{@id}-phone-#{item.id}"}

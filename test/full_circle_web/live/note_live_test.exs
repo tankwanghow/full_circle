@@ -588,6 +588,74 @@ defmodule FullCircleWeb.NoteLiveTest do
              |> Enum.count() == 2
     end
 
+    test "a video and a voice recording play in the note", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      alias FullCircle.Notes.Attachments
+      note = note_fixture(comp, admin, %{"body" => "recordings"})
+
+      {:ok, video} =
+        Attachments.attach(
+          note,
+          %{path: mp4_file(), file_name: "Video 1.mp4", kind: "video"},
+          comp,
+          admin
+        )
+
+      {:ok, audio} =
+        Attachments.attach(note, %{path: ogg_file(), file_name: "Audio 1.ogg"}, comp, admin)
+
+      {:ok, lv, _} = live(conn, edit_path(comp, note))
+      # #t=0.1 makes iPhone Safari show a first frame instead of black.
+      v = ~s(#note-files video[src="#{Attachments.url(video)}#t=0.1"][controls][playsinline])
+      assert has_element?(lv, v)
+      assert has_element?(lv, ~s(#note-files audio[src="#{Attachments.url(audio)}"][controls]))
+      assert has_element?(lv, "#note-files #att-#{audio.id}", "Audio 1.ogg")
+      # Players, not viewer links; and a tap on one must not open the note.
+      refute has_element?(lv, "#note-files a[data-viewer]")
+      assert has_element?(lv, "#note-files #att-#{video.id} [data-no-post-open] video")
+
+      lv |> element("#note-files #att-#{video.id} button") |> render_click()
+      refute has_element?(lv, "#note-files video")
+      assert has_element?(lv, "#note-files audio")
+    end
+
+    test "⏺ Video and 🎙 Audio sit beside 📎, with each kind's limits", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      note = note_fixture(comp, admin, %{"body" => "record here"})
+
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/notes/#{note.id}")
+      url = ~p"/companies/#{comp.id}/notes/#{note.id}/attachments"
+      rec = ~s(#record-#{note.id}[phx-hook=NoteRecord][data-url="#{url}"])
+      assert has_element?(lv, "#attach-#{note.id}")
+      assert has_element?(lv, rec)
+
+      assert has_element?(
+               lv,
+               ~s(#{rec} button[data-kind=video][data-max-bytes="15000000"][data-max-seconds="60"])
+             )
+
+      assert has_element?(
+               lv,
+               ~s(#{rec} button[data-kind=audio][data-max-bytes="5000000"][data-max-seconds="180"])
+             )
+
+      # The edit box records into its tray.
+      {:ok, lv, _} = live(conn, edit_path(comp, note))
+      assert has_element?(lv, "#note-tray #note-record[phx-hook=NoteRecord]")
+      [_, tray] = Regex.run(~r/id="note-tray"[^>]*data-tray-id="([^"]+)"/, render(lv))
+
+      assert has_element?(
+               lv,
+               ~s(#note-record[data-url="/companies/#{comp.id}/note_trays/#{tray}/files"])
+             )
+    end
+
     test "delete returns to the index", %{conn: conn, admin: admin, comp: comp} do
       note = note_fixture(comp, admin)
       {:ok, lv, _} = live(conn, edit_path(comp, note))

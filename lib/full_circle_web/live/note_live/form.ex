@@ -455,6 +455,11 @@ defmodule FullCircleWeb.NoteLive.Form do
               url={~p"/companies/#{@current_company.id}/notes/#{@r.id}/attachments"}
               company={@current_company}
             />
+            <.record_buttons
+              :if={@r.can_edit}
+              id={"record-#{@r.id}"}
+              url={~p"/companies/#{@current_company.id}/notes/#{@r.id}/attachments"}
+            />
             <.live_component
               :if={@r.can_edit}
               module={PhoneQrComponent}
@@ -584,6 +589,11 @@ defmodule FullCircleWeb.NoteLive.Form do
                 id={"attach-#{@note.id}"}
                 url={~p"/companies/#{@current_company.id}/notes/#{@note.id}/attachments"}
                 company={@current_company}
+              />
+              <.record_buttons
+                :if={@can_edit}
+                id={"record-#{@note.id}"}
+                url={~p"/companies/#{@current_company.id}/notes/#{@note.id}/attachments"}
               />
               <.live_component
                 :if={@can_edit}
