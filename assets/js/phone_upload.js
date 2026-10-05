@@ -4,7 +4,7 @@
 // fresh token; it replaces the one in the URL so a reload keeps working
 // within the 10-minute idle window. A scan in progress is remembered in
 // localStorage and resumed from the server's page count after a reload.
-import { downscale, photoOpts } from "./note_attach"
+import { downscale, photoOpts, send } from "./note_attach"
 
 const root = document.getElementById("phone-upload")
 if (root) start(root)
@@ -54,18 +54,13 @@ function start(root) {
     }
   }
 
-  async function call(method, path, form) {
-    let res
-    try {
-      res = await fetch(`/up/${token}${path}`, { method, body: form })
-    } catch (_e) {
-      return { ok: false, retry: true, error: "No connection — tap ↻ to retry." }
-    }
-    let body = {}
-    try { body = await res.json() } catch (_e) {}
-    if (res.ok) { refresh(body); return { ok: true, body } }
+  async function call(method, path, form, onProgress) {
+    const { status, body } = await send(method, `/up/${token}${path}`, { body: form, onProgress })
+    if (status === 0) return { ok: false, retry: true, error: "No connection — tap ↻ to retry." }
+    if (status >= 200 && status < 300) { refresh(body); return { ok: true, body } }
     if (body.code === "expired" || body.code === "closed" || body.code === "forbidden") banner(body.error)
-    return { ok: false, retry: false, error: body.error || `Failed (${res.status}).` }
+    if (status === 413) return { ok: false, retry: false, error: "Too large for the server." }
+    return { ok: false, retry: false, error: body.error || `Failed (${status}).` }
   }
 
   // --- sent list -----------------------------------------------------------
@@ -145,7 +140,8 @@ function start(root) {
       if (ready.size > maxBytes) return { ok: false, error: `Larger than ${Math.floor(maxBytes / 1000000)} MB.` }
       const form = new FormData()
       form.append("file", ready, ready.name)
-      return call("POST", "/files", form)
+      const mark = li.querySelector(".pu-mark")
+      return call("POST", "/files", form, pct => { mark.textContent = pct < 100 ? `⏳ ${pct}%` : "⏳" })
     }
     markSent(li, await attempt(), attempt)
   }

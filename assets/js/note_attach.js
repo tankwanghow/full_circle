@@ -39,21 +39,41 @@ export async function downscale(file, { maxEdge = 1600, quality = 0.75 } = {}) {
   return new File([blob], `${base}.jpg`, { type: "image/jpeg" })
 }
 
-function post(url, file) {
+// XHR, not fetch: fetch cannot report upload progress. Resolves
+// `{status, body}` (body = parsed JSON or {}), or `{status: 0}` when the
+// connection failed. `onProgress(pct)` gets whole percents, each once.
+export function send(method, url, { body, headers = {}, onProgress } = {}) {
   return new Promise(resolve => {
-    const form = new FormData()
-    form.append("file", file, file.name)
     const xhr = new XMLHttpRequest()
-    xhr.open("POST", url)
-    xhr.setRequestHeader("x-csrf-token", document.querySelector("meta[name='csrf-token']").content)
-    xhr.onload = () => {
-      let body = {}
-      try { body = JSON.parse(xhr.responseText) } catch (_e) {}
-      resolve(xhr.status === 200 ? { ok: true, body } : { ok: false, error: body.error || `Upload failed (${xhr.status}).` })
+    xhr.open(method, url)
+    for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v)
+    if (onProgress) {
+      let last = -1
+      xhr.upload.onprogress = e => {
+        if (!e.lengthComputable) return
+        const pct = Math.floor((e.loaded / e.total) * 100)
+        if (pct !== last) onProgress((last = pct))
+      }
     }
-    xhr.onerror = () => resolve({ ok: false, error: "Upload failed — check the connection and try again." })
-    xhr.send(form)
+    xhr.onload = () => {
+      let parsed = {}
+      try { parsed = JSON.parse(xhr.responseText) } catch (_e) {}
+      resolve({ status: xhr.status, body: parsed })
+    }
+    xhr.onerror = () => resolve({ status: 0, body: {} })
+    xhr.send(body)
   })
+}
+
+async function post(url, file, onProgress) {
+  const form = new FormData()
+  form.append("file", file, file.name)
+  const csrf = document.querySelector("meta[name='csrf-token']").content
+  const { status, body } = await send("POST", url, { body: form, headers: { "x-csrf-token": csrf }, onProgress })
+  if (status === 200) return { ok: true, body }
+  if (status === 0) return { ok: false, error: "Upload failed — check the connection and try again." }
+  if (status === 413) return { ok: false, error: "File is too large for the server." }
+  return { ok: false, error: body.error || `Upload failed (${status}).` }
 }
 
 // One file at a time, so a slow line shows steady progress and one bad file
@@ -63,13 +83,15 @@ export async function uploadFiles(files, { url, maxBytes, photo, onMessage }) {
   let ok = 0
   const failed = []
   for (let i = 0; i < list.length; i++) {
-    onMessage(list.length > 1 ? `Uploading ${i + 1} of ${list.length}…` : "Uploading…")
+    const n = list.length > 1 ? ` ${i + 1} of ${list.length}` : ""
+    onMessage(`Uploading${n}…`)
     const file = await downscale(list[i], photo)
     if (file.size > maxBytes) {
       failed.push(`${list[i].name}: larger than ${Math.floor(maxBytes / 1000000)} MB`)
       continue
     }
-    const res = await post(url, file)
+    // At 100% the bytes are sent; the server still checks and stores the file.
+    const res = await post(url, file, pct => onMessage(pct < 100 ? `Uploading${n}… ${pct}%` : `Saving${n}…`))
     if (res.ok) ok++
     else failed.push(`${list[i].name}: ${res.error}`)
   }
