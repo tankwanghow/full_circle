@@ -169,8 +169,10 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
   # --- events ---------------------------------------------------------------
 
   @impl true
+  # A message about the last action (a link, a stale save) goes once the
+  # user edits again.
   def handle_event("validate", %{"note" => params}, socket),
-    do: {:noreply, change(socket, params)}
+    do: {:noreply, socket |> change(params) |> assign(error: nil)}
 
   def handle_event("visibility_everyone", _, socket),
     do: {:noreply, change(socket, Map.put(socket.assigns.params, "visibility", [""]))}
@@ -351,15 +353,21 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
   defp chip_target(%{type: type, id: id, title: title}, company),
     do: {:ok, %{title: title, url: Linkable.url(type, id, company)}}
 
-  defp errors(form) do
-    Enum.map(
-      form[:body].errors ++
-        form[:subject_id].errors ++
-        form[:subject_type].errors ++
-        form[:visibility].errors ++
-        form[:reply_to_id].errors,
-      &FullCircleWeb.CoreComponents.translate_error/1
-    )
+  # By the chips and the picker: what went wrong with the record the note is
+  # about, its links or who sees it. These come from the server, not from
+  # typing, so they show at once.
+  defp record_messages(assigns) do
+    ~H"""
+    <.field_errors
+      id={"#{@id}-record-errors"}
+      fields={
+        for f <- [:subject_id, :subject_type, :visibility, :reply_to_id], do: {@form[f], nil, true}
+      }
+    />
+    <p :if={@error} id={"#{@id}-error"} class="mt-0.5 text-xs text-rose-600 dark:text-rose-400">
+      {@error}
+    </p>
+    """
   end
 
   # The edit box shows the note's author, like the post it replaces.
@@ -383,6 +391,7 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
           <.chips {chip_assigns(assigns)} />
         </div>
         <.picker :if={@picker_open} {picker_assigns(assigns)} class="mt-2" />
+        <.record_messages {message_assigns(assigns)} />
         <.form
           for={@form}
           id={"#{@id}-form"}
@@ -398,14 +407,21 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
             name="note[title]"
             value={@form[:title].value}
             placeholder={gettext("Title (optional)")}
-            class="w-full rounded-md border border-gray-300 bg-transparent px-2 py-1 text-xl font-bold placeholder-gray-500 dark:border-gray-600"
+            class={[
+              "w-full rounded-md border bg-transparent px-2 py-1 text-xl font-bold placeholder-gray-500",
+              border(@form[:title], "border-gray-300 dark:border-gray-600")
+            ]}
           />
+          <.field_errors id={"#{@id}-title-errors"} fields={[{@form[:title], nil}]} />
           <textarea
             id={"#{@id}_body_#{@rev}"}
             name="note[body]"
             rows="6"
             placeholder={@placeholder || gettext("Write a note…")}
-            class="mt-1 w-full resize-y rounded-md border border-gray-300 bg-transparent px-2 py-1 text-lg placeholder-gray-500 dark:border-gray-600"
+            class={[
+              "mt-1 w-full resize-y rounded-md border bg-transparent px-2 py-1 text-lg placeholder-gray-500",
+              border(@form[:body], "border-gray-300 dark:border-gray-600")
+            ]}
           >{Phoenix.HTML.Form.normalize_value("textarea", @form[:body].value)}</textarea>
           <.messages {message_assigns(assigns)} />
           <.tray {tray_assigns(assigns)} />
@@ -451,6 +467,7 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
             placeholder={gettext("Title (optional)")}
             class="w-full border-0 bg-transparent p-1 text-lg font-bold placeholder-gray-500 focus:ring-0"
           />
+          <.field_errors :if={@full} id={"#{@id}-title-errors"} fields={[{@form[:title], nil}]} />
           <textarea
             id={"#{@id}_body_#{@rev}"}
             name="note[body]"
@@ -497,6 +514,7 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
               <.submit_buttons {submit_assigns(assigns)} />
             </span>
           </div>
+          <.record_messages {message_assigns(assigns)} />
         </.form>
         <.picker :if={@picker_open} {picker_assigns(assigns)} class="mt-2" />
       </div>
@@ -680,12 +698,11 @@ defmodule FullCircleWeb.NoteLive.ComposerComponent do
         :note
       ])
 
+  # Under the body: its own errors. Nothing shows before the user has typed
+  # in it or pressed Save (`show_errors?/1`).
   defp messages(assigns) do
     ~H"""
-    <.error :for={msg <- errors(@form)}>{msg}</.error>
-    <p :if={@error} id={"#{@id}-error"} class="text-sm text-rose-700 dark:text-rose-300">
-      {@error}
-    </p>
+    <.field_errors id={"#{@id}-body-errors"} fields={[{@form[:body], nil}]} />
     <p
       :if={@replying}
       id={"#{@id}-reply-scope"}

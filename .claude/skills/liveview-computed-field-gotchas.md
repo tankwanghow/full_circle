@@ -1,6 +1,6 @@
 ---
 name: liveview-computed-field-gotchas
-description: Use when a LiveView form field or input event misbehaves — a readonly/computed field (e.g. Amount) not updating after an edit, a virtual/display-only field rendering blank, a flash message never appearing, a phx-click/phx-change on an input that only fires after clicking away, or work on the calculatorInput JS hook. Covers the focused-input patch skip, programmatic value-set events, _unused_* params, changeset.params fallback rendering, the :warn flash kind, and the .input phx-debounce="blur" default.
+description: Use when a LiveView form field or input event misbehaves — a readonly/computed field (e.g. Amount) not updating after an edit, a virtual/display-only field rendering blank, a flash message never appearing, a phx-click/phx-change on an input that only fires after clicking away, an error message showing on a field the user has not touched yet, a red/error border class that does not take effect, or work on the calculatorInput JS hook. Covers the focused-input patch skip, programmatic value-set events, _unused_* params (and testing used_input?), changeset.params fallback rendering, the :warn flash kind, the .input phx-debounce="blur" default, and conflicting Tailwind colour classes.
 ---
 
 # LiveView Computed-Field Gotchas
@@ -114,6 +114,51 @@ refute has_element?(lv, "#my_checkbox[phx-debounce]")
 When an input event misfires, **dump the rendered markup** rather than reading
 the template — component defaults do not appear at the call site. A throwaway
 test that prints the element settles it in one run.
+
+## 7. Errors on untouched fields: `used_input?`, and how to test it
+
+A changeset built with `action: :validate` on every `phx-change` carries
+errors for **every** invalid field, so a form that renders all of
+`form[field].errors` flags the empty body the moment the user types a title.
+Gate each field's messages on `Phoenix.Component.used_input?(form[field])`:
+false while the browser sends `_unused_<field>` for it (see 3), true once
+typed in or after a submit (submit params carry no `_unused_*` keys).
+`FullCircleWeb.NoteComponents.field_errors/1` and `show_errors?/1` do this
+for the note composer and the task form; errors the user cannot cause by
+typing (a bad link, a stale save) pass `{field, label, true}` to show at once.
+
+**Testing it.** The `form/3` test helper only accepts names of real inputs,
+so it raises on `_unused_*`:
+
+```
+could not find non-disabled input, select or textarea with name "task[_unused_title]"
+```
+
+Send what the browser sends through the form *element* instead:
+
+```elixir
+lv
+|> element("#task-form")
+|> render_change(%{"task" => %{"title" => "", "_unused_title" => ""}})
+
+refute has_element?(lv, "#task-title-errors")
+```
+
+## 8. Two colours of one utility in a class list: the stylesheet decides
+
+`class={["border border-gray-300", if(err, do: "border-rose-500")]}` does not
+reliably turn red. Both rules have the same specificity, so the one **later in
+`app.css`** wins, and the order you write the classes in does not matter.
+Tailwind 4 emits same-property colours alphabetically
+(`gray` < `rose` < `slate` < `zinc`): rose happens to beat gray but loses to
+slate or zinc. Emit **one or the other**, never both:
+
+```elixir
+border(@form[:title], "border-gray-300 dark:border-gray-600")
+# NoteComponents.border/2: the red pair while errors show, else the normal one
+```
+
+The same applies to any pair: `text-*`, `bg-*`, `dark:` variants.
 
 ## Where this pattern lives
 

@@ -88,6 +88,57 @@ defmodule FullCircleWeb.NoteComponents do
     """
   end
 
+  @doc """
+  True when `field` has an error the user should see now: they have typed in
+  it, or the form was submitted. Before that a new box stays clean.
+  """
+  def show_errors?(%Phoenix.HTML.FormField{errors: []}), do: false
+  def show_errors?(field), do: Phoenix.Component.used_input?(field)
+
+  @doc """
+  An input's border colours: red while its errors show, else `normal`. One
+  or the other, never both: two border colours in one class list are
+  decided by stylesheet order, not by which is written last.
+  """
+  def border(true, _normal), do: "border-rose-500 dark:border-rose-400"
+  def border(false, normal), do: normal
+  def border(%Phoenix.HTML.FormField{} = field, normal), do: border(show_errors?(field), normal)
+
+  attr :id, :string, required: true
+
+  attr :fields, :list,
+    required: true,
+    doc: "`{form_field, label | nil}`, or `{form_field, label, show?}` to override `show_errors?/1`"
+
+  @doc """
+  The errors of the fields on one row, directly under that row. A row of
+  several inputs names each (\"Due: is needed to repeat\"); a row of one
+  passes `nil` and the message reads alone.
+  """
+  def field_errors(assigns) do
+    msgs =
+      for spec <- assigns.fields,
+          {field, label, show} = with_show(spec),
+          show,
+          error <- field.errors do
+        msg = FullCircleWeb.CoreComponents.translate_error(error)
+        if label, do: "#{label}: #{msg}", else: msg
+      end
+
+    assigns = assign(assigns, :msgs, msgs)
+
+    ~H"""
+    <div :if={@msgs != []} id={@id}>
+      <p :for={msg <- @msgs} class="mt-0.5 text-xs leading-snug text-rose-600 dark:text-rose-400">
+        <.icon name="hero-exclamation-circle-mini" class="mr-0.5 inline h-3.5 w-3.5 align-text-bottom" />{msg}
+      </p>
+    </div>
+    """
+  end
+
+  defp with_show({field, label}), do: {field, label, show_errors?(field)}
+  defp with_show({field, label, show}), do: {field, label, show and field.errors != []}
+
   attr :visibility, :any, required: true, doc: "the form's current visibility (list or nil)"
   attr :id_prefix, :string, required: true
   attr :disabled, :boolean, default: false

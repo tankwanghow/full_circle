@@ -709,4 +709,60 @@ defmodule FullCircleWeb.TaskLiveTest do
              ~s{span.max-w-40[title="Note · #{long}"] #remove-link-#{link.link_id}}
            )
   end
+  describe "error placement" do
+    test "a field's error stays hidden until that field is touched", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      clerk = user_with_role(comp, admin, "clerk")
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/new")
+
+      lv
+      |> element("#task-form")
+      |> render_change(%{
+        "task" => %{"assignee_id" => clerk.id, "title" => "", "_unused_title" => ""}
+      })
+
+      refute has_element?(lv, "#task-title-errors")
+
+      lv |> element("#task-form") |> render_change(%{"task" => %{"title" => ""}})
+      assert has_element?(lv, "#task-title-errors", "can't be blank")
+    end
+
+    test "each error sits under its own row, named where the row has several inputs", %{
+      conn: conn,
+      comp: comp
+    } do
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks/new")
+
+      lv
+      |> form("#task-form", %{
+        "task" => %{
+          "title" => "Permit",
+          "due_date" => "",
+          "recur_unit" => "month",
+          "recur_every" => "0",
+          "reminder_before_days" => "-1"
+        }
+      })
+      |> render_submit()
+
+      assert has_element?(lv, "#task-due-errors", "Due: is needed to repeat")
+      assert has_element?(lv, "#task-repeat-errors", "Repeat every: must be greater than or equal to 1")
+      assert has_element?(lv, "#task-repeat-errors", "Remind days before: must be greater than or equal to 0")
+      refute has_element?(lv, "#task-title-errors")
+      assert has_element?(lv, "#task-form input[name='task[due_date]'].border-rose-500")
+    end
+
+    test "quick-add shows its error under the title, not as a flash", %{conn: conn, comp: comp} do
+      {:ok, lv, _} = live(conn, ~p"/companies/#{comp.id}/tasks")
+      lv |> form("#task-compose", %{"compose" => %{"title" => "  "}}) |> render_submit()
+      assert has_element?(lv, "#task-compose-error", "can't be blank")
+      refute has_element?(lv, "#flash-warn")
+
+      lv |> form("#task-compose", %{"compose" => %{"title" => "Order bags"}}) |> render_change()
+      refute has_element?(lv, "#task-compose-error")
+    end
+  end
 end

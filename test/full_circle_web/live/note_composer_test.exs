@@ -382,4 +382,69 @@ defmodule FullCircleWeb.NoteComposerTest do
       assert FullCircle.Repo.get!(Note, r.id).subject_id == nil
     end
   end
+
+  describe "error placement" do
+    test "blank body shows its error under the body", %{conn: conn, admin: admin, comp: comp} do
+      lv = host(conn, comp, admin)
+      lv |> form("#c-form", %{"note" => %{"body" => ""}}) |> render_submit()
+      assert has_element?(lv, "#c-body-errors", "can't be blank")
+    end
+
+    test "a title over 120 characters shows its error under the title", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      lv = host(conn, comp, admin, %{"full" => true})
+
+      lv
+      |> form("#c-form", %{"note" => %{"title" => String.duplicate("x", 121), "body" => "b"}})
+      |> render_submit()
+
+      assert has_element?(lv, "#c-title-errors", "should be at most 120 character")
+      assert FullCircle.Repo.all(Note) == []
+    end
+
+    test "typing a title first does not flag the untouched body", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      lv = host(conn, comp, admin, %{"full" => true})
+
+      # What the browser sends: an input not yet touched comes with `_unused_`.
+      lv
+      |> element("#c-form")
+      |> render_change(%{"note" => %{"title" => "Gate", "body" => "", "_unused_body" => ""}})
+
+      refute has_element?(lv, "#c-body-errors")
+
+      lv |> element("#c-form") |> render_change(%{"note" => %{"title" => "Gate", "body" => ""}})
+      assert has_element?(lv, "#c-body-errors", "can't be blank")
+    end
+
+    test "a link error sits by the chips and clears on the next edit", %{
+      conn: conn,
+      admin: admin,
+      comp: comp
+    } do
+      ali = contact_fixture(comp, admin, %{"name" => "Ali Welding"})
+
+      note =
+        note_fixture(comp, admin, %{
+          "body" => "self",
+          "subject_type" => "Contact",
+          "subject_id" => ali.id
+        })
+
+      lv = edit_host(conn, comp, admin, note)
+      lv |> element("#c-open-picker") |> render_click()
+      lv |> form("#c-picker form", %{"type" => "Note", "terms" => "self"}) |> render_change()
+      lv |> element("#c-picker-pick-#{note.id}") |> render_click()
+      assert has_element?(lv, "#c-error", "cannot link to itself")
+
+      lv |> form("#c-form", %{"note" => %{"body" => "self, edited"}}) |> render_change()
+      refute has_element?(lv, "#c-error")
+    end
+  end
 end

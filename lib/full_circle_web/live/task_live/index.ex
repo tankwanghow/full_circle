@@ -28,7 +28,8 @@ defmodule FullCircleWeb.TaskLive.Index do
          compose_title: "",
          compose_due: "",
          show_due: false,
-         compose_private: false
+         compose_private: false,
+         compose_error: nil
        )
        |> stream_configure(:rows, dom_id: &"tasks-#{&1.id}")}
     else
@@ -86,7 +87,8 @@ defmodule FullCircleWeb.TaskLive.Index do
     {:noreply,
      assign(socket,
        compose_title: p["title"] || "",
-       compose_due: p["due_date"] || socket.assigns.compose_due
+       compose_due: p["due_date"] || socket.assigns.compose_due,
+       compose_error: nil
      )}
   end
 
@@ -122,12 +124,23 @@ defmodule FullCircleWeb.TaskLive.Index do
       {:ok, _} ->
         {:noreply,
          socket
-         |> assign(compose_title: "", compose_due: "", show_due: false, compose_private: false)
+         |> assign(
+           compose_title: "",
+           compose_due: "",
+           show_due: false,
+           compose_private: false,
+           compose_error: nil
+         )
          |> put_flash(:info, gettext("Task saved."))
          |> load(true, 1)}
 
-      {:error, %Ecto.Changeset{errors: [{_field, err} | _]}} ->
-        {:noreply, put_flash(socket, :warn, FullCircleWeb.CoreComponents.translate_error(err))}
+      # Under the title, where the user is typing, not in a flash at the top.
+      {:error, %Ecto.Changeset{errors: [{field, err} | _]}} ->
+        {:noreply,
+         assign(socket,
+           compose_title: p["title"] || "",
+           compose_error: compose_error(field, err)
+         )}
 
       _ ->
         {:noreply, put_flash(socket, :warn, gettext("Could not save the task."))}
@@ -185,6 +198,12 @@ defmodule FullCircleWeb.TaskLive.Index do
   defp index_path(socket, search) do
     ~p"/companies/#{socket.assigns.current_company.id}/tasks?#{%{search: search}}"
   end
+
+  # The box has two inputs; only the date's message needs naming.
+  defp compose_error(:due_date, err),
+    do: "#{gettext("Due")}: #{FullCircleWeb.CoreComponents.translate_error(err)}"
+
+  defp compose_error(_field, err), do: FullCircleWeb.CoreComponents.translate_error(err)
 
   defp blank(nil), do: nil
   defp blank(""), do: nil
@@ -260,6 +279,13 @@ defmodule FullCircleWeb.TaskLive.Index do
                 placeholder={gettext("Add a task…")}
                 class="w-full border-0 bg-transparent p-0 text-sm placeholder:text-gray-500 focus:ring-0 dark:bg-transparent"
               />
+              <p
+                :if={@compose_error}
+                id="task-compose-error"
+                class="mt-0.5 text-xs text-rose-600 dark:text-rose-400"
+              >
+                {@compose_error}
+              </p>
               <input
                 :if={@show_due}
                 type="date"

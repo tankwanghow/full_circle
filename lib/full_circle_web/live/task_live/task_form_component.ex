@@ -10,7 +10,8 @@ defmodule FullCircleWeb.TaskLive.TaskFormComponent do
   """
   use FullCircleWeb, :live_component
 
-  import FullCircleWeb.NoteComponents, only: [record_chip: 1, visibility_chips: 1]
+  import FullCircleWeb.NoteComponents,
+    only: [record_chip: 1, visibility_chips: 1, field_errors: 1, border: 2, show_errors?: 1]
 
   alias FullCircle.{Linkable, Tasks}
   alias FullCircle.Tasks.CompanyTask
@@ -87,8 +88,10 @@ defmodule FullCircleWeb.TaskLive.TaskFormComponent do
   # --- events ---------------------------------------------------------------
 
   @impl true
+  # A message about the last action (a link, a stale save) goes once the
+  # user edits again.
   def handle_event("validate", %{"task" => params}, socket),
-    do: {:noreply, change(socket, params)}
+    do: {:noreply, socket |> change(params) |> assign(error: nil)}
 
   def handle_event("visibility_everyone", _, socket),
     do: {:noreply, change(socket, Map.put(socket.assigns.params, "visibility", [""]))}
@@ -237,12 +240,10 @@ defmodule FullCircleWeb.TaskLive.TaskFormComponent do
   defp email_name(%{email: email}) when is_binary(email), do: email |> String.split("@") |> hd()
   defp email_name(_), do: nil
 
-  defp field_errors(form) do
-    ~w(title descriptions due_date recur_unit recur_every reminder_before_days assignee_id documents_needed visibility)a
-    |> Enum.flat_map(fn field ->
-      Enum.map(form[field].errors, &FullCircleWeb.CoreComponents.translate_error/1)
-    end)
-  end
+  # "is needed to repeat" is the due date's error but is caused by picking a
+  # repeat, so either one being touched shows it.
+  defp due_shown?(form),
+    do: show_errors?(form[:due_date]) or show_errors?(form[:recur_unit])
 
   @impl true
   def render(assigns) do
@@ -277,31 +278,53 @@ defmodule FullCircleWeb.TaskLive.TaskFormComponent do
             type="date"
             name="task[due_date]"
             value={Phoenix.HTML.Form.normalize_value("date", @form[:due_date].value)}
-            class="rounded-full border-gray-400 bg-transparent px-2 py-0.5 text-sm dark:border-gray-600 dark:bg-gray-900"
+            class={[
+              "rounded-full bg-transparent px-2 py-0.5 text-sm dark:bg-gray-900",
+              border(due_shown?(@form), "border-gray-400 dark:border-gray-600")
+            ]}
           />
         </div>
+        <.field_errors
+          id={"#{@id}-due-errors"}
+          fields={[
+            {@form[:assignee_id], gettext("Assigned to")},
+            {@form[:due_date], gettext("Due"), due_shown?(@form)}
+          ]}
+        />
         <input
           type="text"
           name="task[title]"
           value={@form[:title].value}
           placeholder={gettext("Title")}
-          class="mt-1 w-full rounded-md border border-gray-400 bg-transparent px-2 py-1 text-xl font-bold dark:border-gray-600 dark:bg-gray-900"
+          class={[
+            "mt-1 w-full rounded-md border bg-transparent px-2 py-1 text-xl font-bold dark:bg-gray-900",
+            border(@form[:title], "border-gray-400 dark:border-gray-600")
+          ]}
         />
+        <.field_errors id={"#{@id}-title-errors"} fields={[{@form[:title], nil}]} />
         <textarea
           name="task[descriptions]"
           rows="3"
           placeholder={gettext("Description")}
-          class="mt-2 w-full resize-y rounded-md border border-gray-400 bg-transparent px-2 py-1 text-base dark:border-gray-600 dark:bg-gray-900"
+          class={[
+            "mt-2 w-full resize-y rounded-md border bg-transparent px-2 py-1 text-base dark:bg-gray-900",
+            border(@form[:descriptions], "border-gray-400 dark:border-gray-600")
+          ]}
         >{Phoenix.HTML.Form.normalize_value("textarea", @form[:descriptions].value)}</textarea>
+        <.field_errors id={"#{@id}-descriptions-errors"} fields={[{@form[:descriptions], nil}]} />
         <div class="mt-2 flex items-center gap-2 text-sm text-amber-800 dark:text-amber-200">
           <span class="shrink-0">{gettext("Task expects:")}</span>
           <input
             type="text"
             name="task[documents_needed]"
             value={@form[:documents_needed].value}
-            class="min-w-0 flex-1 rounded-md border border-gray-400 bg-transparent px-2 py-0.5 text-sm text-amber-900 dark:border-gray-600 dark:bg-gray-900 dark:text-amber-100"
+            class={[
+              "min-w-0 flex-1 rounded-md border bg-transparent px-2 py-0.5 text-sm text-amber-900 dark:bg-gray-900 dark:text-amber-100",
+              border(@form[:documents_needed], "border-gray-400 dark:border-gray-600")
+            ]}
           />
         </div>
+        <.field_errors id={"#{@id}-documents-errors"} fields={[{@form[:documents_needed], nil}]} />
         <div class="mt-2 flex flex-wrap items-center gap-1">
           <.record_chip
             :for={l <- shown_links(@links, @host)}
@@ -342,6 +365,9 @@ defmodule FullCircleWeb.TaskLive.TaskFormComponent do
             ＋ {gettext("link a record")}
           </button>
         </div>
+        <p :if={@error} id={"#{@id}-error"} class="mt-0.5 text-xs text-rose-600 dark:text-rose-400">
+          {@error}
+        </p>
         <div class="mt-2 flex flex-wrap items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
           {gettext("Repeat")}
           <%!-- Always rendered: a missing input would vanish from phx-change.
@@ -358,7 +384,10 @@ defmodule FullCircleWeb.TaskLive.TaskFormComponent do
               name="task[recur_every]"
               min="1"
               value={Ecto.Changeset.get_field(@form.source, :recur_every) || 1}
-              class="w-16 rounded-full border-gray-400 bg-transparent px-2 py-0.5 text-center text-sm dark:border-gray-600 dark:bg-gray-900"
+              class={[
+                "w-16 rounded-full bg-transparent px-2 py-0.5 text-center text-sm dark:bg-gray-900",
+                border(@form[:recur_every], "border-gray-400 dark:border-gray-600")
+              ]}
             />
           </span>
           <select
@@ -379,9 +408,20 @@ defmodule FullCircleWeb.TaskLive.TaskFormComponent do
             name="task[reminder_before_days]"
             min="0"
             value={@form[:reminder_before_days].value}
-            class="w-16 rounded-full border-gray-400 bg-transparent px-2 py-0.5 text-center text-sm dark:border-gray-600 dark:bg-gray-900"
+            class={[
+              "w-16 rounded-full bg-transparent px-2 py-0.5 text-center text-sm dark:bg-gray-900",
+              border(@form[:reminder_before_days], "border-gray-400 dark:border-gray-600")
+            ]}
           />
         </div>
+        <.field_errors
+          id={"#{@id}-repeat-errors"}
+          fields={[
+            {@form[:recur_unit], gettext("Repeat")},
+            {@form[:recur_every], gettext("Repeat every")},
+            {@form[:reminder_before_days], gettext("Remind days before")}
+          ]}
+        />
         <div
           class="mt-1 flex flex-wrap items-center gap-1"
           title={gettext("Admin, the creator and the assignee can always see it.")}
@@ -394,10 +434,7 @@ defmodule FullCircleWeb.TaskLive.TaskFormComponent do
             private_title={gettext("Only admins, the creator and the assignee can see it.")}
           />
         </div>
-        <.error :for={msg <- field_errors(@form)}>{msg}</.error>
-        <p :if={@error} id={"#{@id}-error"} class="text-sm text-rose-700 dark:text-rose-300">
-          {@error}
-        </p>
+        <.field_errors id={"#{@id}-visibility-errors"} fields={[{@form[:visibility], nil, true}]} />
         <div class="mt-2 flex flex-wrap items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
           {render_slot(@footer)}
           <span class="ml-auto flex flex-wrap items-center gap-2">
