@@ -33,6 +33,7 @@ form. The clerk corrects it and confirms. Nothing is saved until the clerk saves
 | 9 | Payment `funds_account`: the contact's sole funds account → else **Cash In Hand** when the receipt says cash and that account exists → else blank |
 | 10 | SST given only as a total, and a non-zero rounding adjustment, each become a **separate line** with the good blank |
 | 11 | Every warning is advisory. **Nothing blocks Save** except the forms' existing validation |
+| 12 | **Picture not recognised** as a bill or receipt: the AI returns a short description of what it sees, which goes into the document's `descriptions` (when blank), with a warning. Nothing else is seeded |
 
 ## User flow
 
@@ -97,6 +98,8 @@ lines: [{description, quantity, unit_price, discount, tax_rate_percent, amount}]
 subtotal, tax_total, rounding, total
 payment_method: "cash" | "card" | "transfer" | "cheque" | null
 e_invoice_uuid
+recognized: true | false   (is this a bill / receipt / invoice at all?)
+summary: string            (one sentence of what the picture shows, max 200 chars; always set)
 ```
 
 **Prompt rules:**
@@ -116,6 +119,11 @@ e_invoice_uuid
 - **Date:** if it is in the future or more than 12 months old, warn.
 - **No lines but a total:** make one line, description = supplier name (or
   "Receipt"), quantity 1, unit price = total − tax_total − rounding.
+- **Not recognised:** `recognized == false`, or no total and no lines,
+  gives `%Extracted{recognized: false}` with only `summary` kept, plus the
+  warning "Not recognised as a bill or receipt". Prefill then seeds only
+  `descriptions` = summary (truncated to 200 chars). This also covers a wrong
+  photo, such as a delivery order, a cheque or a blurry shot.
 - **Bad JSON:** retry once with "Reply with the JSON object only", then return
   `{:error, …}`.
 
@@ -141,8 +149,9 @@ forms already handle for e-invoice seeds.
 |---|---|---|
 | `date` | `pur_invoice_date` | `payment_date` |
 | `due_date` | `due_date` (else = date) | — |
-| `doc_no` | `pur_invoice_no` | in `descriptions` |
+| `doc_no` | `e_inv_internal_id` (the supplier's bill no; `pur_invoice_no` is our gapless PINV no) | in `descriptions` |
 | supplier name + `doc_no` | — | `descriptions` = "<name> #<doc_no>" |
+| `summary` (only when not recognised) | `descriptions` | `descriptions` |
 | `total` | totals-check anchor | `funds_amount` + totals-check anchor |
 
 **Contact:** `DocPrefill.put_contact` with the supplier role. A name-only match
@@ -163,7 +172,7 @@ named in the description; else blank). Extra lines with the good blank:
 
 **Warnings added here:**
 - **Possible duplicate:**
-  - PurInvoice: same contact + `pur_invoice_no`.
+  - PurInvoice: same contact + `e_inv_internal_id`.
   - Payment: same contact + `payment_date` + `funds_amount`.
   - Link to the existing document. Re-checked when the clerk changes the contact.
 - **Locked period:** the date falls in a locked accounting period
