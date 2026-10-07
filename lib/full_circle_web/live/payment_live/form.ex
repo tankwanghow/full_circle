@@ -40,6 +40,9 @@ defmodule FullCircleWeb.PaymentLive.Form do
            socket.assigns.current_company,
            socket.assigns.current_user
          )
+     )
+     |> then(
+       &if(&1.assigns.live_action == :new, do: FullCircleWeb.ReceiptCapture.init(&1), else: &1)
      )}
   end
 
@@ -247,6 +250,36 @@ defmodule FullCircleWeb.PaymentLive.Form do
     socket
   end
 
+  defp receipt_multi(socket) do
+    case socket.assigns[:receipt_tray_id] do
+      nil ->
+        &Function.identity/1
+
+      tray_id ->
+        FullCircleWeb.ReceiptCapture.attach_multi(
+          tray_id,
+          "Payment",
+          :create_payment,
+          socket.assigns.current_company,
+          socket.assigns.current_user
+        )
+    end
+  end
+
+  defp maybe_warn_receipt_not_attached(socket) do
+    %{current_company: com, current_user: user} = socket.assigns
+
+    if socket.assigns[:receipt_tray_id] &&
+         FullCircleWeb.ReceiptCapture.attach_blocked?(socket.assigns.receipt_tray_id, com, user),
+       do:
+         put_flash(
+           socket,
+           :warn,
+           gettext("Saved, but the receipt was not attached: you cannot write notes.")
+         ),
+       else: socket
+  end
+
   defp mount_edit(socket, id) do
     object =
       BillPay.get_payment!(
@@ -270,6 +303,40 @@ defmodule FullCircleWeb.PaymentLive.Form do
     |> assign(page_title: gettext("Edit Payment") <> " " <> object.payment_no)
     |> assign(:form, to_form(cs))
   end
+
+  @impl true
+  def handle_info({:note_files, {:tray, _}}, socket),
+    do: {:noreply, FullCircleWeb.ReceiptCapture.files_changed(socket, :payment_details)}
+
+  @impl true
+  def handle_async(:receipt, result, socket) do
+    case FullCircleWeb.ReceiptCapture.finished(socket, result) do
+      {socket, nil} ->
+        {:noreply, socket}
+
+      {socket, seed} ->
+        params =
+          FullCircleWeb.ReceiptCapture.merge_params(
+            socket.assigns.form.params,
+            seed.attrs,
+            :payment_details
+          )
+
+        validate(params, assign(socket, e_inv_supplier_ids: seed.contact_ids))
+    end
+  end
+
+  @impl true
+  def handle_event("attachment_uploaded", _, socket),
+    do: {:noreply, FullCircleWeb.ReceiptCapture.files_changed(socket, :payment_details)}
+
+  @impl true
+  def handle_event("receipt_read_again", _, socket),
+    do: {:noreply, FullCircleWeb.ReceiptCapture.read(socket, nil, :payment_details)}
+
+  @impl true
+  def handle_event("receipt_discard_file", %{"id" => id}, socket),
+    do: {:noreply, FullCircleWeb.ReceiptCapture.discard_file(socket, id, :payment_details)}
 
   @impl true
   def handle_event("close_e_inv_preview", _, socket) do
@@ -528,6 +595,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
 
   @impl true
   def handle_event("validate", %{"payment" => params}, socket) do
+    socket = FullCircleWeb.ReceiptCapture.recheck_duplicate(socket, params, :payment_details)
     validate(params, socket)
   end
 
@@ -542,13 +610,15 @@ defmodule FullCircleWeb.PaymentLive.Form do
     case BillPay.create_payment(
            params,
            socket.assigns.current_company,
-           socket.assigns.current_user
+           socket.assigns.current_user,
+           receipt_multi(socket)
          ) do
       {:ok, %{create_payment: obj}} ->
         socket =
           socket
           |> maybe_attach_egg_planned(obj, params)
           |> maybe_learn_supplier_ids(obj)
+          |> maybe_warn_receipt_not_attached()
 
         case FullCircleWeb.Helpers.match_recon_after_save(
                socket.assigns[:recon_link],
@@ -711,6 +781,20 @@ defmodule FullCircleWeb.PaymentLive.Form do
       <div class="w-fit min-w-[64rem] max-w-[98vw] border rounded-lg border-pink-500 bg-pink-100 p-4 [&>*:not(form)]:[contain:inline-size]">
         <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
         <.error_box changeset={@form.source} />
+        <FullCircleWeb.ReceiptCapture.receipt_capture
+          :if={@live_action == :new}
+          id="receipt"
+          tray_id={@receipt_tray_id}
+          files={@receipt_files}
+          state={@receipt_state}
+          receipt={@receipt}
+          usage={@receipt_usage}
+          error={@receipt_error}
+          keyed_total={Ecto.Changeset.fetch_field!(@form.source, :payment_detail_amount)}
+          label={gettext("a new payment")}
+          current_company={@current_company}
+          current_user={@current_user}
+        />
         <.form
           for={@form}
           id="object-form"
