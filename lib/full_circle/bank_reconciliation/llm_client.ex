@@ -27,6 +27,9 @@ defmodule FullCircle.BankReconciliation.LlmClient do
     }
   }
 
+  @default_timeout 600_000
+  @default_max_tokens 65_536
+
   def active_model(settings) do
     provider = settings["llm-provider"] || "none"
     model = settings["llm-model"] || ""
@@ -54,7 +57,20 @@ defmodule FullCircle.BankReconciliation.LlmClient do
     end
   end
 
-  def call_with_pdf(settings, system_prompt, user_prompt, pdf_base64) do
+  def call_with_pdf(settings, system_prompt, user_prompt, pdf_base64, opts \\ []),
+    do:
+      call_with_file(
+        settings,
+        system_prompt,
+        user_prompt,
+        {:pdf, "application/pdf", pdf_base64},
+        opts
+      )
+
+  def call_with_image(settings, system_prompt, user_prompt, base64, media_type, opts \\ []),
+    do: call_with_file(settings, system_prompt, user_prompt, {:image, media_type, base64}, opts)
+
+  defp call_with_file(settings, system_prompt, user_prompt, file, opts) do
     provider = settings["llm-provider"] || "none"
 
     case @providers[provider] do
@@ -66,14 +82,15 @@ defmodule FullCircle.BankReconciliation.LlmClient do
         model = non_blank(settings["llm-model"], config.model)
         api_key = settings["llm-api-key"] || ""
 
-        request_with_pdf(
+        request_with_file(
           config.format,
           endpoint,
           model,
           api_key,
           system_prompt,
           user_prompt,
-          pdf_base64
+          file,
+          opts
         )
     end
   end
@@ -95,7 +112,7 @@ defmodule FullCircle.BankReconciliation.LlmClient do
       {"anthropic-version", "2023-06-01"}
     ]
 
-    with {:ok, resp} <- http_post(url, headers, body) do
+    with {:ok, resp} <- http_post(url, headers, body, @default_timeout) do
       text = get_in(resp, ["content", Access.at(0), "text"]) || ""
       usage = resp["usage"] || %{}
 
@@ -129,7 +146,7 @@ defmodule FullCircle.BankReconciliation.LlmClient do
           else: []
         )
 
-    with {:ok, resp} <- http_post(url, headers, body) do
+    with {:ok, resp} <- http_post(url, headers, body, @default_timeout) do
       require Logger
       finish = get_in(resp, ["choices", Access.at(0), "finish_reason"])
       Logger.info("LLM finish_reason: #{inspect(finish)}")
@@ -150,7 +167,7 @@ defmodule FullCircle.BankReconciliation.LlmClient do
 
   # --- Claude native API with PDF ---
 
-  defp request_with_pdf(:claude, url, model, api_key, system_prompt, user_prompt, pdf_base64) do
+  defp request_with_file(:claude, url, model, api_key, system_prompt, user_prompt, file, opts) do
     body =
       Jason.encode!(%{
         model: model,
@@ -159,15 +176,12 @@ defmodule FullCircle.BankReconciliation.LlmClient do
           %{
             role: "user",
             content: [
-              %{
-                type: "document",
-                source: %{type: "base64", media_type: "application/pdf", data: pdf_base64}
-              },
+              file_block(:claude, file),
               %{type: "text", text: user_prompt}
             ]
           }
         ],
-        max_tokens: 65536
+        max_tokens: Keyword.get(opts, :max_tokens, @default_max_tokens)
       })
 
     headers = [
@@ -176,7 +190,8 @@ defmodule FullCircle.BankReconciliation.LlmClient do
       {"anthropic-version", "2023-06-01"}
     ]
 
-    with {:ok, resp} <- http_post(url, headers, body) do
+    with {:ok, resp} <-
+           http_post(url, headers, body, Keyword.get(opts, :timeout, @default_timeout)) do
       text = get_in(resp, ["content", Access.at(0), "text"]) || ""
       usage = resp["usage"] || %{}
 
@@ -192,7 +207,7 @@ defmodule FullCircle.BankReconciliation.LlmClient do
 
   # --- OpenAI-compatible API with PDF (Gemini supports inline PDF) ---
 
-  defp request_with_pdf(:openai, url, model, api_key, system_prompt, user_prompt, pdf_base64) do
+  defp request_with_file(:openai, url, model, api_key, system_prompt, user_prompt, file, opts) do
     body =
       Jason.encode!(%{
         model: model,
@@ -201,15 +216,12 @@ defmodule FullCircle.BankReconciliation.LlmClient do
           %{
             role: "user",
             content: [
-              %{
-                type: "image_url",
-                image_url: %{url: "data:application/pdf;base64,#{pdf_base64}"}
-              },
+              file_block(:openai, file),
               %{type: "text", text: user_prompt}
             ]
           }
         ],
-        max_tokens: 65536
+        max_tokens: Keyword.get(opts, :max_tokens, @default_max_tokens)
       })
 
     headers =
@@ -219,7 +231,8 @@ defmodule FullCircle.BankReconciliation.LlmClient do
           else: []
         )
 
-    with {:ok, resp} <- http_post(url, headers, body) do
+    with {:ok, resp} <-
+           http_post(url, headers, body, Keyword.get(opts, :timeout, @default_timeout)) do
       require Logger
       finish = get_in(resp, ["choices", Access.at(0), "finish_reason"])
       Logger.info("LLM finish_reason: #{inspect(finish)}")
@@ -237,6 +250,15 @@ defmodule FullCircle.BankReconciliation.LlmClient do
        )}
     end
   end
+
+  defp file_block(:claude, {:pdf, _media_type, data}),
+    do: %{type: "document", source: %{type: "base64", media_type: "application/pdf", data: data}}
+
+  defp file_block(:claude, {:image, media_type, data}),
+    do: %{type: "image", source: %{type: "base64", media_type: media_type, data: data}}
+
+  defp file_block(:openai, {_kind, media_type, data}),
+    do: %{type: "image_url", image_url: %{url: "data:#{media_type};base64,#{data}"}}
 
   # --- Usage & Cost ---
 
@@ -272,13 +294,21 @@ defmodule FullCircle.BankReconciliation.LlmClient do
 
   # --- HTTP ---
 
-  defp http_post(url, headers, body) do
+  # Tests swap the transport: config :full_circle, :llm_http, fn url, headers, body, timeout -> …
+  defp http_post(url, headers, body, timeout) do
+    case Application.get_env(:full_circle, :llm_http) do
+      nil -> httpc_post(url, headers, body, timeout)
+      post -> post.(url, headers, body, timeout)
+    end
+  end
+
+  defp httpc_post(url, headers, body, timeout) do
     h = Enum.map(headers, fn {k, v} -> {to_charlist(k), to_charlist(v)} end)
 
     case :httpc.request(
            :post,
            {to_charlist(url), h, ~c"application/json", body},
-           [{:timeout, 600_000}],
+           [{:timeout, timeout}],
            []
          ) do
       {:ok, {{_, 200, _}, _, resp}} ->
