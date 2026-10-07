@@ -299,4 +299,27 @@ defmodule FullCircle.BillPayTest do
       refute BillPay.sole_funds_account_name(contact_fixture(company, admin).id, company)
     end
   end
+
+  describe "create_payment/4 extend_multi" do
+    test "runs the extension inside the same transaction", %{admin: u, company: c} do
+      contact = contact_fixture(c, u)
+      good = good_fixture(c, u)
+      pur_acct = Accounting.get_account_by_name("General Purchases", c, u)
+
+      tc =
+        FullCircle.Repo.one!(
+          Ecto.Query.from(t in TaxCode, where: t.company_id == ^c.id and t.code == "NoPTax")
+        )
+
+      attrs =
+        payment_attrs(contact, good, pur_acct, tc, pay_funds_account_fixture(c, u), tax_rate: "0")
+
+      ext = fn multi ->
+        Ecto.Multi.run(multi, :boom, fn _repo, %{create_payment: p} -> {:error, p.payment_no} end)
+      end
+
+      assert {:error, :boom, _no, _} = BillPay.create_payment(attrs, c, u, ext)
+      assert FullCircle.Repo.aggregate(BillPay.Payment, :count) == 0
+    end
+  end
 end

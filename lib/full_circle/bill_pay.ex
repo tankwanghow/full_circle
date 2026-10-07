@@ -316,11 +316,16 @@ defmodule FullCircle.BillPay do
     end
   end
 
-  def create_payment(attrs, com, user) do
+  @doc """
+  `extend_multi` lets a caller append steps that need the created Payment —
+  e.g. attaching a captured receipt as a note (`FullCircleWeb.ReceiptCapture`).
+  """
+  def create_payment(attrs, com, user, extend_multi \\ &Function.identity/1) do
     case can?(user, :create_payment, com) do
       true ->
         Multi.new()
         |> create_payment_multi(attrs, com, user)
+        |> extend_multi.()
         |> Repo.transaction()
         |> Accounting.map_period_closed()
 
