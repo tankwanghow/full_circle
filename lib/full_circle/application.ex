@@ -8,8 +8,6 @@ defmodule FullCircle.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      # Start the Telemetry supervisor
-      FullCircleWeb.Telemetry,
       # Start the Ecto repository
       FullCircle.Repo,
       FullCircle.QueryRepo,
@@ -20,8 +18,6 @@ defmodule FullCircle.Application do
       FullCircleWeb.PhoneUploadFinished,
       # Start the PubSub system
       {Phoenix.PubSub, name: FullCircle.PubSub},
-      # Start Finch
-      {Finch, name: FullCircle.Finch},
       # Start the Endpoint (http/https)
       FullCircleWeb.Endpoint
       # Start a worker by calling: FullCircle.Worker.start_link(arg)

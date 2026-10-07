@@ -52,14 +52,10 @@ defmodule FullCircle.MixProject do
       heroicons_dep(),
       {:swoosh, "~> 1.5"},
       {:gen_smtp, "~> 1.2"},
-      {:finch, "~> 0.13"},
-      {:telemetry_metrics, "~> 1.0"},
-      {:telemetry_poller, "~> 1.0"},
       # timex 3.7.13 (latest) declares gettext ~> 0.26; gettext 1.0 is that
       # release with no breaking changes, so override the stale requirement.
       {:gettext, "~> 1.0", override: true},
       {:jason, "~> 1.2"},
-      {:dns_cluster, "~> 0.3.0"},
       {:bandit, "~> 1.5"},
       {:tzdata, "~> 1.1"},
       {:timex, "~> 3.0"},
