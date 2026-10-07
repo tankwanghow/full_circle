@@ -117,7 +117,7 @@ Every entity belongs to a `Company`. Routes are scoped as `/companies/:company_i
 
 Project skills (non-obvious domain contracts) live in `.claude/skills/`:
 `grain-trading-desk.md`, `egg-stock-day-board.md`, `e-invoice-sync.md`,
-`e-invoice-bill-prefill.md`, `bank-recon-llm-parser.md`, `bank-recon-matching.md`, `cash-forecast-model.md`,
+`e-invoice-bill-prefill.md`, `receipt-capture.md`, `bank-recon-llm-parser.md`, `bank-recon-matching.md`, `cash-forecast-model.md`,
 `cp204-instalment-planner.md`, `punch-card-payroll.md`, `finger-print-import.md`,
 `qr-gate-punch.md`, `punch-photo-pdpa.md`, `statutory-bundle.md`,
 `liveview-computed-field-gotchas.md`,

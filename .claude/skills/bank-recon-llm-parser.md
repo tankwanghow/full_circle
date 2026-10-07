@@ -17,7 +17,7 @@ against the book balances.
 | `lib/full_circle/bank_reconciliation/llm_parser.ex` | Prompts + batching + balance extraction. **The prompts are the behaviour** — most parsing bugs are prompt bugs, not code bugs. |
 | `lib/full_circle/bank_reconciliation/llm_client.ex` | HTTP client. Providers: `claude` (native API), `gemini` (OpenAI-compatible endpoint). PDF sent as base64 document (Claude) / `image_url` data URI (Gemini). |
 | `lib/full_circle/bank_reconciliation/pdf_text.ex` | `pdftotext -layout` per page via poppler-utils. Filters out blank pages. |
-| `lib/full_circle_web/live/bank_reconciliation_live/index.ex` | Upload handling, `load_llm_settings/1` (from company `settings["llm"]` JSONB), `save_manual_balances` override UI. |
+| `lib/full_circle_web/live/bank_reconciliation_live/index.ex` | Upload handling, `load_llm_settings/1` → `Sys.llm_settings/1` (company `settings["llm"]` JSONB; receipts use the `:receipt` profile, see `receipt-capture.md`), `save_manual_balances` override UI. |
 
 ## Parse flow
 

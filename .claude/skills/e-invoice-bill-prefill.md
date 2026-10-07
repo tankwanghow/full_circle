@@ -29,6 +29,8 @@ Callers only add their own field names (`pur_invoice_no` / `invoice_date` / `fun
 
 For sync/match/reconcile see `e-invoice-sync.md`. For queue stages (needs bill vs needs invoice) see queue dual-lane behaviour. This skill is only the data-entry path.
 
+The contact, goods and seeded-line helpers live in `FullCircle.DocPrefill` (shared with receipt capture, `receipt-capture.md`); `EInvMetas.Prefill` calls them.
+
 A bill seeded here carries **no trading link** — `Prefill` knows nothing about grain trading. Clerks attach loads/drops from the form panel; see `grain-trading-desk.md`.
 
 ---
@@ -73,7 +75,7 @@ Do **not** add abbreviation rules ("Bhd" ↔ "Berhad"). Data has near-collisions
 
 ## Goods: seed only when safe
 
-`Prefill` fills the good (pivot for account, tax code, unit). Rules, in order:
+`DocPrefill.put_goods/5` fills the good (pivot for account, tax code, unit). Rules, in order:
 
 1. **Contact has only ever traded one good**  
    - purchase: `Billing.sole_purchased_good_name/2` / `purchased_good_names`  
