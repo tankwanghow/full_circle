@@ -5,8 +5,11 @@
 // within the 10-minute idle window. A scan in progress is remembered in
 // localStorage and resumed from the server's page count after a reload.
 // ⏺ Video / 🎙 Audio record in the page (note_record.js) and send like a file.
+// Every camera shot (Photo, each Scan page) goes through the crop view
+// (photo_crop.js) first; ↺ Retake there reopens the camera.
 import { downscale, photoOpts, send } from "./note_attach"
 import { markCanRecord, openRecorder } from "./note_record"
+import { cropPhoto } from "./photo_crop"
 
 const root = document.getElementById("phone-upload")
 if (root) start(root)
@@ -156,7 +159,15 @@ function start(root) {
     markSent(li, await attempt(), attempt)
   }
 
-  $("pu-photo").onclick = () => pick({ capture: true, accept: "image/*" }, files => sendFile(files[0]))
+  function takePhoto() {
+    pick({ capture: true, accept: "image/*" }, async files => {
+      const cropped = await cropPhoto(files[0])
+      if (cropped) sendFile(cropped)
+      else takePhoto()
+    })
+  }
+
+  $("pu-photo").onclick = () => takePhoto()
   $("pu-files").onclick = () =>
     pick({ multiple: true, accept: "image/*,application/pdf" }, async files => { for (const f of files) await sendFile(f) })
 
@@ -195,7 +206,11 @@ function start(root) {
 
   function takePage() {
     if (busy) return
-    pick({ capture: true, accept: "image/*" }, files => addPage(files[0]))
+    pick({ capture: true, accept: "image/*" }, async files => {
+      const cropped = await cropPhoto(files[0])
+      if (cropped) addPage(cropped)
+      else takePage()
+    })
   }
 
   async function addPage(file) {
@@ -294,7 +309,7 @@ function start(root) {
   }
 
   // For checking the page without a camera (DevTools): window.__phoneUpload.
-  window.__phoneUpload = { addPage, sendFile, startScan: () => { scan = { id: uuid(), pages: 0 }; store.set(scanKey, scan); showScan() }, uuid }
+  window.__phoneUpload = { addPage, sendFile, cropPhoto, startScan: () => { scan = { id: uuid(), pages: 0 }; store.set(scanKey, scan); showScan() }, uuid }
 }
 
 // --- page look ---------------------------------------------------------------
