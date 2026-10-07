@@ -16,7 +16,11 @@ Extract and Prefill know nothing about LiveView. A future inbox calls them as th
 
 ## Contracts that bite
 - **Settings:** use `Sys.llm_settings(company, :receipt)`. Never read `"llm"` directly.
-  Blank `"llm_receipt"` fields fall back to `"llm"`.
+  Blank `"llm_receipt"` fields fall back to `"llm"` **only when the receipt
+  provider is blank or the same as the shared one**; on another provider the
+  endpoint, model and key start blank (a Gemini key must never reach Anthropic).
+  Only admins can save either block (`can?(:update_company)` checked in the
+  save handler — the template hiding it is not enough).
 - **Supplier bill no → `e_inv_internal_id`.** `pur_invoice_no` is our gapless PINV
   number and is never seeded. Payment puts "<shop> #<doc_no>" in `descriptions`.
 - **Not recognised** (`recognized: false`, or no total and no lines): only
@@ -39,8 +43,20 @@ Extract and Prefill know nothing about LiveView. A future inbox calls them as th
   Everyone, subject = the new doc) to the create Multi. The doc and its note
   commit together. A failed save leaves the tray for a re-save. With no
   `:create_note` permission the step is skipped and a `:warn` flash says so.
-- **Limits:** images over 5 MB are refused before the call; 90 s timeout;
-  `max_tokens` 4096.
+- **Limits:** an image whose **base64** exceeds 5 MB (raw ≳ 3.75 MB) is refused
+  before the call — the AI's limit is on the encoded payload; 90 s timeout;
+  `max_tokens` 16_384 (Gemini 2.5 thinking tokens count against it).
+- **Learning identifiers:** `Prefill` returns `learn: {contact_id, tin, brn}`
+  only when the contact matched by TIN/BRN (nil on a name match or no match).
+  After save, `ReceiptCapture.learn_identifiers/4` stamps them only if the
+  saved contact is that same contact — never onto one the clerk picked
+  instead. Logged as "learnt from Receipt".
+- **Duplicate warning** is `seed.duplicate`, separate from `warnings`. The form
+  re-checks it (`recheck_duplicate/3`) after the read merges and on every
+  validate, against the form's current contact/date/amount.
+- **Receipt-note failure** on save returns `{:error, :receipt_note, …}`; both
+  forms have their own clause (flash, keep form and tray) — it must not fall
+  into the generic changeset clause.
 - **Tests:** stub `Application.put_env(:full_circle, :llm_http, fn url, headers,
   body, timeout -> …)` with `async: false`. LiveView tests: `Trays.open` +
   `Attachments.attach_to_tray`, then `render(lv)` and `render_async(lv)`.

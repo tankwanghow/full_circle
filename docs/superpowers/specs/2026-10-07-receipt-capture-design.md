@@ -29,7 +29,7 @@ form. The clerk corrects it and confirms. Nothing is saved until the clerk saves
 | 5 | **Contact:** match by TIN → BRN → name (the existing resolver); otherwise leave it blank for the clerk and show what was read. Never auto-create contacts |
 | 6 | **Lines:** one detail line per receipt item. A good is seeded **only** by the proven safe rules; otherwise it is blank. No AI good-guessing |
 | 7 | **The photo is kept** as a files-only Note on the saved document, using the note tray, the phone page and attachments (approach A). No new file store |
-| 8 | **Separate AI settings for receipts** (`"llm_receipt"`). Any blank field falls back to the shared `"llm"` setting. Bank Recon and Query are unchanged |
+| 8 | **Separate AI settings for receipts** (`"llm_receipt"`). A blank field falls back to the shared `"llm"` setting **only on the same provider**; on another provider endpoint, model and key start blank. Admin-only, checked on the server. Bank Recon and Query are unchanged |
 | 9 | Payment `funds_account`: the contact's sole funds account → else **Cash In Hand** when the receipt says cash and that account exists → else blank |
 | 10 | SST given only as a total, and a non-zero rounding adjustment, each become a **separate line** with the good blank |
 | 11 | Every warning is advisory. **Nothing blocks Save** except the forms' existing validation |
@@ -68,7 +68,11 @@ fills only empty fields.
 - `:default` returns `"llm"` merged over the defaults (`llm-provider` "none", the
   rest ""), exactly what the three copies do today.
 - `:receipt` returns `:default` with every **non-blank** `"llm_receipt"` field
-  laid over it.
+  laid over it — when the receipt provider is blank or equals the shared one.
+  On a different provider the non-blank fields are laid over the blank
+  defaults instead, so another vendor's key, model or endpoint is never sent.
+- The Company form's save handler writes either key only when
+  `can?(user, :update_company, company)` — hiding the block is not a check.
 - It replaces `load_llm_settings/1` in `bank_reconciliation_live/index.ex` and
   `query_live/form.ex`, and the `llm_defaults` merge in `company_live/form.ex`.
 - **Company form:** a second block, **"AI for receipts / bills"**, with the same
@@ -109,6 +113,9 @@ summary: string            (one sentence of what the picture shows, max 200 char
 - Rounding is its own field, not a line.
 - Handwritten cash-bill items are lines.
 - Never guess: return null instead.
+
+**Limits:** an image is refused when its base64 exceeds 5 MB (the AI's limit
+is on the encoded payload); `max_tokens` 16_384; 90 s timeout.
 
 **Code-side validation** (the model is never trusted):
 - Every amount → `Decimal` and every date → `Date`. A value that does not parse
@@ -174,7 +181,9 @@ named in the description; else blank). Extra lines with the good blank:
 - **Possible duplicate:**
   - PurInvoice: same contact + `e_inv_internal_id`.
   - Payment: same contact + `payment_date` + `funds_amount`.
-  - Link to the existing document. Re-checked when the clerk changes the contact.
+  - Returned as `duplicate`, apart from `warnings`. Re-checked after the read
+    merges into the form and on every change, against the form's current
+    contact (the clerk may have picked one first).
 - **Locked period:** the date falls in a locked accounting period
   (`.claude/skills/accounting-period-lock.md`).
 - **Has an e-invoice:** a printed `e_invoice_uuid` matches a synced received
@@ -204,8 +213,10 @@ named in the description; else blank). Extra lines with the good blank:
     uploading again.
   - If the user lacks `:create_note`, the extension is skipped: the document saves
     and a `:warn` flash says the receipt was not attached.
-- **After a successful save:** `learn_contact_identifiers` with the extracted
-  TIN/BRN, the same call as `maybe_learn_e_inv_contact_ids`.
+- **After a successful save:** learn the extracted TIN/BRN
+  (`learn_contact_identifiers`, logged "learnt from Receipt") **only** when the
+  contact matched by TIN/BRN and the saved contact is that same contact. A
+  name match, no match, or a contact the clerk picked instead learns nothing.
 - A phone upload that arrives after Save follows the tray to its note (existing
   tray behaviour).
 
