@@ -62,6 +62,9 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
            socket.assigns.current_company,
            socket.assigns.current_user
          )
+     )
+     |> then(
+       &if(&1.assigns.live_action == :new, do: FullCircleWeb.ReceiptCapture.init(&1), else: &1)
      )}
   end
 
@@ -370,6 +373,36 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
     socket
   end
 
+  defp receipt_multi(socket) do
+    case socket.assigns[:receipt_tray_id] do
+      nil ->
+        &Function.identity/1
+
+      tray_id ->
+        FullCircleWeb.ReceiptCapture.attach_multi(
+          tray_id,
+          "PurInvoice",
+          :create_pur_invoice,
+          socket.assigns.current_company,
+          socket.assigns.current_user
+        )
+    end
+  end
+
+  defp maybe_warn_receipt_not_attached(socket) do
+    %{current_company: com, current_user: user} = socket.assigns
+
+    if socket.assigns[:receipt_tray_id] &&
+         FullCircleWeb.ReceiptCapture.attach_blocked?(socket.assigns.receipt_tray_id, com, user),
+       do:
+         put_flash(
+           socket,
+           :warn,
+           gettext("Saved, but the receipt was not attached: you cannot write notes.")
+         ),
+       else: socket
+  end
+
   defp mount_edit(socket, id) do
     company = socket.assigns.current_company
 
@@ -598,8 +631,21 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
   end
 
   def handle_event("validate", %{"pur_invoice" => params}, socket) do
+    socket = FullCircleWeb.ReceiptCapture.recheck_duplicate(socket, params, :pur_invoice_details)
     validate(params, socket)
   end
+
+  @impl true
+  def handle_event("attachment_uploaded", _, socket),
+    do: {:noreply, FullCircleWeb.ReceiptCapture.files_changed(socket, :pur_invoice_details)}
+
+  @impl true
+  def handle_event("receipt_read_again", _, socket),
+    do: {:noreply, FullCircleWeb.ReceiptCapture.read(socket, nil, :pur_invoice_details)}
+
+  @impl true
+  def handle_event("receipt_discard_file", %{"id" => id}, socket),
+    do: {:noreply, FullCircleWeb.ReceiptCapture.discard_file(socket, id, :pur_invoice_details)}
 
   @impl true
   def handle_event("save", %{"pur_invoice" => params}, socket) do
@@ -667,6 +713,28 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
   end
 
   @impl true
+  def handle_async(:receipt, result, socket) do
+    case FullCircleWeb.ReceiptCapture.finished(socket, result) do
+      {socket, nil} ->
+        {:noreply, socket}
+
+      {socket, seed} ->
+        params =
+          FullCircleWeb.ReceiptCapture.merge_params(
+            socket.assigns.form.params,
+            seed.attrs,
+            :pur_invoice_details
+          )
+
+        validate(params, assign(socket, e_inv_supplier_ids: seed.contact_ids))
+    end
+  end
+
+  @impl true
+  def handle_info({:note_files, {:tray, _}}, socket),
+    do: {:noreply, FullCircleWeb.ReceiptCapture.files_changed(socket, :pur_invoice_details)}
+
+  @impl true
   def handle_info({:trading_attach_selection, contact_id, load_ids, transport_drop_ids}, socket) do
     {:noreply,
      socket
@@ -696,12 +764,12 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
           )
 
         true ->
-          Billing.create_pur_invoice(
-            params,
-            company,
-            user,
-            attach_links_fun(socket, params, company, user)
-          )
+          links = attach_links_fun(socket, params, company, user)
+          receipt = receipt_multi(socket)
+
+          Billing.create_pur_invoice(params, company, user, fn multi ->
+            multi |> links.() |> receipt.()
+          end)
       end
 
     case result do
@@ -710,6 +778,7 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
           socket
           |> maybe_attach_egg_planned(obj, params)
           |> maybe_learn_supplier_ids(obj)
+          |> maybe_warn_receipt_not_attached()
 
         flash =
           cond do
@@ -1118,6 +1187,20 @@ defmodule FullCircleWeb.PurInvoiceLive.Form do
       <div class="w-fit min-w-[64rem] max-w-[98vw] border rounded-lg border-pink-500 bg-pink-100 p-4 [&>*:not(form)]:[contain:inline-size]">
         <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
         <.error_box changeset={@form.source} />
+        <FullCircleWeb.ReceiptCapture.receipt_capture
+          :if={@live_action == :new}
+          id="receipt"
+          tray_id={@receipt_tray_id}
+          files={@receipt_files}
+          state={@receipt_state}
+          receipt={@receipt}
+          usage={@receipt_usage}
+          error={@receipt_error}
+          keyed_total={Ecto.Changeset.fetch_field!(@form.source, :pur_invoice_amount)}
+          label={gettext("a new purchase invoice")}
+          current_company={@current_company}
+          current_user={@current_user}
+        />
         <div
           :if={@live_action == :edit and @trading_settlement.linked?}
           class="mb-3 rounded border border-amber-600 bg-amber-50 px-3 py-2 text-sm"
