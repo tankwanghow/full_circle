@@ -55,7 +55,7 @@ defmodule FullCircle.Receipts.Extract do
 
   def run(path, content_type, settings, opts \\ []) do
     today = Keyword.get(opts, :today, Date.utc_today())
-    llm_opts = [timeout: Keyword.get(opts, :timeout, 90_000), max_tokens: 4096]
+    llm_opts = [timeout: Keyword.get(opts, :timeout, 90_000), max_tokens: 16_384]
 
     with {:ok, kind} <- kind(content_type),
          {:ok, bin} <- read(path, kind) do
@@ -86,7 +86,8 @@ defmodule FullCircle.Receipts.Extract do
 
   defp read(path, kind) do
     case File.read(path) do
-      {:ok, bin} when kind == :image and byte_size(bin) > @max_image_bytes ->
+      # The AI's 5 MB image limit applies to the base64 sent, not the file.
+      {:ok, bin} when kind == :image and div(byte_size(bin) + 2, 3) * 4 > @max_image_bytes ->
         {:error, gettext("Photo too large to read (max 5 MB).")}
 
       {:ok, bin} ->

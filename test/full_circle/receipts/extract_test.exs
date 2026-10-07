@@ -193,7 +193,7 @@ defmodule FullCircle.Receipts.ExtractTest do
   end
 
   describe "run/4" do
-    test "image: one call with the 90 s timeout and 4096 tokens" do
+    test "image: one call with the 90 s timeout and 16k tokens" do
       stub([Jason.encode!(@good)])
       path = tmp(".jpg", <<0xFF, 0xD8, 0xFF, 0xE0, 0, 0>>)
 
@@ -202,7 +202,7 @@ defmodule FullCircle.Receipts.ExtractTest do
 
       assert usage.total_tokens == 150
       assert_received {:llm_called, body, 90_000}
-      assert body["max_tokens"] == 4096
+      assert body["max_tokens"] == 16_384
       [%{"content" => [%{"type" => "image"}, _]}] = body["messages"]
     end
 
@@ -232,6 +232,14 @@ defmodule FullCircle.Receipts.ExtractTest do
       path = tmp(".jpg", <<0xFF, 0xD8, 0xFF>>)
       assert {:error, msg} = Extract.run(path, "image/jpeg", @settings, today: @today)
       assert msg =~ "could not be read"
+    end
+
+    test "a 4 MB photo is refused: its base64 exceeds the 5 MB image limit" do
+      stub([])
+      path = tmp(".png", :binary.copy(<<0>>, 4 * 1024 * 1024))
+      assert {:error, msg} = Extract.run(path, "image/png", @settings, today: @today)
+      assert msg =~ "too large"
+      refute_received {:llm_called, _, _}
     end
 
     test "photo over 5 MB is refused before any call" do

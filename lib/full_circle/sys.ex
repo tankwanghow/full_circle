@@ -298,13 +298,22 @@ defmodule FullCircle.Sys do
     do: Map.merge(@llm_defaults, get_company_settings(company, "llm"))
 
   def llm_settings(company, :receipt) do
+    shared = llm_settings(company, :default)
+
     overrides =
       company
       |> get_company_settings("llm_receipt")
       |> Enum.reject(fn {_k, v} -> v in [nil, ""] end)
       |> Map.new()
 
-    Map.merge(llm_settings(company, :default), overrides)
+    # Inherit endpoint, model and key only on the same provider: a Gemini key
+    # must never be sent to Anthropic (or the other way round).
+    base =
+      if overrides["llm-provider"] in [nil, shared["llm-provider"]],
+        do: shared,
+        else: @llm_defaults
+
+    Map.merge(base, overrides)
   end
 
   @period_settings_key "period"

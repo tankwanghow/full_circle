@@ -400,12 +400,22 @@ defmodule FullCircleWeb.CompanyLive.Form do
 
   @impl true
   def handle_event("save", %{"company" => company_params} = params, socket) do
-    if llm_params = params["llm"] do
-      Sys.update_company_settings(socket.assigns.company, "llm", llm_params)
-    end
+    # The AI blocks are hidden from non-admins, but a forged event still
+    # arrives here: check on the server. A receipt endpoint inherits the
+    # shared API key, so a forged one would send that key elsewhere.
+    if socket.assigns[:company] &&
+         FullCircle.Authorization.can?(
+           socket.assigns.current_user,
+           :update_company,
+           socket.assigns.company
+         ) do
+      if llm_params = params["llm"] do
+        Sys.update_company_settings(socket.assigns.company, "llm", llm_params)
+      end
 
-    if llm_receipt_params = params["llm_receipt"] do
-      Sys.update_company_settings(socket.assigns.company, "llm_receipt", llm_receipt_params)
+      if llm_receipt_params = params["llm_receipt"] do
+        Sys.update_company_settings(socket.assigns.company, "llm_receipt", llm_receipt_params)
+      end
     end
 
     save_company(socket, socket.assigns.live_action, company_params)

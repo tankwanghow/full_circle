@@ -246,4 +246,48 @@ defmodule FullCircleWeb.PaymentReceiptCaptureLiveTest do
     assert html =~ "Possible duplicate"
     assert html =~ pv.payment_no
   end
+
+  test "duplicate is checked against the clerk's contact after the read merges", %{
+    conn: conn,
+    user: u,
+    company: c
+  } do
+    stub(%{@reply | "supplier" => %{"name" => "Unknown Shop", "tin" => "C000"}})
+    picked = contact_fixture(c, u)
+    good = good_fixture(c, u)
+    pur_acct = Accounting.get_account_by_name("General Purchases", c, u)
+
+    tc =
+      Repo.one!(
+        from t in FullCircle.Accounting.TaxCode,
+          where: t.company_id == ^c.id and t.code == "NoPTax"
+      )
+
+    {:ok, %{create_payment: pv}} =
+      FullCircle.BillPay.create_payment(
+        FullCircle.BillPayFixtures.payment_attrs(
+          picked,
+          good,
+          pur_acct,
+          tc,
+          FullCircle.BillPayFixtures.pay_funds_account_fixture(c, u),
+          tax_rate: "0",
+          quantity: "1",
+          unit_price: "50.00",
+          funds_amount: "50.00"
+        ),
+        c,
+        u
+      )
+
+    {:ok, lv, _} = live(conn, ~p"/companies/#{c.id}/Payment/new")
+
+    render_change(lv, "validate", %{
+      "payment" => %{"contact_name" => picked.name, "contact_id" => picked.id}
+    })
+
+    html = drop_photo(lv, c, u)
+    assert value(lv, "payment_contact_id") == picked.id
+    assert html =~ pv.payment_no
+  end
 end

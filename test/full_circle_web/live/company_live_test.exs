@@ -296,6 +296,35 @@ defmodule FullCircleWeb.CompanyLiveTest do
       assert FullCircle.Sys.llm_settings(fresh)["llm-model"] == "claude-sonnet-4-6"
     end
 
+    test "a non-admin's forged save cannot change the AI settings", %{comp: comp, user: admin} do
+      {:ok, _} =
+        FullCircle.Sys.update_company_settings(comp, "llm", %{
+          "llm-provider" => "claude",
+          "llm-api-key" => "secret"
+        })
+
+      clerk = FullCircle.NotesFixtures.user_with_role(comp, admin, "clerk")
+
+      conn =
+        build_conn()
+        |> log_in_user(clerk)
+        |> put_session(:current_company_id, comp.id)
+        |> put_session(:current_role, "clerk")
+
+      {:ok, lv, _html} = live(conn, ~p"/edit_company/#{comp.id}")
+
+      _ =
+        render_submit(lv, "save", %{
+          "company" => valid_company_attributes(%{name: comp.name}),
+          "llm" => %{"llm-provider" => "gemini"},
+          "llm_receipt" => %{"llm-endpoint" => "https://attacker.example"}
+        })
+
+      fresh = FullCircle.Sys.get_company!(comp.id)
+      assert FullCircle.Sys.get_company_settings(fresh, "llm_receipt") == %{}
+      assert FullCircle.Sys.llm_settings(fresh)["llm-provider"] == "claude"
+    end
+
     test "save valid company", %{conn: conn, comp: comp, comp1: comp1} do
       conn = conn |> put_session(:current_company_id, comp1.id)
       {:ok, lv, _html} = live(conn, ~p"/edit_company/#{comp.id}")

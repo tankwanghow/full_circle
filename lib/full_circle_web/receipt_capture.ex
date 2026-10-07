@@ -126,7 +126,7 @@ defmodule FullCircleWeb.ReceiptCapture do
       receipt: nil,
       receipt_usage: nil,
       receipt_error: nil,
-      receipt_contact_ids: nil,
+      receipt_learn: nil,
       receipt_settings: Sys.llm_settings(socket.assigns.current_company, :receipt)
     )
   end
@@ -184,10 +184,10 @@ defmodule FullCircleWeb.ReceiptCapture do
          extracted: extracted,
          warnings: seed.warnings,
          total: seed.total,
-         duplicate: nil
+         duplicate: seed.duplicate
        },
        receipt_usage: LlmClient.format_usage(usage),
-       receipt_contact_ids: seed.contact_ids
+       receipt_learn: seed.learn
      ), seed}
   end
 
@@ -198,21 +198,27 @@ defmodule FullCircleWeb.ReceiptCapture do
     do: {assign(socket, receipt_state: :error, receipt_error: inspect(reason)), nil}
 
   @doc """
-  The clerk changed the form: re-check the duplicate warning against the
-  current contact. The original warnings from the read stay; the duplicate
-  line is replaced.
+  Re-check the duplicate warning against the form's current params — after
+  the read merges (the clerk may have picked the contact first) and on every
+  change.
   """
   def recheck_duplicate(%{assigns: %{receipt: %{} = receipt}} = socket, params, detail_key) do
-    com = socket.assigns.current_company
-
-    warnings =
-      Enum.reject(receipt.warnings, &String.starts_with?(&1, gettext("Possible duplicate")))
-
-    dup = Receipts.Prefill.duplicate_warning(params, detail_key, com)
-    assign(socket, receipt: %{receipt | warnings: warnings, duplicate: dup})
+    dup = Receipts.Prefill.duplicate_warning(params, detail_key, socket.assigns.current_company)
+    assign(socket, receipt: %{receipt | duplicate: dup})
   end
 
   def recheck_duplicate(socket, _params, _detail_key), do: socket
+
+  @doc """
+  After save: stamp the receipt's TIN/BRN onto the saved contact, but only
+  when it is the contact those identifiers matched. A contact the clerk
+  picked instead (a catch-all "Cash Purchases") must not take a shop's TIN.
+  """
+  def learn_identifiers({contact_id, tin, brn}, contact_id, com, user),
+    do:
+      FullCircle.Accounting.learn_contact_identifiers(contact_id, tin, brn, com, user, "Receipt")
+
+  def learn_identifiers(_learn, _saved_contact_id, _com, _user), do: :noop
 
   attr :id, :string, required: true
   attr :tray_id, :string, required: true

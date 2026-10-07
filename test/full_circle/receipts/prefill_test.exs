@@ -157,7 +157,9 @@ defmodule FullCircle.Receipts.PrefillTest do
     {:ok, %{create_pur_invoice: pinv}} = Billing.create_pur_invoice(attrs, c, u)
 
     seed = Prefill.build(ex(), c, u, :pur_invoice_details)
-    assert Enum.any?(seed.warnings, &(&1 =~ "Possible duplicate" and &1 =~ pinv.pur_invoice_no))
+    assert seed.duplicate =~ "Possible duplicate"
+    assert seed.duplicate =~ pinv.pur_invoice_no
+    refute Enum.any?(seed.warnings, &(&1 =~ "Possible duplicate"))
   end
 
   test "possible duplicate payment: same contact, date and amount", %{c: c, u: u} do
@@ -179,7 +181,7 @@ defmodule FullCircle.Receipts.PrefillTest do
       )
 
     seed = Prefill.build(ex(), c, u, :payment_details)
-    assert Enum.any?(seed.warnings, &(&1 =~ "Possible duplicate" and &1 =~ pv.payment_no))
+    assert seed.duplicate =~ pv.payment_no
 
     assert Prefill.duplicate_warning(
              %{
@@ -227,5 +229,16 @@ defmodule FullCircle.Receipts.PrefillTest do
     assert seed.attrs == %{descriptions: "Photo of a cheque"}
     assert seed.warnings == ["Not recognised as a bill or receipt."]
     assert seed.total == nil
+  end
+
+  test "learn only from an identifier match: {contact, tin, brn}", %{c: c, u: u} do
+    contact = contact_fixture(c, u, %{"name" => "Kedai Ali Hdw", "tax_id" => "C2345678901"})
+    seed = Prefill.build(ex(%{supplier_brn: "201901012345"}), c, u, :payment_details)
+    assert seed.learn == {contact.id, "C2345678901", "201901012345"}
+
+    contact_fixture(c, u, %{"name" => "Kedai Ali Hardware", "tax_id" => "OTHER"})
+    seed = Prefill.build(ex(%{supplier_tin: nil}), c, u, :payment_details)
+    assert seed.attrs.contact_id
+    assert seed.learn == nil
   end
 end

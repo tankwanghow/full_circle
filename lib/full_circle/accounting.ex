@@ -739,7 +739,7 @@ defmodule FullCircle.Accounting do
   new 12-digit SSM number ("198901001548"), and the local one is the record the
   business relies on elsewhere.
   """
-  def learn_contact_identifiers(contact_id, tax_id, reg_no, com, user) do
+  def learn_contact_identifiers(contact_id, tax_id, reg_no, com, user, source \\ "e-Invoice") do
     tin = String.trim(tax_id || "")
     brn = String.trim(reg_no || "")
 
@@ -762,7 +762,7 @@ defmodule FullCircle.Accounting do
             entity: "contacts",
             entity_id: contact_id,
             action: "update",
-            delta: "Note: #{learnt} learnt from e-Invoice",
+            delta: "Note: #{learnt} learnt from #{source}",
             user_id: user.id,
             company_id: com.id
           })

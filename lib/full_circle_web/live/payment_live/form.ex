@@ -322,7 +322,8 @@ defmodule FullCircleWeb.PaymentLive.Form do
             :payment_details
           )
 
-        validate(params, assign(socket, e_inv_supplier_ids: seed.contact_ids))
+        socket = FullCircleWeb.ReceiptCapture.recheck_duplicate(socket, params, :payment_details)
+        validate(params, socket)
     end
   end
 
@@ -619,6 +620,14 @@ defmodule FullCircleWeb.PaymentLive.Form do
           |> maybe_attach_egg_planned(obj, params)
           |> maybe_learn_supplier_ids(obj)
           |> maybe_warn_receipt_not_attached()
+          |> tap(
+            &FullCircleWeb.ReceiptCapture.learn_identifiers(
+              &1.assigns[:receipt_learn],
+              obj.contact_id,
+              &1.assigns.current_company,
+              &1.assigns.current_user
+            )
+          )
 
         case FullCircleWeb.Helpers.match_recon_after_save(
                socket.assigns[:recon_link],
@@ -659,6 +668,19 @@ defmodule FullCircleWeb.PaymentLive.Form do
            :warn,
            gettext("Accounting period is closed on or before %{date}.",
              date: to_string(FullCircle.Sys.period_closed_through(socket.assigns.current_company))
+           )
+         )}
+
+      # The 🧾 Receipt note step failed: the document was not saved either
+      # (one transaction). Keep the form and the tray; the reason is not a
+      # changeset of this form, so it must not reach the generic clause.
+      {:error, :receipt_note, _reason, _} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext(
+             "Not saved: the receipt could not be attached. Remove the receipt file and save again."
            )
          )}
 

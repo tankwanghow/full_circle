@@ -161,4 +161,39 @@ defmodule FullCircleWeb.ReceiptCaptureTest do
              ) == Ecto.Multi.new()
     end
   end
+
+  describe "learn_identifiers/4" do
+    setup do
+      %{admin: u, company: c} = billing_setup()
+      %{u: u, c: c}
+    end
+
+    test "stamps the read TIN/BRN only onto the contact the receipt matched", %{u: u, c: c} do
+      matched = contact_fixture(c, u, %{"tax_id" => "C2345678901", "reg_no" => ""})
+
+      picked =
+        contact_fixture(c, u, %{"name" => "Cash Purchases", "tax_id" => "", "reg_no" => ""})
+
+      learn = {matched.id, "C2345678901", "201901012345"}
+
+      ReceiptCapture.learn_identifiers(learn, picked.id, c, u)
+      assert Repo.get!(FullCircle.Accounting.Contact, picked.id).tax_id in [nil, ""]
+
+      ReceiptCapture.learn_identifiers(learn, matched.id, c, u)
+      assert Repo.get!(FullCircle.Accounting.Contact, matched.id).reg_no == "201901012345"
+
+      log =
+        Repo.one!(
+          from l in FullCircle.Sys.Log,
+            where: l.entity_id == ^matched.id and like(l.delta, "%learnt%")
+        )
+
+      assert log.delta =~ "learnt from Receipt"
+    end
+
+    test "nothing learnt without an identifier match", %{u: u, c: c} do
+      picked = contact_fixture(c, u, %{"tax_id" => "", "reg_no" => ""})
+      assert ReceiptCapture.learn_identifiers(nil, picked.id, c, u) == :noop
+    end
+  end
 end

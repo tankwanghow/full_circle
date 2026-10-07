@@ -56,4 +56,22 @@ defmodule FullCircle.LlmSettingsTest do
     c = put(c, "llm", %{"llm-provider" => "gemini", "llm-api-key" => "g"})
     assert Sys.llm_settings(c, :receipt) == Sys.llm_settings(c)
   end
+
+  test "receipt on another provider inherits nothing but its own fields", %{company: c} do
+    c =
+      c
+      |> put("llm", %{
+        "llm-provider" => "gemini",
+        "llm-endpoint" => "https://gemini.example",
+        "llm-model" => "gemini-2.5-flash",
+        "llm-api-key" => "gemini-key"
+      })
+      |> put("llm_receipt", %{"llm-provider" => "claude", "llm-api-key" => ""})
+
+    receipt = Sys.llm_settings(c, :receipt)
+    assert receipt["llm-provider"] == "claude"
+    assert receipt["llm-api-key"] == ""
+    assert receipt["llm-model"] == ""
+    assert receipt["llm-endpoint"] == ""
+  end
 end

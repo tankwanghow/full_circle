@@ -21,6 +21,8 @@ defmodule FullCircle.Receipts.Prefill do
     %{
       attrs: %{descriptions: String.slice(ex.summary || "", 0, @descriptions_max)},
       warnings: ex.warnings,
+      duplicate: nil,
+      learn: nil,
       contact_ids: {nil, nil},
       total: nil
     }
@@ -35,7 +37,9 @@ defmodule FullCircle.Receipts.Prefill do
         ex.supplier_brn,
         ex.supplier_name,
         com,
-        :supplier, source: gettext("Receipt"))
+        :supplier,
+        source: gettext("Receipt")
+      )
 
     attrs =
       attrs
@@ -46,7 +50,6 @@ defmodule FullCircle.Receipts.Prefill do
       (ex.warnings ++
          [
            contact_warning,
-           duplicate_warning(attrs, detail_key, com),
            period_warning(ex.date, com),
            e_invoice_warning(ex.e_invoice_uuid, com)
          ])
@@ -55,6 +58,14 @@ defmodule FullCircle.Receipts.Prefill do
     %{
       attrs: attrs,
       warnings: warnings,
+      # Re-checked by the form against whatever contact the clerk ends up with.
+      duplicate: duplicate_warning(attrs, detail_key, com),
+      # Identifiers are learnt only onto the contact they themselves matched
+      # (a name match proves nothing about the read TIN).
+      learn:
+        if(attrs[:contact_id] && is_nil(contact_warning),
+          do: {attrs.contact_id, ex.supplier_tin, ex.supplier_brn}
+        ),
       contact_ids: {ex.supplier_tin, ex.supplier_brn},
       total: ex.total
     }
