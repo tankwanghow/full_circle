@@ -281,17 +281,8 @@ defmodule FullCircleWeb.QueryLive.Form do
     assign(socket, form: to_form(changeset))
   end
 
-  defp load_llm_settings(socket) do
-    defaults = %{
-      "llm-provider" => "none",
-      "llm-endpoint" => "",
-      "llm-model" => "",
-      "llm-api-key" => ""
-    }
-
-    saved = FullCircle.Sys.get_company_settings(socket.assigns.current_company, "llm")
-    Map.merge(defaults, saved)
-  end
+  defp load_llm_settings(socket),
+    do: FullCircle.Sys.llm_settings(socket.assigns.current_company)
 
   defp llm_configured?(settings) do
     settings["llm-provider"] not in [nil, "", "none"]

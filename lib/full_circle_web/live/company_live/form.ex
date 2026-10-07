@@ -116,7 +116,7 @@ defmodule FullCircleWeb.CompanyLive.Form do
         <p class="font-semibold text-lg mb-2">{gettext("LLM Settings")}</p>
         <p class="text-xs text-gray-500 mb-2">
           {gettext(
-            "Configure LLM for bank statement CSV parsing. These settings are shared across all users in this company."
+            "Shared AI settings: bank statements and queries. These settings are shared across all users in this company."
           )}
         </p>
         <div class="grid grid-cols-12 gap-1">
@@ -166,6 +166,63 @@ defmodule FullCircleWeb.CompanyLive.Form do
               type="text"
               name="llm[llm-api-key]"
               value={@llm_settings["llm-api-key"]}
+              class="w-full rounded border-gray-300 text-sm"
+            />
+          </div>
+        </div>
+        <p class="font-semibold mt-4 mb-1">{gettext("AI for receipts / bills")}</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+          {gettext(
+            "Reads photos of bills and receipts on New Payment / New Purchase Invoice. Leave a field blank to use the setting above."
+          )}
+        </p>
+        <div class="grid grid-cols-12 gap-1">
+          <div class="col-span-3">
+            <label class="block text-sm font-medium mb-1">{gettext("Provider")}</label>
+            <select name="llm_receipt[llm-provider]" class="w-full rounded border-gray-300 text-sm">
+              <option value="" selected={@llm_receipt["llm-provider"] in [nil, ""]}>
+                {gettext("Same as above")}
+              </option>
+              <option value="none" selected={@llm_receipt["llm-provider"] == "none"}>
+                {gettext("None")}
+              </option>
+              <option value="claude" selected={@llm_receipt["llm-provider"] == "claude"}>
+                Claude
+              </option>
+              <option value="gemini" selected={@llm_receipt["llm-provider"] == "gemini"}>
+                Gemini
+              </option>
+            </select>
+          </div>
+          <div class="col-span-9">
+            <label class="block text-sm font-medium mb-1">{gettext("Endpoint")}</label>
+            <input
+              type="text"
+              name="llm_receipt[llm-endpoint]"
+              value={@llm_receipt["llm-endpoint"]}
+              placeholder={@llm_settings["llm-endpoint"]}
+              class="w-full rounded border-gray-300 text-sm"
+            />
+          </div>
+          <div class="col-span-3">
+            <label class="block text-sm font-medium mb-1">{gettext("Model")}</label>
+            <input
+              type="text"
+              name="llm_receipt[llm-model]"
+              value={@llm_receipt["llm-model"]}
+              placeholder={@llm_settings["llm-model"]}
+              class="w-full rounded border-gray-300 text-sm"
+            />
+          </div>
+          <div class="col-span-9">
+            <label class="block text-sm font-medium mb-1">{gettext("API Key")}</label>
+            <input
+              type="text"
+              name="llm_receipt[llm-api-key]"
+              value={@llm_receipt["llm-api-key"]}
+              placeholder={
+                if @llm_settings["llm-api-key"] != "", do: "•••• " <> gettext("same as above")
+              }
               class="w-full rounded border-gray-300 text-sm"
             />
           </div>
@@ -295,14 +352,10 @@ defmodule FullCircleWeb.CompanyLive.Form do
     company = Sys.get_company!(id)
     form = to_form(Sys.company_changeset(company, %{}, socket.assigns.current_user))
 
-    llm_defaults = %{
-      "llm-provider" => "none",
-      "llm-endpoint" => "",
-      "llm-model" => "",
-      "llm-api-key" => ""
-    }
+    llm_settings = Sys.llm_settings(company)
 
-    llm_settings = Map.merge(llm_defaults, Sys.get_company_settings(company, "llm"))
+    llm_receipt =
+      Map.merge(Sys.llm_defaults(), Sys.get_company_settings(company, "llm_receipt"))
 
     {:ok,
      socket
@@ -313,6 +366,7 @@ defmodule FullCircleWeb.CompanyLive.Form do
      |> assign(:trigger_method, "post")
      |> assign(:company, company)
      |> assign(:llm_settings, llm_settings)
+     |> assign(:llm_receipt, llm_receipt)
      |> assign(:photo, Attachments.photo_settings(company))
      |> assign(closing_days: closing_days(company.closing_month))
      |> assign(:closed_through, Sys.period_closed_through(company))}
@@ -348,6 +402,10 @@ defmodule FullCircleWeb.CompanyLive.Form do
   def handle_event("save", %{"company" => company_params} = params, socket) do
     if llm_params = params["llm"] do
       Sys.update_company_settings(socket.assigns.company, "llm", llm_params)
+    end
+
+    if llm_receipt_params = params["llm_receipt"] do
+      Sys.update_company_settings(socket.assigns.company, "llm_receipt", llm_receipt_params)
     end
 
     save_company(socket, socket.assigns.live_action, company_params)

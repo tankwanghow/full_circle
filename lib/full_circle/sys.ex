@@ -277,6 +277,36 @@ defmodule FullCircle.Sys do
     Repo.update(cs)
   end
 
+  @llm_defaults %{
+    "llm-provider" => "none",
+    "llm-endpoint" => "",
+    "llm-model" => "",
+    "llm-api-key" => ""
+  }
+
+  def llm_defaults, do: @llm_defaults
+
+  @doc """
+  AI provider settings for a feature. `:default` is the shared `"llm"` key
+  (Bank Recon, Query). `:receipt` lays every non-blank `"llm_receipt"` field
+  over it, so receipts can use another model, or another provider, while
+  reusing whatever was left blank.
+  """
+  def llm_settings(company, profile \\ :default)
+
+  def llm_settings(company, :default),
+    do: Map.merge(@llm_defaults, get_company_settings(company, "llm"))
+
+  def llm_settings(company, :receipt) do
+    overrides =
+      company
+      |> get_company_settings("llm_receipt")
+      |> Enum.reject(fn {_k, v} -> v in [nil, ""] end)
+      |> Map.new()
+
+    Map.merge(llm_settings(company, :default), overrides)
+  end
+
   @period_settings_key "period"
   @closed_through_key "closed_through"
 

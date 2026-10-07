@@ -1250,17 +1250,8 @@ defmodule FullCircleWeb.BankReconciliationLive.Index do
     Enum.reverse(allocs)
   end
 
-  defp load_llm_settings(socket) do
-    defaults = %{
-      "llm-provider" => "none",
-      "llm-endpoint" => "",
-      "llm-model" => "",
-      "llm-api-key" => ""
-    }
-
-    saved = FullCircle.Sys.get_company_settings(socket.assigns.current_company, "llm")
-    Map.merge(defaults, saved)
-  end
+  defp load_llm_settings(socket),
+    do: FullCircle.Sys.llm_settings(socket.assigns.current_company)
 
   @impl true
   def render(assigns) do

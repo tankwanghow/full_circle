@@ -244,7 +244,9 @@ defmodule FullCircleWeb.CompanyLiveTest do
         })
 
       doc = LazyHTML.from_fragment(html)
-      options = doc |> LazyHTML.query("#company_closing_day option") |> LazyHTML.attribute("value")
+
+      options =
+        doc |> LazyHTML.query("#company_closing_day option") |> LazyHTML.attribute("value")
 
       assert "28" in options
       refute "29" in options
@@ -256,6 +258,42 @@ defmodule FullCircleWeb.CompanyLiveTest do
         |> LazyHTML.attribute("value")
 
       assert selected == ["28"], "expected the day to clamp to 28, got #{inspect(selected)}"
+    end
+
+    test "saves receipt AI settings apart from the shared ones", %{
+      conn: conn,
+      comp: comp,
+      comp1: comp1
+    } do
+      # The AI blocks are admin-only; the role comes from the session.
+      conn =
+        conn
+        |> put_session(:current_company_id, comp1.id)
+        |> put_session(:current_role, "admin")
+
+      {:ok, lv, html} = live(conn, ~p"/edit_company/#{comp.id}")
+      assert html =~ "AI for receipts / bills"
+
+      attrs = valid_company_attributes(%{name: "kakak"})
+
+      {:ok, _, _html} =
+        lv
+        |> announce_closing_month(attrs)
+        |> form("#company",
+          company: attrs,
+          llm: %{"llm-provider" => "claude", "llm-model" => "claude-sonnet-4-6"},
+          llm_receipt: %{"llm-provider" => "", "llm-model" => "claude-haiku-4-5-20251001"}
+        )
+        |> render_submit()
+        |> follow_redirect(conn)
+
+      fresh = FullCircle.Sys.get_company!(comp.id)
+
+      assert FullCircle.Sys.llm_settings(fresh, :receipt)["llm-model"] ==
+               "claude-haiku-4-5-20251001"
+
+      assert FullCircle.Sys.llm_settings(fresh, :receipt)["llm-provider"] == "claude"
+      assert FullCircle.Sys.llm_settings(fresh)["llm-model"] == "claude-sonnet-4-6"
     end
 
     test "save valid company", %{conn: conn, comp: comp, comp1: comp1} do
@@ -398,6 +436,7 @@ defmodule FullCircleWeb.CompanyLiveTest do
       attrs = valid_company_attributes()
 
       assert attrs.closing_day >= 1
+
       assert attrs.closing_day <= days_offered[attrs.closing_month],
              "month #{attrs.closing_month} offers 1..#{days_offered[attrs.closing_month]}, " <>
                "fixture produced day #{attrs.closing_day}"
