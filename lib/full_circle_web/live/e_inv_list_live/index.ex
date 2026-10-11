@@ -299,6 +299,7 @@ defmodule FullCircleWeb.EInvListLive.Index do
           <div class="w-32 shrink-0 text-right">{gettext("Amount")}</div>
           <div class="w-20 shrink-0">{gettext("Status")}</div>
           <div class="w-80 shrink-0">{gettext("Full Circle")}</div>
+          <div class="w-6 shrink-0"></div>
         </:head>
         <div id="objects_list" phx-update="stream" phx-page-loading>
           <div id="objects_empty" class="hidden only:block p-4 text-sm text-slate-500">

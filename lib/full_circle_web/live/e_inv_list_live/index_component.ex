@@ -7,13 +7,19 @@ defmodule FullCircleWeb.EInvListLive.IndexComponent do
   """
   use FullCircleWeb, :live_component
   import FullCircleWeb.ListComponents
+  import FullCircleWeb.EInvComponents, only: [einv_toggle: 1]
 
   alias FullCircle.EInvMetas
   alias FullCircleWeb.Helpers
 
   @impl true
   def update(assigns, socket) do
-    {:ok, assign(socket, assigns)}
+    {:ok, socket |> assign(assigns) |> assign_new(:einv_open, fn -> false end)}
+  end
+
+  @impl true
+  def handle_event("toggle_einv", _, socket) do
+    {:noreply, update(socket, :einv_open, &(!&1))}
   end
 
   @impl true
@@ -234,8 +240,107 @@ defmodule FullCircleWeb.EInvListLive.IndexComponent do
               />
           <% end %>
         </div>
+        <.einv_toggle open={@einv_open} myself={@myself} />
+      </div>
+
+      <.details
+        :if={@einv_open}
+        obj={@obj}
+        company={@company}
+        einv_portal={@einv_portal}
+      />
+    </div>
+    """
+  end
+
+  defp zero?(nil), do: true
+  defp zero?(amount), do: Decimal.eq?(amount, 0)
+
+  attr :obj, :map, required: true
+  attr :company, :map, required: true
+  attr :einv_portal, :string, required: true
+
+  # Everything the one-line row hides in tooltips, plus each Full Circle
+  # candidate's date, contact and amount.
+  defp details(assigns) do
+    ~H"""
+    <div
+      class="ml-8 mr-2 mb-2 rounded border border-slate-200 dark:border-gray-700 text-xs"
+      data-role="einv-details"
+    >
+      <div class="flex flex-wrap items-center gap-x-5 gap-y-1 p-2 border-b border-slate-200 dark:border-gray-700">
+        <a
+          class="text-sky-700 dark:text-sky-400 hover:underline"
+          target="_blank"
+          href={"#{@einv_portal}/documents/#{@obj.uuid}"}
+        >
+          {@obj.uuid}
+        </a>
+        <span>{@obj.internalId} · {@obj.typeName} {@obj.typeVersionName}</span>
+        <.field :if={@obj.dateTimeIssued} label={gettext("Issued")}>
+          {Helpers.format_datetime(@obj.dateTimeIssued, @company)}
+        </.field>
+        <.field :if={@obj.dateTimeReceived} label={gettext("Received")}>
+          {Helpers.format_datetime(@obj.dateTimeReceived, @company)}
+        </.field>
+        <.field :if={@obj.dateTimeValidated} label={gettext("Validated")}>
+          {Helpers.format_datetime(@obj.dateTimeValidated, @company)}
+        </.field>
+        <.field :if={@obj.rejectRequestDateTime} label={gettext("Reject requested")}>
+          {Helpers.format_datetime(@obj.rejectRequestDateTime, @company)}
+        </.field>
+        <.field :if={@obj.cancelDateTime} label={gettext("Cancelled")}>
+          {Helpers.format_datetime(@obj.cancelDateTime, @company)}
+        </.field>
+        <.field :if={@obj.submissionChannel} label={gettext("Channel")}>
+          {@obj.submissionChannel}
+        </.field>
+      </div>
+      <div class="flex flex-wrap items-center gap-x-5 gap-y-1 p-2 border-b border-slate-200 dark:border-gray-700 last:border-0">
+        <.field label={gettext("Supplier")}>
+          {@obj.supplierName} <span class={muted_class()}>{@obj.supplierTIN}</span>
+        </.field>
+        <.field label={gettext("Buyer")}>
+          {@obj.buyerName} <span class={muted_class()}>{@obj.buyerTIN}</span>
+        </.field>
+        <span class="tabular-nums">
+          <span class="text-slate-500">{@obj.documentCurrency}</span>
+          <span :if={!zero?(@obj.totalExcludingTax)}>
+            {gettext("Excl. tax")} {delimited(@obj.totalExcludingTax)} ·
+          </span>
+          <span :if={!zero?(@obj.totalDiscount)}>
+            {gettext("Discount")} {delimited(@obj.totalDiscount)} ·
+          </span>
+          {gettext("Net")} {delimited(@obj.totalNetAmount)} · {gettext("Payable")}
+          {delimited(@obj.totalPayableAmount)}
+        </span>
+        <span :if={@obj.documentStatusReason} class="text-rose-700 dark:text-rose-300">
+          {@obj.documentStatusReason}
+        </span>
+      </div>
+      <div
+        :for={doc <- @obj.fc_docs}
+        class="flex flex-wrap items-center gap-x-5 gap-y-1 p-2 border-b border-slate-200 dark:border-gray-700 last:border-0"
+      >
+        <span class="tabular-nums">{Helpers.format_date(doc.doc_date)}</span>
+        <.doc_link current_company={@company} doc_obj={doc} />
+        <span class={muted_class()}>{doc.doc_type}</span>
+        <span>{doc.contact_name} <span class={muted_class()}>{doc.contact_tin}</span></span>
+        <span class="tabular-nums">{delimited(doc.amount)}</span>
+        <span :if={doc.e_inv_internal_id not in [nil, "", doc.doc_no]}>
+          <span class="text-slate-500">{gettext("e-Invoice no")}</span> {doc.e_inv_internal_id}
+        </span>
       </div>
     </div>
+    """
+  end
+
+  attr :label, :string, required: true
+  slot :inner_block, required: true
+
+  defp field(assigns) do
+    ~H"""
+    <span><span class="text-slate-500">{@label}</span> {render_slot(@inner_block)}</span>
     """
   end
 

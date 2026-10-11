@@ -138,6 +138,44 @@ defmodule FullCircleWeb.EInvListLiveTest do
     assert has_element?(lv, "#{row} [phx-click=match]", "Match")
   end
 
+  test "▸ expands the row's e-invoice and Full Circle details", %{
+    conn: conn,
+    admin: admin,
+    company: company
+  } do
+    inv = create_invoice!(company, admin)
+
+    einv =
+      e_invoice!(company, %{
+        internalId: inv.invoice_no,
+        issuerTIN: company.tax_id,
+        buyerName: "Swee Lee Farm",
+        buyerTIN: "TAX001",
+        totalNetAmount: Decimal.new("0.00"),
+        totalPayableAmount: Decimal.new("50.00"),
+        submissionChannel: "ERP"
+      })
+
+    row = "##{einv.uuid}"
+    {:ok, lv, _html} = live(conn, list_path(company, "Sent"))
+
+    refute has_element?(lv, "#{row} [data-role=einv-details]")
+
+    lv |> element("#{row} [phx-click=toggle_einv]") |> render_click()
+    details = "#{row} [data-role=einv-details]"
+
+    assert has_element?(lv, "#{details} a[href$='/documents/#{einv.uuid}']", einv.uuid)
+    assert has_element?(lv, details, "TAX001")
+    assert has_element?(lv, details, "Net 0.00")
+    assert has_element?(lv, details, "Payable 50.00")
+    assert has_element?(lv, details, "ERP")
+    assert has_element?(lv, "#{details} a", inv.invoice_no)
+    assert has_element?(lv, details, "Swee Lee Farm")
+
+    lv |> element("#{row} [phx-click=toggle_einv]") |> render_click()
+    refute has_element?(lv, "#{row} [data-role=einv-details]")
+  end
+
   test "empty period shows an empty-state line", %{conn: conn, company: company} do
     {:ok, lv, _html} = live(conn, list_path(company))
     assert has_element?(lv, "#objects_empty", "No e-invoices in this period.")

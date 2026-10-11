@@ -9,7 +9,10 @@ Every listing is **one line per record** in a shared frame. Pilot: Invoice
 Listing; rolled out to all document and master-data listings (2026-10-01).
 The E-Invoices listing (`e_inv_list_live`) uses the same frame with one
 `IndexComponent` for both directions (LHDN doc left, Full Circle doc or
-"+ New …" links in the last column). Not converted (special-purpose): Notes
+"+ New …" links in the last column) and the same ▸ `einv_toggle`, which opens
+its own `details` panel (UUID, all LHDN timestamps, supplier + buyer TINs,
+excl-tax / discount / net / payable, status reason, and each Full Circle
+candidate's date, contact, TIN and amount). Not converted (special-purpose): Notes
 feed, Punch Ingest Log, Punch (time attendance) index.
 
 ## Building blocks (`FullCircleWeb.ListComponents`)
