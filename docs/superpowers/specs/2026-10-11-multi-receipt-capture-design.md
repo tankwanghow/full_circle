@@ -80,7 +80,7 @@ clerk-chosen payee/date/amount against earlier Payments.
   printed total.
 - Closed-period and has-an-e-invoice checks run per receipt, prefixed the same way.
 - `"<n> receipts from <m> shops — pick the payee (e.g. the salesperson)."` on every 2+ read.
-- Dates spanning more than one day: `"Receipts are dated <first> to <last>; the pay date was set to <last>."`
+- Dates spanning more than one day: `"Receipts are dated <first> to <last> — check the pay date."` (the form may already hold a pay date, which the blank-only merge keeps)
 - Per-receipt duplicate: `"Petronas BM #12345 (RM 80.00) may already be claimed on <PAY-no>."`
 - Over 40: `"<n> receipts read; only the first 40 were used. Split the claim into two Payments."`
 - PurInvoice with 2+ documents: `"The file shows <n> bills — only the first was used. One Purchase Invoice per bill."`

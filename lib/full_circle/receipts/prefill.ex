@@ -245,7 +245,7 @@ defmodule FullCircle.Receipts.Prefill do
     if Date.compare(first, pay_date) == :eq,
       do: [],
       else: [
-        gettext("Receipts are dated %{first} to %{last}; the pay date was set to %{last}.",
+        gettext("Receipts are dated %{first} to %{last} — check the pay date.",
           first: Calendar.strftime(first, "%d/%m/%Y"),
           last: Calendar.strftime(pay_date, "%d/%m/%Y")
         )

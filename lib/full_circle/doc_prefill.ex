@@ -23,7 +23,8 @@ defmodule FullCircle.DocPrefill do
     |> Enum.map(fn {line, idx} ->
       %{
         "_persistent_id" => idx,
-        "descriptions" => line.descriptions,
+        # Every *_details.descriptions column is varchar(255).
+        "descriptions" => line.descriptions && String.slice(line.descriptions, 0, 255),
         "quantity" => line.quantity,
         "unit_price" => line.unit_price,
         "discount" => line.discount,

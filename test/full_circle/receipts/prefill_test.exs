@@ -297,7 +297,9 @@ defmodule FullCircle.Receipts.PrefillTest do
 
       assert "3 receipts from 3 shops — pick the payee (e.g. the salesperson)." in seed.warnings
 
-      assert "Receipts are dated #{dmy(9)} to #{dmy(2)}; the pay date was set to #{dmy(2)}." in seed.warnings
+      # The form may already hold a pay date (today, or one the clerk typed);
+      # the blank-only merge keeps it, so the warning must not claim a value.
+      assert "Receipts are dated #{dmy(9)} to #{dmy(2)} — check the pay date." in seed.warnings
     end
 
     test "receipts from one shop still leave the payee blank", %{c: c, u: u} do
@@ -604,6 +606,17 @@ defmodule FullCircle.Receipts.PrefillTest do
         )
 
       assert "Hotel lines take tax code SST8 (8%) from the last claim — receipt totals already include tax; check the amounts." in seed.warnings
+    end
+
+    test "seeded line text never exceeds the 255-char column", %{c: c, u: u} do
+      long = String.duplicate("Stesen Minyak Jalan Besar ", 12)
+      docs = [%{fuel(long, "1", 1, "10") | kind: "Fuel"}, fuel("B", "2", 1, "5")]
+      seed = Prefill.build(docs, c, u, :payment_details)
+      assert Enum.all?(seed.attrs.payment_details, &(String.length(&1["descriptions"]) <= 255))
+
+      [line | _] = ex().lines
+      one = Prefill.build(ex(%{lines: [%{line | descriptions: long}]}), c, u, :payment_details)
+      assert Enum.all?(one.attrs.payment_details, &(String.length(&1["descriptions"]) <= 255))
     end
   end
 end
