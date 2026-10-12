@@ -120,6 +120,13 @@ defmodule FullCircle.DocPrefill do
 
   def put_goods(attrs, _detail_key, _com, _user, _side), do: attrs
 
+  @doc """
+  Applies a good by name to a purchase line, with the good's default package.
+  An unknown name leaves the line unchanged.
+  """
+  def apply_purchase_good(detail, name, com, user),
+    do: apply_good(detail, name, com, user, packaging: true, side: :purchase)
+
   defp seed_good(detail, names, true = _sole?, com, user, side) do
     apply_good(detail, hd(names), com, user, packaging: true, side: side)
   end

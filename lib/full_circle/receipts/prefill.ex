@@ -13,6 +13,8 @@ defmodule FullCircle.Receipts.Prefill do
   alias FullCircle.BillPay.{Payment, PaymentDetail}
   alias FullCircle.EInvMetas.EInvoice
   alias FullCircle.Receipts.Extracted
+  alias FullCircle.Accounting.{Account, TaxCode}
+  alias FullCircle.Product.Good
 
   @descriptions_max 200
   @cash_account "Cash In Hand"
@@ -136,9 +138,18 @@ defmodule FullCircle.Receipts.Prefill do
     total = Enum.reduce(used, Decimal.new(0), &Decimal.add(&1.total || 0, &2))
     method = if Enum.all?(used, &(&1.payment_method == "cash")), do: "cash"
 
+    learnt = learnt_goods(Enum.map(used, & &1.kind), com)
+
+    lines =
+      used
+      |> Enum.map(&receipt_line/1)
+      |> DocPrefill.seed_lines()
+      |> Enum.zip(used)
+      |> Enum.map(fn {line, doc} -> apply_learnt(line, learnt[doc.kind], com, user) end)
+
     attrs =
       %{
-        payment_details: used |> Enum.map(&receipt_line/1) |> DocPrefill.seed_lines(),
+        payment_details: lines,
         payment_date: pay_date,
         funds_amount: total,
         descriptions: many_descriptions(length(used), shops)
@@ -150,6 +161,7 @@ defmodule FullCircle.Receipts.Prefill do
         span_warning(dates, pay_date) ++
         over_warning(length(used) + length(over)) ++
         repeated_warnings(used) ++
+        taxed_kind_warnings(learnt) ++
         Enum.flat_map(used, &receipt_warnings(&1, com))
 
     %{
@@ -319,6 +331,84 @@ defmodule FullCircle.Receipts.Prefill do
         receipt: receipt_text(doc, false)
       )
     end)
+  end
+
+  @doc """
+  Kind → the most recent saved Payment line of that kind that has a good
+  (latest pay date, then latest saved). "Other" and nil are never learnt. The
+  "<Kind> · " prefix is the key, which is why kind labels are never translated.
+  """
+  def learnt_goods(kinds, com) do
+    kinds
+    |> Enum.uniq()
+    |> Enum.reject(&(&1 in [nil, "Other"]))
+    |> Enum.flat_map(fn kind ->
+      case last_line_of_kind(kind, com) do
+        nil -> []
+        line -> [{kind, line}]
+      end
+    end)
+    |> Map.new()
+  end
+
+  defp last_line_of_kind(kind, com) do
+    prefix = kind <> " · %"
+
+    from(d in PaymentDetail,
+      join: p in Payment,
+      on: p.id == d.payment_id,
+      join: g in Good,
+      on: g.id == d.good_id,
+      join: a in Account,
+      on: a.id == d.account_id,
+      join: t in TaxCode,
+      on: t.id == d.tax_code_id,
+      where: p.company_id == ^com.id,
+      where: like(d.descriptions, ^prefix),
+      order_by: [desc: p.payment_date, desc: p.inserted_at],
+      limit: 1,
+      select: %{
+        good_name: g.name,
+        account_id: a.id,
+        account_name: a.name,
+        tax_code_id: t.id,
+        tax_code_name: t.code,
+        tax_rate: t.rate
+      }
+    )
+    |> Repo.one()
+  end
+
+  # The good with its default package, then the account and tax code the
+  # clerk used last time (an override carries forward). A good that no
+  # longer resolves leaves the line blank rather than half-filled.
+  defp apply_learnt(line, nil, _com, _user), do: line
+
+  defp apply_learnt(line, learnt, com, user) do
+    case DocPrefill.apply_purchase_good(line, learnt.good_name, com, user) do
+      %{"good_id" => id} = applied when not is_nil(id) ->
+        Map.merge(applied, %{
+          "account_name" => learnt.account_name,
+          "account_id" => learnt.account_id,
+          "tax_code_name" => learnt.tax_code_name,
+          "tax_code_id" => learnt.tax_code_id,
+          "tax_rate" => learnt.tax_rate
+        })
+
+      _ ->
+        line
+    end
+  end
+
+  defp taxed_kind_warnings(learnt) do
+    for {kind, %{tax_rate: %Decimal{} = rate} = l} <- learnt, Decimal.gt?(rate, 0) do
+      gettext(
+        "%{kind} lines take tax code %{code} (%{rate}%) from the last claim — receipt totals already include tax; check the amounts.",
+        kind: kind,
+        code: l.tax_code_name,
+        rate: rate |> Decimal.mult(100) |> Decimal.normalize() |> Decimal.to_string(:normal)
+      )
+    end
   end
 
   defp header(ex, :payment_details) do

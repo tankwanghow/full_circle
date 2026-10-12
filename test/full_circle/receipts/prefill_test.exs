@@ -502,5 +502,108 @@ defmodule FullCircle.Receipts.PrefillTest do
       assert Enum.count(seed.warnings, &(&1 == "Shell #777 appears more than once in this file.")) ==
                1
     end
+
+    defp claim_line!(c, u, line_text, good, account, tax_code, days_ago \\ 0) do
+      attrs =
+        payment_attrs(
+          contact_fixture(c, u),
+          good,
+          account,
+          tax_code,
+          pay_funds_account_fixture(c, u),
+          tax_rate: Decimal.to_string(tax_code.rate),
+          quantity: "1",
+          unit_price: "10.00",
+          funds_amount: "20.00"
+        )
+        |> put_in(["payment_details", "0", "descriptions"], line_text)
+        |> Map.put("payment_date", Date.to_iso8601(Date.add(Date.utc_today(), -days_ago)))
+
+      {:ok, %{create_payment: pv}} = BillPay.create_payment(attrs, c, u)
+      pv
+    end
+
+    defp kinded(kind, shop, no), do: %{fuel(shop, no, 1, "30.00") | kind: kind}
+
+    test "a Fuel line takes the good, account and tax code of the last Fuel line", %{
+      c: c,
+      u: u
+    } do
+      good = good_fixture(c, u, %{"name" => "Diesel"})
+      travel = account_fixture(%{name: "Travelling - Sales", account_type: "Expenses"}, c, u)
+      claim_line!(c, u, "Fuel · Shell #1 01/10/2026", good, travel, no_ptax(c))
+
+      seed =
+        Prefill.build(
+          [kinded("Fuel", "Petronas", "P-1"), kinded("Hotel", "Seri", "H-1")],
+          c,
+          u,
+          :payment_details
+        )
+
+      fuel_line = Enum.find(seed.attrs.payment_details, &(&1["descriptions"] =~ "Fuel · "))
+      hotel_line = Enum.find(seed.attrs.payment_details, &(&1["descriptions"] =~ "Hotel · "))
+
+      assert fuel_line["good_id"] == good.id
+      assert fuel_line["good_name"] == "Diesel"
+      assert fuel_line["account_id"] == travel.id
+      assert fuel_line["account_name"] == "Travelling - Sales"
+      assert fuel_line["tax_code_name"] == "NoPTax"
+      assert fuel_line["package_name"] not in [nil, ""]
+      assert Decimal.eq?(fuel_line["unit_price"], Decimal.new("30.00"))
+      assert hotel_line["good_name"] == ""
+    end
+
+    test "the latest saved line of a kind wins", %{c: c, u: u} do
+      pur = Accounting.get_account_by_name("General Purchases", c, u)
+      old = good_fixture(c, u, %{"name" => "Petrol Old"})
+      new = good_fixture(c, u, %{"name" => "Petrol New"})
+      claim_line!(c, u, "Fuel · A #1 01/10/2026", new, pur, no_ptax(c), 0)
+      claim_line!(c, u, "Fuel · B #2 01/10/2026", old, pur, no_ptax(c), 5)
+
+      [line | _] =
+        Prefill.build(
+          [kinded("Fuel", "X", "9"), kinded("Toll", "PLUS", "T")],
+          c,
+          u,
+          :payment_details
+        ).attrs.payment_details
+        |> Enum.filter(&(&1["descriptions"] =~ "Fuel · "))
+
+      assert line["good_name"] == "Petrol New"
+    end
+
+    test "Other is never learnt", %{c: c, u: u} do
+      pur = Accounting.get_account_by_name("General Purchases", c, u)
+      claim_line!(c, u, "Other · A #1 01/10/2026", good_fixture(c, u), pur, no_ptax(c))
+
+      assert Prefill.learnt_goods(["Other", nil], c) == %{}
+
+      seed =
+        Prefill.build(
+          [kinded("Other", "X", "1"), kinded("Other", "Y", "2")],
+          c,
+          u,
+          :payment_details
+        )
+
+      assert Enum.all?(seed.attrs.payment_details, &(&1["good_name"] == ""))
+    end
+
+    test "a learnt tax code with a rate warns that totals already include tax", %{c: c, u: u} do
+      pur = Accounting.get_account_by_name("General Purchases", c, u)
+      sst = purchase_tax_code_fixture(c, u, %{"code" => "SST8", "rate" => "0.08"})
+      claim_line!(c, u, "Hotel · Seri #1 01/10/2026", good_fixture(c, u), pur, sst)
+
+      seed =
+        Prefill.build(
+          [kinded("Hotel", "Seri", "2"), kinded("Fuel", "Shell", "3")],
+          c,
+          u,
+          :payment_details
+        )
+
+      assert "Hotel lines take tax code SST8 (8%) from the last claim — receipt totals already include tax; check the amounts." in seed.warnings
+    end
   end
 end
