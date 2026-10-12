@@ -177,6 +177,13 @@ defmodule FullCircleWeb.DashboardLive do
         >
           {gettext("Statutory Calcs")}
         </.link>
+        <.link
+          :if={@current_role == "admin"}
+          navigate={~p"/companies/#{@current_company.id}/bank_payment_profiles"}
+          class="button orange"
+        >
+          {gettext("Bank Payment Setup")}
+        </.link>
       </div>
 
       <div class="font-medium text-xl">Operations</div>

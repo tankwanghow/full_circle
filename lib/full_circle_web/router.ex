@@ -209,6 +209,13 @@ defmodule FullCircleWeb.Router do
 
       live("/statutory_bundle/import", StatutoryBundleLive.Import, :new)
 
+      live("/bank_payment_profiles", BankPaymentProfileLive.Index, :index)
+      live("/bank_payment_profiles/new", BankPaymentProfileLive.Form, :new)
+      live("/bank_payment_profiles/:id/edit", BankPaymentProfileLive.Form, :edit)
+
+      live("/bank_file_formats", BankFileFormatLive.Index, :index)
+      live("/bank_file_formats/new", BankFileFormatLive.Form, :new)
+
       live("/goods", GoodLive.Index, :index)
       live("/goods/new", GoodLive.Form, :new)
       live("/goods/:good_id/copy", GoodLive.Form, :copy)
