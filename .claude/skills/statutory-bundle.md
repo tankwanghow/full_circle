@@ -41,6 +41,13 @@ FullCircle stores Malaysia statutory payroll config (rate tables, PayScript calc
 }
 ```
 
+- File-format `spec` keys: `renderer` (`"text"`), `line_ending` (default `"\r\n"`),
+  `delimiter` (set → delimited mode, no field `width`), `extension` (download file
+  extension without the dot, 1–10 alphanumerics, default `"txt"`; the download
+  content type follows it, e.g. `"csv"` → `text/csv`), and `sections`
+  (`header` / `detail` / `footer`). A `header` section with literal exprs
+  (`"\"Member No\""`) gives a CSV its column-title row. KWSP's EPF upload needs
+  both: `"extension": "csv"` plus a header row.
 - `bundle_version` must be `1`.
 - `source` — record the official circular / URL / PDF reference (KWSP, PERKESO, LHDN).
 - Each entry is keyed by `(code, effective_from)`; importing the same key replaces content.

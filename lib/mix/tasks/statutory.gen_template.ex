@@ -64,6 +64,7 @@ defmodule Mix.Tasks.Statutory.GenTemplate do
 
   @socso_txt_spec %{
     "renderer" => "text",
+    "extension" => "txt",
     "line_ending" => "\r\n",
     "sections" => [
       %{
@@ -105,6 +106,7 @@ defmodule Mix.Tasks.Statutory.GenTemplate do
 
   @eis_txt_spec %{
     "renderer" => "text",
+    "extension" => "txt",
     "line_ending" => "\r\n",
     "sections" => [
       %{
@@ -146,6 +148,7 @@ defmodule Mix.Tasks.Statutory.GenTemplate do
 
   @epf_form_a_spec %{
     "renderer" => "text",
+    "extension" => "csv",
     "line_ending" => "\r\n",
     "delimiter" => ",",
     "sections" => [
@@ -168,6 +171,7 @@ defmodule Mix.Tasks.Statutory.GenTemplate do
 
   @socso_eis_txt_spec %{
     "renderer" => "text",
+    "extension" => "txt",
     "line_ending" => "\r\n",
     "sections" => [
       %{
@@ -245,6 +249,7 @@ defmodule Mix.Tasks.Statutory.GenTemplate do
 
   @pcb_cp39_spec %{
     "renderer" => "text",
+    "extension" => "txt",
     "line_ending" => "\r\n",
     "sections" => [
       %{

@@ -131,7 +131,7 @@ defmodule FullCircle.StatutoryConfig do
         }
 
         case FileSpec.render(spec, rows, header_ctx) do
-          {:ok, text} -> {:ok, {"#{code}_#{month}_#{year}.txt", text}}
+          {:ok, text} -> {:ok, {"#{code}_#{month}_#{year}.#{FileSpec.extension(spec)}", text}}
           {:error, msg} -> {:error, msg}
         end
     end
@@ -221,7 +221,8 @@ defmodule FullCircle.StatutoryConfig do
     %{
       "wages" => cs |> fetch_field!(:addition_amount) |> Decimal.to_float(),
       "bonus" => cs |> fetch_field!(:bonus_amount) |> Decimal.to_float(),
-      "fixed_wages" => cs |> fetch_field!(:fixed_wage_amount) |> Decimal.new() |> Decimal.to_float(),
+      "fixed_wages" =>
+        cs |> fetch_field!(:fixed_wage_amount) |> Decimal.new() |> Decimal.to_float(),
       "age" => Timex.diff(end_of_month, emp.dob, :years),
       "malaysian" =>
         emp.nationality |> String.trim() |> String.downcase() |> String.starts_with?("malays"),

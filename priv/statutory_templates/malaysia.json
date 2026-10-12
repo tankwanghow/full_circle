@@ -99,6 +99,7 @@
       "name": "SOCSO text file",
       "renderer": "text",
       "spec": {
+        "extension": "txt",
         "line_ending": "\r\n",
         "renderer": "text",
         "sections": [
@@ -160,6 +161,7 @@
       "name": "EIS text file",
       "renderer": "text",
       "spec": {
+        "extension": "txt",
         "line_ending": "\r\n",
         "renderer": "text",
         "sections": [
@@ -222,6 +224,7 @@
       "renderer": "text",
       "spec": {
         "delimiter": ",",
+        "extension": "csv",
         "line_ending": "\r\n",
         "renderer": "text",
         "sections": [
@@ -263,6 +266,7 @@
       "name": "SOCSO+EIS text file",
       "renderer": "text",
       "spec": {
+        "extension": "txt",
         "line_ending": "\r\n",
         "renderer": "text",
         "sections": [
@@ -359,6 +363,7 @@
       "name": "PCB CP39",
       "renderer": "text",
       "spec": {
+        "extension": "txt",
         "line_ending": "\r\n",
         "renderer": "text",
         "sections": [

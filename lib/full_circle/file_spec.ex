@@ -7,6 +7,7 @@ defmodule FullCircle.FileSpec do
   alias FullCircle.PayScript.{Error, Validator}
 
   @default_line_ending "\r\n"
+  @default_extension "txt"
   @section_kinds ~w(header detail footer)
 
   @doc """
@@ -41,6 +42,9 @@ defmodule FullCircle.FileSpec do
     end
   end
 
+  @doc "File extension (no dot) for the rendered file; `\"txt\"` when the spec sets none."
+  def extension(spec) when is_map(spec), do: Map.get(spec, "extension", @default_extension)
+
   defp detail_variables(rows, header_ctx) do
     row_keys =
       rows
@@ -56,6 +60,7 @@ defmodule FullCircle.FileSpec do
     |> validate_renderer(spec)
     |> validate_line_ending(spec)
     |> validate_delimiter(spec)
+    |> validate_extension(spec)
   end
 
   defp validate_renderer(errors, %{"renderer" => "text"}), do: errors
@@ -77,6 +82,20 @@ defmodule FullCircle.FileSpec do
       nil -> errors
       d when is_binary(d) and byte_size(d) > 0 -> errors
       other -> ["delimiter must be a non-empty string or null, got #{inspect(other)}" | errors]
+    end
+  end
+
+  defp validate_extension(errors, spec) do
+    case Map.get(spec, "extension", @default_extension) do
+      ext when is_binary(ext) ->
+        if ext =~ ~r/\A[A-Za-z0-9]{1,10}\z/,
+          do: errors,
+          else: [
+            "extension must be 1-10 letters or digits without a dot, got #{inspect(ext)}" | errors
+          ]
+
+      other ->
+        ["extension must be a string, got #{inspect(other)}" | errors]
     end
   end
 

@@ -66,6 +66,17 @@ defmodule FullCircle.FileSpecTest do
       assert msg =~ "statutory_rows"
     end
 
+    test "accepts an alphanumeric extension" do
+      assert :ok = FileSpec.validate(socso_spec(%{"extension" => "csv"}), @variables)
+    end
+
+    test "rejects an extension with a dot or punctuation" do
+      for bad <- [".csv", "c-sv", "", 1] do
+        assert {:error, [msg]} = FileSpec.validate(socso_spec(%{"extension" => bad}), @variables)
+        assert msg =~ "extension"
+      end
+    end
+
     test "delimiter mode forbids field width" do
       spec =
         socso_spec(%{
@@ -268,6 +279,16 @@ defmodule FullCircle.FileSpecTest do
 
       assert {:error, msg} = FileSpec.render(spec, [%{socso_employee: 123.45}], %{})
       assert msg =~ "exceeds width"
+    end
+  end
+
+  describe "extension/1" do
+    test "defaults to txt" do
+      assert FileSpec.extension(socso_spec()) == "txt"
+    end
+
+    test "uses the spec's extension" do
+      assert FileSpec.extension(socso_spec(%{"extension" => "csv"})) == "csv"
     end
   end
 end

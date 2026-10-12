@@ -164,6 +164,28 @@ defmodule FullCircleWeb.CsvControllerStatutoryTest do
            ]
   end
 
+  test "EPF download (comma-delimited spec) is named and typed as CSV", %{
+    conn: conn,
+    com: com,
+    month: month,
+    year: year
+  } do
+    {:ok, {_, text}} = StatutoryConfig.render_file(com.id, "epf_form_a", month, year, "EPFCODE")
+
+    conn =
+      get(
+        conn,
+        ~p"/companies/#{com.id}/csv?report=epfsocsoeis&rep=EPF&month=#{month}&year=#{year}&code=EPFCODE"
+      )
+
+    assert response(conn, 200) == text
+    assert get_resp_header(conn, "content-type") == ["text/csv; charset=utf-8"]
+
+    assert get_resp_header(conn, "content-disposition") == [
+             ~s|attachment; filename="epf_form_a_#{month}_#{year}.csv"|
+           ]
+  end
+
   test "Contributions download returns per-employee category CSV", %{
     conn: conn,
     com: com,

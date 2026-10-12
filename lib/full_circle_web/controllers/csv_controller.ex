@@ -18,7 +18,7 @@ defmodule FullCircleWeb.CsvController do
     case render_epfsocsoeis(com_id, rep, month, year, code) do
       {:ok, {filename, text}} ->
         conn
-        |> put_resp_content_type("text/plain")
+        |> put_resp_content_type(MIME.from_path(filename))
         |> put_resp_header("content-disposition", "attachment; filename=\"#{filename}\"")
         |> put_root_layout(false)
         |> send_resp(200, text)
