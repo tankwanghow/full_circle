@@ -82,4 +82,18 @@ defmodule FullCircleWeb.QueryLiveTest do
 
     assert html =~ "Generate SQL"
   end
+
+  for role <- ["clerk", "supervisor"] do
+    test "a #{role} is sent away from the query pages", %{company: company, user: admin} do
+      u = user_fixture()
+      FullCircle.Sys.allow_user_to_access(company, u, unquote(role), admin)
+      conn = log_in_user(build_conn(), u)
+
+      assert {:error, {:live_redirect, %{to: to}}} =
+               live(conn, ~p"/companies/#{company.id}/queries")
+
+      assert to =~ "/dashboard"
+      assert {:error, {:live_redirect, _}} = live(conn, ~p"/companies/#{company.id}/queries/new")
+    end
+  end
 end

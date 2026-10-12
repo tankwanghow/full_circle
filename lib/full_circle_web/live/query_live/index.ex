@@ -56,24 +56,40 @@ defmodule FullCircleWeb.QueryLive.Index do
 
   @impl true
   def mount(_params, _session, socket) do
-    socket =
-      socket
-      |> assign(page_title: gettext("Queries Listing"))
-
-    {:ok, socket}
+    if allowed?(socket) do
+      {:ok, assign(socket, page_title: gettext("Queries Listing"))}
+    else
+      {:ok,
+       socket
+       |> put_flash(:error, gettext("You are not authorised to perform this action"))
+       |> push_navigate(to: ~p"/companies/#{socket.assigns.current_company.id}/dashboard")}
+    end
   end
 
   @impl true
   def handle_params(params, _uri, socket) do
-    params = params["search"]
+    if allowed?(socket) do
+      params = params["search"]
 
-    terms = params["terms"] || ""
+      terms = params["terms"] || ""
 
-    {:noreply,
-     socket
-     |> assign(search: %{terms: terms})
-     |> filter_objects(terms, true, 1)}
+      {:noreply,
+       socket
+       |> assign(search: %{terms: terms})
+       |> filter_objects(terms, true, 1)}
+    else
+      {:noreply, socket}
+    end
   end
+
+  # Saved queries can read any column, including supplier bank details.
+  defp allowed?(socket),
+    do:
+      FullCircle.Authorization.can?(
+        socket.assigns.current_user,
+        :execute_query,
+        socket.assigns.current_company
+      )
 
   @impl true
   def handle_event("next-page", _, socket) do

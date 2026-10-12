@@ -6,7 +6,22 @@ defmodule FullCircleWeb.QueryLive.Form do
   alias FullCircle.StdInterface
 
   @impl true
-  def mount(params, _session, socket) do
+  def mount(params, session, socket) do
+    if FullCircle.Authorization.can?(
+         socket.assigns.current_user,
+         :execute_query,
+         socket.assigns.current_company
+       ) do
+      mount_allowed(params, session, socket)
+    else
+      {:ok,
+       socket
+       |> put_flash(:error, gettext("You are not authorised to perform this action"))
+       |> push_navigate(to: ~p"/companies/#{socket.assigns.current_company.id}/dashboard")}
+    end
+  end
+
+  defp mount_allowed(params, _session, socket) do
     id = params["query_id"]
 
     socket =

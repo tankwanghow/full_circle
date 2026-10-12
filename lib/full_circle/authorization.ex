@@ -226,16 +226,16 @@ defmodule FullCircle.Authorization do
     do: allow_roles(~w(admin manager supervisor), company, user)
 
   def can?(user, :create_query, company),
-    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+    do: allow_roles(~w(admin manager), company, user)
 
   def can?(user, :update_query, company),
-    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+    do: allow_roles(~w(admin manager), company, user)
 
   def can?(user, :delete_query, company),
-    do: allow_roles(~w(admin manager supervisor clerk), company, user)
+    do: allow_roles(~w(admin manager), company, user)
 
   def can?(user, :execute_query, company),
-    do: allow_roles(~w(admin manager supervisor clerk auditor), company, user)
+    do: allow_roles(~w(admin manager), company, user)
 
   def can?(user, :create_holiday, company),
     do: allow_roles(~w(admin manager supervisor), company, user)
