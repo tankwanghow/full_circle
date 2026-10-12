@@ -27,10 +27,13 @@ defmodule FullCircle.FileSpec do
   end
 
   @doc """
-  Renders a spec against detail rows and header/footer context.
+  Renders a spec against detail rows and header/footer context. `variables`
+  names identifiers that are valid even when no row carries them, so a month
+  without pay slips still renders its header and footer.
   """
-  def render(spec, rows, header_ctx) when is_map(spec) and is_list(rows) and is_map(header_ctx) do
-    with :ok <- validate(spec, detail_variables(rows, header_ctx)),
+  def render(spec, rows, header_ctx, variables \\ [])
+      when is_map(spec) and is_list(rows) and is_map(header_ctx) and is_list(variables) do
+    with :ok <- validate(spec, Enum.uniq(variables ++ detail_variables(rows, header_ctx))),
          {:ok, prepared} <- prepare_rows(rows, header_ctx),
          {:ok, lines} <- render_sections(spec, prepared, header_ctx) do
       ending = line_ending(spec)

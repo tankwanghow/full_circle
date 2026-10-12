@@ -282,6 +282,18 @@ defmodule FullCircle.FileSpecTest do
     end
   end
 
+  describe "render/4 with no rows" do
+    test "row identifiers are unknown without the variables list" do
+      assert {:error, msg} = FileSpec.render(socso_spec(), [], %{"employer_code" => "E"})
+      assert msg =~ "unknown identifier"
+    end
+
+    test "renders an empty file when the variables list names the row keys" do
+      assert {:ok, "\r\n"} =
+               FileSpec.render(socso_spec(), [], %{"employer_code" => "E"}, @variables)
+    end
+  end
+
   describe "extension/1" do
     test "defaults to txt" do
       assert FileSpec.extension(socso_spec()) == "txt"

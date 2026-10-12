@@ -114,26 +114,29 @@ defmodule FullCircle.StatutoryConfig do
   end
 
   def render_file(company_id, code, month, year, employer_code) do
-    date = Timex.end_of_month(year, month)
-
-    case effective_file_format(company_id, code, date) do
+    case effective_file_format(company_id, code, Timex.end_of_month(year, month)) do
       nil ->
         {:error, "no file format '#{code}' configured"}
 
       %{spec: spec} ->
-        rows = HR.statutory_contributions(month, year, company_id)
+        render_spec(company_id, spec, code, month, year, employer_code)
+    end
+  end
 
-        header_ctx = %{
-          "employer_code" => employer_code,
-          "company_name" => company_name(company_id),
-          "pay_month" => month,
-          "pay_year" => year
-        }
+  @doc "Renders `spec` (saved or not) for a pay month; `{:ok, {filename, text}}`."
+  def render_spec(company_id, spec, code, month, year, employer_code) do
+    rows = HR.statutory_contributions(month, year, company_id)
 
-        case FileSpec.render(spec, rows, header_ctx) do
-          {:ok, text} -> {:ok, {"#{code}_#{month}_#{year}.#{FileSpec.extension(spec)}", text}}
-          {:error, msg} -> {:error, msg}
-        end
+    header_ctx = %{
+      "employer_code" => employer_code,
+      "company_name" => company_name(company_id),
+      "pay_month" => month,
+      "pay_year" => year
+    }
+
+    case FileSpec.render(spec, rows, header_ctx, file_format_variables(company_id)) do
+      {:ok, text} -> {:ok, {"#{code}_#{month}_#{year}.#{FileSpec.extension(spec)}", text}}
+      {:error, msg} -> {:error, msg}
     end
   end
 

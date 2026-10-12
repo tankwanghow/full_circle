@@ -45,7 +45,8 @@ defmodule FullCircleWeb.StatutoryFileFormatLive.Form do
        |> assign(preview_lines: nil)
        |> assign(preview_error: nil)
        |> assign(spec_errors: [])
-       |> assign(save_errors: [])}
+       |> assign(save_errors: [])
+       |> assign(confirm_replace: false)}
     else
       {:ok,
        socket
@@ -59,6 +60,7 @@ defmodule FullCircleWeb.StatutoryFileFormatLive.Form do
     {:noreply,
      socket
      |> assign(form: Map.merge(socket.assigns.form, params))
+     |> assign(confirm_replace: false)
      |> assign_spec_errors(params["spec"])}
   end
 
@@ -67,12 +69,13 @@ defmodule FullCircleWeb.StatutoryFileFormatLive.Form do
     form = Map.merge(socket.assigns.form, Map.get(params, "file_format", %{}))
     socket = assign(socket, form: form)
 
-    with {:ok, _spec} <- decode_and_validate_spec(form["spec"], socket),
+    with {:ok, spec} <- decode_and_validate_spec(form["spec"], socket),
          month <- String.to_integer(form["pay_month"]),
          year <- String.to_integer(form["pay_year"]),
          {:ok, {_filename, text}} <-
-           StatutoryConfig.render_file(
+           StatutoryConfig.render_spec(
              socket.assigns.current_company.id,
+             spec,
              form["code"],
              month,
              year,
@@ -98,24 +101,54 @@ defmodule FullCircleWeb.StatutoryFileFormatLive.Form do
 
   @impl true
   def handle_event("save", %{"file_format" => params}, socket) do
-    with {:ok, spec} <- decode_and_validate_spec(params["spec"], socket) do
+    form = Map.merge(socket.assigns.form, params)
+    socket = assign(socket, form: form)
+
+    if StatutoryConfig.version_exists?(
+         :file_format,
+         socket.assigns.current_company.id,
+         form["code"],
+         form["effective_from"]
+       ) do
+      {:noreply, assign(socket, confirm_replace: true, save_errors: [])}
+    else
+      do_save(socket, [])
+    end
+  end
+
+  @impl true
+  def handle_event("replace", _params, socket) do
+    do_save(socket, replace: true)
+  end
+
+  defp do_save(socket, opts) do
+    form = socket.assigns.form
+
+    with {:ok, spec} <- decode_and_validate_spec(form["spec"], socket) do
       attrs = %{
-        code: params["code"],
-        name: params["name"],
-        effective_from: params["effective_from"],
-        renderer: params["renderer"] || "text",
+        code: form["code"],
+        name: form["name"],
+        effective_from: form["effective_from"],
+        renderer: form["renderer"] || "text",
         spec: spec
       }
 
       case StatutoryConfig.save_file_format(
              attrs,
              socket.assigns.current_company,
-             socket.assigns.current_user
+             socket.assigns.current_user,
+             opts
            ) do
         {:ok, _} ->
           {:noreply,
            socket
-           |> put_flash(:info, gettext("File format saved."))
+           |> put_flash(
+             :info,
+             if(opts[:replace],
+               do: gettext("File format version replaced."),
+               else: gettext("File format saved.")
+             )
+           )
            |> push_navigate(
              to: ~p"/companies/#{socket.assigns.current_company.id}/statutory_file_formats"
            )}
@@ -123,7 +156,7 @@ defmodule FullCircleWeb.StatutoryFileFormatLive.Form do
         {:error, cs} ->
           {:noreply,
            socket
-           |> assign(form: Map.merge(socket.assigns.form, params))
+           |> assign(confirm_replace: false)
            |> assign(save_errors: changeset_errors(cs))}
 
         :not_authorise ->
@@ -134,7 +167,7 @@ defmodule FullCircleWeb.StatutoryFileFormatLive.Form do
       {:error, _} ->
         {:noreply,
          socket
-         |> assign(form: Map.merge(socket.assigns.form, params))
+         |> assign(confirm_replace: false)
          |> assign(save_errors: [gettext("fix spec errors before saving")])}
     end
   end
@@ -286,6 +319,27 @@ defmodule FullCircleWeb.StatutoryFileFormatLive.Form do
           >
             {Enum.join(@preview_lines, "\n")}
           </pre>
+        </div>
+
+        <div
+          :if={@confirm_replace}
+          class="mt-4 border rounded border-amber-500 bg-amber-100 dark:bg-amber-900/40 p-3 text-center"
+        >
+          <p class="font-semibold">
+            {gettext(
+              "A version of '%{code}' effective %{date} already exists.",
+              code: @form["code"],
+              date: @form["effective_from"]
+            )}
+          </p>
+          <p class="text-sm mb-2">
+            {gettext(
+              "Replace it to correct a mistake in place, or change the effective date to keep history."
+            )}
+          </p>
+          <button type="button" phx-click="replace" class="red button" id="replace-version">
+            {gettext("Replace this version")}
+          </button>
         </div>
 
         <div class="flex justify-center mt-4 gap-2">

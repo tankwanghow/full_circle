@@ -99,7 +99,11 @@ Save-time validation rejects parse errors, unknown identifiers/tables, missing `
   stays recalculable. **Script was simply wrong** → replace it in place: import
   a bundle entry with the *same* `(code, effective_from)`, or use the calc
   form's **Replace this version** button. Already-paid slips keep their old
-  values until re-paid.
+  values until re-paid. The file-format form works the same way: Save always
+  inserts a new version (Effective from defaults to *today*, so it only applies
+  from the current pay month on); saving onto an existing `(code, effective_from)`
+  offers **Replace this version**. Its Preview renders the spec in the text box
+  (unsaved), and a month with no pay slips renders header/footer only.
 
 ## Workflow
 
