@@ -162,6 +162,54 @@ defmodule FullCircle.PayScript.Evaluator do
          do: {:ok, String.replace(str, from_str, to_str)}
   end
 
+  defp eval_call("left", [s, n], vars, env) do
+    with {:ok, str} <- eval_text(s, vars, env),
+         {:ok, k} <- eval_num(n, vars, env),
+         do: {:ok, String.slice(str, 0, max(trunc(k), 0))}
+  end
+
+  defp eval_call("right", [s, n], vars, env) do
+    with {:ok, str} <- eval_text(s, vars, env),
+         {:ok, k} <- eval_num(n, vars, env) do
+      k = max(trunc(k), 0)
+      {:ok, String.slice(str, max(String.length(str) - k, 0), k)}
+    end
+  end
+
+  defp eval_call("mid", [s, start, n], vars, env) do
+    with {:ok, str} <- eval_text(s, vars, env),
+         {:ok, st} <- eval_num(start, vars, env),
+         {:ok, k} <- eval_num(n, vars, env),
+         do: {:ok, String.slice(str, max(trunc(st) - 1, 0), max(trunc(k), 0))}
+  end
+
+  defp eval_call("num", [s], vars, env) do
+    with {:ok, v} <- eval(s, vars, env) do
+      cond do
+        is_number(v) ->
+          {:ok, v * 1.0}
+
+        is_binary(v) ->
+          case v |> String.replace(~r/[^0-9.\-]/, "") |> Float.parse() do
+            {f, _} -> {:ok, f}
+            :error -> {:ok, 0.0}
+          end
+
+        true ->
+          {:error, %Error{message: "num expects text or a number, got #{value_label(v)}"}}
+      end
+    end
+  end
+
+  defp eval_call("mod", [a, b], vars, env) do
+    with {:ok, x} <- eval_num(a, vars, env),
+         {:ok, y} <- eval_num(b, vars, env) do
+      if y == 0,
+        do: {:error, %Error{message: "mod by zero"}},
+        else: {:ok, x - y * Float.floor(x / y)}
+    end
+  end
+
   defp eval_call("lookup", [t, v, c], vars, env) do
     with {:ok, table} <- eval_str(t, vars, env),
          {:ok, value} <- eval_num(v, vars, env),
@@ -210,6 +258,18 @@ defmodule FullCircle.PayScript.Evaluator do
     end
   end
 
+  # Text for the slicing builtins: a whole number reads as its digits.
+  defp eval_text(e, vars, env) do
+    with {:ok, v} <- eval(e, vars, env) do
+      cond do
+        is_binary(v) -> {:ok, v}
+        is_number(v) and v == trunc(v) -> {:ok, Integer.to_string(trunc(v))}
+        is_number(v) -> {:ok, Float.to_string(v * 1.0)}
+        true -> {:error, %Error{message: "expected text, got #{value_label(v)}"}}
+      end
+    end
+  end
+
   defp eval_str(e, vars, env) do
     with {:ok, v} <- eval(e, vars, env) do
       if is_binary(v) do
@@ -253,6 +313,8 @@ defmodule FullCircle.PayScript.Evaluator do
   defp value_label(v) when is_binary(v), do: "string #{inspect(v)}"
   defp value_label(v) when is_boolean(v), do: "boolean #{v}"
   defp value_label(v) when is_list(v), do: "a list"
+  defp value_label(%Date{} = d), do: "date #{d}"
+  defp value_label(v), do: inspect(v)
 
   defp op_text(:add), do: "+"
   defp op_text(:sub), do: "-"

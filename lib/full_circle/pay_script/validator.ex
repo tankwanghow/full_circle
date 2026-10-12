@@ -14,6 +14,11 @@ defmodule FullCircle.PayScript.Validator do
     "lower" => 1,
     "trim" => 1,
     "replace" => 3,
+    "left" => 2,
+    "right" => 2,
+    "mid" => 3,
+    "num" => 1,
+    "mod" => 2,
     "lookup" => 3,
     "ytd_sum" => 1,
     "calc" => 1
