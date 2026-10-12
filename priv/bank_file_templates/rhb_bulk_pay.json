@@ -1,0 +1,114 @@
+{
+  "code": "rhb_bulk_pay",
+  "name": "RHB Reflex Bulk Pay (CSV)",
+  "spec": {
+    "renderer": "text",
+    "delimiter": ",",
+    "quote": "csv",
+    "line_ending": "\r\n",
+    "extension": "CSV",
+    "filename": "PAYMENT_{corporate_id}_{today:%d%m%Y}_{seq:3}.CSV",
+    "params": ["corporate_id", "corporate_name"],
+    "our_account_no_digits": [14],
+    "max_rows": 300,
+    "computed": {
+      "hash_part": "num(right(account_no, 6)) * mod(floor(amount), 1000000)"
+    },
+    "sections": [
+      {
+        "kind": "header",
+        "fields": [
+          {"expr": "\"00\""},
+          {"expr": "\"01\""},
+          {"expr": "corporate_id", "format": "digits"},
+          {"expr": "\"\""},
+          {"expr": "left(replace(corporate_name, \"&\", \"AND\"), 40)", "allow": "A-Za-z0-9 /?:().,'+-"},
+          {"expr": "our_account_no", "format": "digits"},
+          {"expr": "payment_date", "format": "date:{0D}{0M}{YYYY}"},
+          {"expr": "batch_no"},
+          {"expr": "\"\""},
+          {"expr": "\"A\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""}
+        ]
+      },
+      {
+        "kind": "detail",
+        "source": "payments",
+        "fields": [
+          {"expr": "\"10\""},
+          {"expr": "\"10\""},
+          {"expr": "record_id"},
+          {"expr": "amount", "format": "decimal:2"},
+          {"expr": "bank_code"},
+          {"expr": "\"1\""},
+          {"expr": "left(replace(account_name, \"&\", \"AND\"), 96)", "allow": "A-Za-z0-9 /?:().,'+-"},
+          {"expr": "account_no", "format": "digits"},
+          {"expr": "if(reg_no == \"\", \"\", \"05\")"},
+          {"expr": "left(reg_no, 15)", "allow": "A-Za-z0-9"},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "left(payment_no, 20)", "allow": "A-Za-z0-9 /?:().,'+-"},
+          {"expr": "left(replace(descriptions, \"&\", \"AND\"), 20)", "allow": "A-Za-z0-9 /?:().,'+-"},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "emails", "allow": "A-Za-z0-9@._+;-"},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""}
+        ],
+        "children": [
+          {
+            "source": "advice",
+            "fields": [
+              {"expr": "\"30\""},
+              {"expr": "advice_doc_date", "format": "date:{0D}{0M}{YYYY}"},
+              {"expr": "advice_amount", "format": "decimal:2"},
+              {"expr": "left(replace(advice_doc_no, \"&\", \"AND\"), 20)", "allow": "A-Za-z0-9 /?:().,'+-"},
+              {"expr": "left(replace(if(advice_doc_no == \"\", payment_no, advice_doc_no), \"&\", \"AND\"), 20)", "allow": "A-Za-z0-9 /?:().,'+-"},
+              {"expr": "\"\""},
+              {"expr": "\"\""},
+              {"expr": "\"\""},
+              {"expr": "\"\""}
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "footer",
+        "fields": [
+          {"expr": "\"99\""},
+          {"expr": "batch_no"},
+          {"expr": "count()", "format": "decimal:0"},
+          {"expr": "sum(\"amount\")", "format": "decimal:2"},
+          {"expr": "floor((sum(\"hash_part\") * 24 + 2994) / 285)", "format": "decimal:0"},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""},
+          {"expr": "\"\""}
+        ]
+      }
+    ]
+  }
+}

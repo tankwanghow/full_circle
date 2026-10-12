@@ -1,0 +1,69 @@
+{
+  "code": "pbb_ecp_payment",
+  "name": "PB enterprise ECP Payment (text)",
+  "spec": {
+    "renderer": "text",
+    "line_ending": "\r\n",
+    "extension": "txt",
+    "filename": "{our_account_no}PM{payment_date:%d%m%y}{seq:2}.txt",
+    "our_account_no_digits": [10],
+    "computed": {
+      "acct4": "num(left(account_no, 4))"
+    },
+    "result": {
+      "layout": "fixed",
+      "header": {"identifier": "H", "filename": [10, 23]},
+      "detail": {"identifier": "D", "record_id": [2, 16], "amount": [201, 18], "status": [259, 2], "reason": [261, 40]},
+      "amount_in_cents": true,
+      "success": ["01"]
+    },
+    "sections": [
+      {
+        "kind": "header",
+        "fields": [
+          {"expr": "\"H\"", "width": 1},
+          {"expr": "our_account_no", "format": "digits", "width": 10},
+          {"expr": "payment_date", "format": "date:{YYYY}{0M}{0D}", "width": 8}
+        ]
+      },
+      {
+        "kind": "detail",
+        "source": "payments",
+        "fields": [
+          {"expr": "\"D\"", "width": 1},
+          {"expr": "record_id", "width": 16},
+          {"expr": "if(bank_code == \"PBBEMYKL\" or bank_code == \"PIBEMYK1\", \"PBB\", \"IBG\")", "width": 3},
+          {"expr": "account_no", "format": "digits", "width": 20},
+          {"expr": "bank_code", "width": 11},
+          {"expr": "account_name", "width": 120, "allow": "A-Za-z0-9 .,/()&'@:;+-"},
+          {"expr": "if(reg_no == \"\", \"\", \"BR\")", "width": 2},
+          {"expr": "reg_no", "width": 29, "allow": "A-Za-z0-9-"},
+          {"expr": "amount", "format": "cents", "width": 16, "align": "right", "pad": "0"},
+          {"expr": "payment_no", "width": 20, "allow": "A-Za-z0-9 .,/()&'@:;+-"},
+          {"expr": "descriptions", "width": 20, "allow": "A-Za-z0-9 .,/()&'@:;+-"},
+          {"expr": "email", "width": 70, "allow": "A-Za-z0-9@._+-"},
+          {"expr": "\"\"", "width": 70},
+          {"expr": "\"\"", "width": 16},
+          {"expr": "\"\"", "width": 16},
+          {"expr": "\"\"", "width": 120},
+          {"expr": "\"\"", "width": 2},
+          {"expr": "\"\"", "width": 29},
+          {"expr": "mid(advice_text, 1, 40)", "width": 40, "allow": "A-Za-z0-9 .,/()&'@:;+-"},
+          {"expr": "mid(advice_text, 41, 40)", "width": 40, "allow": "A-Za-z0-9 .,/()&'@:;+-"},
+          {"expr": "mid(advice_text, 81, 40)", "width": 40, "allow": "A-Za-z0-9 .,/()&'@:;+-"},
+          {"expr": "mid(advice_text, 121, 40)", "width": 40, "allow": "A-Za-z0-9 .,/()&'@:;+-"},
+          {"expr": "mid(advice_text, 161, 40)", "width": 40, "allow": "A-Za-z0-9 .,/()&'@:;+-"}
+        ]
+      },
+      {
+        "kind": "footer",
+        "fields": [
+          {"expr": "\"F\"", "width": 1},
+          {"expr": "count()", "format": "decimal:0", "width": 10, "align": "right", "pad": "0"},
+          {"expr": "sum(\"amount\")", "format": "cents", "width": 20, "align": "right", "pad": "0"},
+          {"expr": "round(sum(\"amount\") * 100, 0) + sum(\"acct4\")", "format": "decimal:0", "width": 20, "align": "right", "pad": "0"}
+        ]
+      }
+    ]
+  }
+}
