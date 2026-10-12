@@ -153,4 +153,39 @@ defmodule FullCircleWeb.BankBatchLiveTest do
              ~p"/companies/#{com.id}/bank_batches/download?#{[ids: Ecto.UUID.generate()]}"
            ).status == 403
   end
+
+  test "download again of a batch voided in another tab shows an error instead of leaving",
+       %{com: com, p: p, profile: profile, admin: admin, mgr_conn: conn} do
+    {:ok, [b]} =
+      BankPayment.create_batches(profile.id, [p.id], BankPayment.today(com), com, admin)
+
+    {:ok, _} = BankPayment.download_files([b.id], nil, com, admin)
+    {:ok, lv, _} = live(conn, ~p"/companies/#{com.id}/bank_batches")
+    {:ok, _} = BankPayment.void_batch(b.id, "never uploaded", com, admin)
+
+    lv |> element("#download-again-#{b.id}") |> render_click()
+    html = lv |> form("#action-form", %{"reason" => "again"}) |> render_submit()
+    assert html =~ "voided"
+    refute_push_event(lv, "download", %{url: _})
+  end
+
+  test "upload errors are shown", %{com: com, mgr_conn: conn} do
+    {:ok, lv, _} = live(conn, ~p"/companies/#{com.id}/bank_batches")
+
+    upload =
+      file_input(lv, "#result-upload-form", :result, [
+        %{name: "x.pdf", content: "x", type: "application/pdf"}
+      ])
+
+    render_upload(upload, "x.pdf")
+    assert render(lv) =~ "not accepted"
+  end
+
+  test "a ticked row that leaves the list is no longer counted", %{com: com, p: p, mgr_conn: conn} do
+    {:ok, lv, _} = live(conn, ~p"/companies/#{com.id}/bank_batches")
+    lv |> element("#tick-#{p.id}") |> render_click()
+    lv |> element("#dismiss-#{p.id}") |> render_click()
+    html = lv |> form("#action-form", %{"reason" => "cheque"}) |> render_submit()
+    assert html =~ "0 ticked, total 0.00"
+  end
 end

@@ -19,7 +19,7 @@ logged manager/admin action. Keep it that way when changing anything here.
   context *over* each row, so names must not collide. The Payment's own date is
   `doc_date`; `payment_date` is the batch's bank payment date (header).
 - **Reserved names** (`BankPayment.reserved_variables/0`): row, child
-  (`advice_*`) and header variables. Profile params may not use them — a param
+  (`advice_*`) and header variables. Profile params and `computed` columns may not use them — a param
   named `bank_code` would overwrite every line's bank. Also dropped in
   `header_ctx/3` as a second guard.
 - **Bank-only spec keys** (FileSpec ignores them; `BankPayment.validate_spec/1`
@@ -57,6 +57,11 @@ logged manager/admin action. Keep it that way when changing anything here.
 | `submitted` | Release a pending line "rejected by bank" | line `rejected` | admin, manager |
 | `completed`/`partly_rejected` | Mark a paid line "returned" | line `rejected` | **admin** |
 | `completed`/`partly_rejected` | Void | not allowed | — |
+| any batch with an imported result or a paid line | Void | not allowed (even if still `submitted`) | — |
+
+Every status change locks the batch row (`FOR UPDATE`) and re-checks the rule on
+the locked row; void never takes `live` off a `paid` line. Dismissal locks the
+Payment row, which batch creation also locks.
 
 ## Money guards (do not weaken)
 
@@ -83,9 +88,13 @@ logged manager/admin action. Keep it that way when changing anything here.
 `BankPayment.import_result/3` finds the batch by the result header's filename
 (compared **without extension**, case-insensitive — PB's header keeps only 23
 chars), matches lines by record id, and requires the amount to the cent.
-Success → `paid` (locked for good); failure → `rejected`, `live = false`,
-`bank_reason` set. Unknown ids, amount mismatches and contradictions with an
-earlier status are reported, never applied. Re-importing is a no-op.
+A status in `success` → `paid` (locked for good); a status in `failure` →
+`rejected`, `live = false`, `bank_reason` set. **Any other status** (blank,
+"processing", garbled) is reported as unrecognised and changes nothing — the
+result spec must list both `success` and `failure` codes. Unknown ids,
+unreadable or mismatched amounts, a record id repeated in the same file (only
+the first counts) and contradictions with an earlier status are reported, never
+applied. Re-importing is a no-op.
 Result layouts are data (`result` key, `Result.parse/2`, `"layout": "fixed"`,
 1-based `[from, length]`). PB PSF positions: guide §7.
 

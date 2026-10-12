@@ -48,9 +48,14 @@ defmodule FullCircleWeb.BankBatchLive.Index do
 
   defp load_rows(socket) do
     com = socket.assigns.current_company
+    rows = BankPayment.eligible_payments(socket.assigns.profile, com)
+    tickable = for r <- rows, r.has_bank, into: MapSet.new(), do: r.id
+
+    # A ticked row that left the list (dismissed, batched elsewhere) is dropped.
+    socket = assign(socket, selected: MapSet.intersection(socket.assigns.selected, tickable))
 
     assign(socket,
-      rows: BankPayment.eligible_payments(socket.assigns.profile, com),
+      rows: rows,
       dismissed: BankPayment.list_dismissed(com)
     )
   end
@@ -188,14 +193,21 @@ defmodule FullCircleWeb.BankBatchLive.Index do
         )
 
       {"download", id} ->
-        if String.trim(reason) == "",
-          do: {:noreply, assign(socket, errors: [gettext("a reason is required")])},
-          else:
+        case BankPayment.check_download(id, reason, com, user) do
+          :ok ->
             {:noreply,
              socket
              |> assign(action: nil)
              |> push_event("download", %{url: download_url(com, [id], reason)})
              |> load_batches()}
+
+          {:error, msg} ->
+            {:noreply, socket |> assign(action: nil, errors: [msg]) |> load_batches()}
+
+          :not_authorise ->
+            {:noreply,
+             put_flash(socket, :error, gettext("You are not authorised to perform this action"))}
+        end
 
       _ ->
         {:noreply, assign(socket, action: nil)}
@@ -297,6 +309,11 @@ defmodule FullCircleWeb.BankBatchLive.Index do
   end
 
   # ── View helpers ──
+
+  defp upload_error_text(:not_accepted), do: gettext("file type not accepted (use .txt or .csv)")
+  defp upload_error_text(:too_large), do: gettext("file too large")
+  defp upload_error_text(:too_many_files), do: gettext("one file at a time")
+  defp upload_error_text(other), do: inspect(other)
 
   defp money(d), do: d |> Decimal.round(2) |> Decimal.to_string(:normal)
 
@@ -428,7 +445,9 @@ defmodule FullCircleWeb.BankBatchLive.Index do
           <div class="col-span-3 truncate">
             {r.contact_name}
             <span :if={r.last_reason} class="block text-xs text-rose-700 dark:text-rose-300">{gettext(
-              "last rejected: %{r}", r: r.last_reason)}</span>
+              "last rejected: %{r}",
+              r: r.last_reason
+            )}</span>
           </div>
           <div class="col-span-2 truncate">
             {if r.has_bank, do: "#{r.bank_name} #{r.account_no}", else: gettext("no bank details")}
@@ -456,7 +475,9 @@ defmodule FullCircleWeb.BankBatchLive.Index do
             disabled={MapSet.size(@selected) == 0}
           >{gettext("Create file")}</button>
           <button id="show-dismissed" phx-click="show_dismissed" class="text-sm underline">{gettext(
-            "Paid outside file (%{n})", n: length(@dismissed))}</button>
+            "Paid outside file (%{n})",
+            n: length(@dismissed)
+          )}</button>
         </div>
         <div :if={@show_dismissed} class="mt-2 border rounded p-2">
           <div :for={d <- @dismissed} class="grid grid-cols-12 text-sm border-b p-1">
@@ -485,6 +506,15 @@ defmodule FullCircleWeb.BankBatchLive.Index do
         >
           <span>{gettext("Import bank result:")}</span>
           <.live_file_input upload={@uploads.result} />
+          <span :for={err <- upload_errors(@uploads.result)} class="text-rose-700 dark:text-rose-300">
+            {upload_error_text(err)}
+          </span>
+          <span
+            :for={err <- Enum.flat_map(@uploads.result.entries, &upload_errors(@uploads.result, &1))}
+            class="text-rose-700 dark:text-rose-300"
+          >
+            {upload_error_text(err)}
+          </span>
         </form>
       </div>
 

@@ -688,6 +688,14 @@ defmodule FullCircle.BankPayment do
     end
   end
 
+  @doc "Would `download_files/4` allow this download? Logs nothing."
+  def check_download(batch_id, reason, company, user) do
+    with true <- can?(user, :create_bank_payment_batch, company) || :not_authorise,
+         %Batch{} = batch <- get_batch(batch_id, company) || {:error, "batch not found"} do
+      may_download(batch, String.trim(reason || ""), company, user)
+    end
+  end
+
   defp may_download(%Batch{status: "voided", filename: f}, _reason, _company, _user),
     do: {:error, "#{f} is voided and cannot be downloaded; its payments may be in a newer file"}
 

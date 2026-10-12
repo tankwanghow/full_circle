@@ -24,6 +24,7 @@ defmodule FullCircleWeb.ContactLive.BankComponent do
 
   @impl true
   def handle_event("validate", %{"contact_bank" => params}, socket) do
+    params = clearing(params)
     cs = socket.assigns.contact |> Contact.bank_changeset(params) |> Map.put(:action, :validate)
     {:noreply, assign(socket, form: to_form(cs, as: :contact_bank), saved: false)}
   end
@@ -32,7 +33,7 @@ defmodule FullCircleWeb.ContactLive.BankComponent do
   def handle_event("save", %{"contact_bank" => params}, socket) do
     case Accounting.save_contact_bank(
            socket.assigns.contact,
-           params,
+           clearing(params),
            socket.assigns.current_company,
            socket.assigns.current_user
          ) do
@@ -53,6 +54,14 @@ defmodule FullCircleWeb.ContactLive.BankComponent do
         {:noreply, socket}
     end
   end
+
+  # No bank and no account number means "clear"; the holder name (pre-filled
+  # with the contact name) must not block it.
+  defp clearing(%{"bank_code" => code, "bank_account_no" => no} = params)
+       when code in [nil, ""] and no in [nil, ""],
+       do: Map.put(params, "bank_account_name", "")
+
+  defp clearing(params), do: params
 
   @impl true
   def render(assigns) do
