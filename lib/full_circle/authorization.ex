@@ -11,6 +11,18 @@ defmodule FullCircle.Authorization do
   def can?(user, :manage_statutory_config, company),
     do: allow_roles(~w(admin), company, user)
 
+  def can?(user, :manage_contact_bank, company),
+    do: allow_roles(~w(admin manager), company, user)
+
+  def can?(user, :manage_bank_payment_config, company),
+    do: allow_roles(~w(admin), company, user)
+
+  def can?(user, :create_bank_payment_batch, company),
+    do: allow_roles(~w(admin manager), company, user)
+
+  def can?(user, :admin_bank_payment_batch, company),
+    do: allow_roles(~w(admin), company, user)
+
   def can?(user, :seed_taxcodes, company),
     do: allow_roles(~w(admin), company, user)
 

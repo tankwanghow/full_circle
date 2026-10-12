@@ -646,6 +646,49 @@ defmodule FullCircle.Accounting do
   end
 
   @doc """
+  Saves a contact's bank details. Admin/manager only. Logs only real changes,
+  under entity "contact_bank", so the contact's ordinary log — which any
+  contact editor sees — never shows account numbers.
+  """
+  def save_contact_bank(%Contact{} = contact, attrs, com, user) do
+    if can?(user, :manage_contact_bank, com) and contact.company_id == com.id do
+      cs = Contact.bank_changeset(contact, attrs)
+
+      delta =
+        cs.changes
+        |> Map.take([:bank_code, :bank_account_no, :bank_account_name])
+        |> Map.new(fn {k, v} -> {k, v || "(cleared)"} end)
+        |> Sys.attr_to_string()
+
+      Multi.new()
+      |> Multi.update(:update_contact_bank, cs)
+      |> then(fn multi ->
+        if delta == "" do
+          multi
+        else
+          Multi.insert(multi, :log, fn %{update_contact_bank: c} ->
+            Sys.Log.changeset(%Sys.Log{}, %{
+              entity: "contact_bank",
+              entity_id: c.id,
+              action: "update_contact_bank",
+              delta: delta,
+              user_id: user.id,
+              company_id: com.id
+            })
+          end)
+        end
+      end)
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{update_contact_bank: c}} -> {:ok, c}
+        {:error, _step, cs, _} -> {:error, cs}
+      end
+    else
+      :not_authorise
+    end
+  end
+
+  @doc """
   Resolve the local `Contact` for an e-invoice supplier.
 
   Identifiers are tried before the name, because a matching TIN or registration

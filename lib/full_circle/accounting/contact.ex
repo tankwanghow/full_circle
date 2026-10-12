@@ -24,12 +24,77 @@ defmodule FullCircle.Accounting.Contact do
     field :tou_id, :string
     field :misc_code, :string
 
+    # Supplier bank details for bank payment files. Written only through
+    # bank_changeset/2 (admin/manager); changeset/2 never casts them.
+    field :bank_code, :string
+    field :bank_account_no, :string
+    field :bank_account_name, :string
+    field :bank_details_changed_at, :utc_datetime
+
     has_many :invoices, FullCircle.Billing.Invoice
 
     # Concurrency guard, see FullCircle.StdInterface.changeset/5
     field :lock_version, :integer, default: 0
 
     timestamps(type: :utc_datetime)
+  end
+
+  @bank_fields [:bank_code, :bank_account_no, :bank_account_name]
+
+  def bank_changeset(contact, attrs) do
+    contact
+    |> cast(attrs, @bank_fields)
+    |> update_change(:bank_account_no, &(&1 && String.replace(&1, ~r/\D/, "")))
+    |> update_change(:bank_account_name, &(&1 && String.trim(&1)))
+    |> validate_length(:bank_account_name, max: 120)
+    |> validate_bank_details()
+    |> stamp_bank_change()
+  end
+
+  defp validate_bank_details(cs) do
+    values = Enum.map(@bank_fields, &get_field(cs, &1))
+
+    cond do
+      Enum.all?(values, &(&1 in [nil, ""])) ->
+        cs
+
+      Enum.any?(values, &(&1 in [nil, ""])) ->
+        Enum.reduce(@bank_fields, cs, fn f, acc ->
+          if get_field(acc, f) in [nil, ""],
+            do: add_error(acc, f, gettext("required when bank details are filled")),
+            else: acc
+        end)
+
+      true ->
+        validate_account_length(cs)
+    end
+  end
+
+  defp validate_account_length(cs) do
+    case FullCircle.BankPayment.Banks.get(get_field(cs, :bank_code)) do
+      nil ->
+        add_error(cs, :bank_code, gettext("not in list"))
+
+      bank ->
+        if String.length(get_field(cs, :bank_account_no)) in bank.lengths,
+          do: cs,
+          else:
+            add_error(
+              cs,
+              :bank_account_no,
+              gettext("must be %{lengths} digits for %{bank}",
+                lengths: Enum.join(bank.lengths, "/"),
+                bank: bank.name
+              )
+            )
+    end
+  end
+
+  defp stamp_bank_change(cs) do
+    if Enum.any?(@bank_fields, &Map.has_key?(cs.changes, &1)),
+      do:
+        put_change(cs, :bank_details_changed_at, DateTime.utc_now() |> DateTime.truncate(:second)),
+      else: cs
   end
 
   @doc false
