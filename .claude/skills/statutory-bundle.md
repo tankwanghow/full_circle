@@ -48,6 +48,13 @@ FullCircle stores Malaysia statutory payroll config (rate tables, PayScript calc
   (`header` / `detail` / `footer`). A `header` section with literal exprs
   (`"\"Member No\""`) gives a CSV its column-title row. KWSP's EPF upload needs
   both: `"extension": "csv"` plus a header row.
+- Further optional keys, added for bank payment files (see `bank-bulk-payment.md`)
+  but available to any spec: `computed` (`name => expression`, per detail row,
+  usable in `sum()`), detail-section `children` (child lines per item of a row
+  list), `quote: "csv"` (delimited only), per-field `allow` (character-class body;
+  other characters stripped before padding), `filename` (`{name}`,
+  `{name:<strftime>}`, `{seq:N}`), and `max_rows`. Statutory callers still only
+  accept `source: "statutory_rows"`; none of the bundled statutory specs use these keys.
 - `bundle_version` must be `1`.
 - `source` — record the official circular / URL / PDF reference (KWSP, PERKESO, LHDN).
 - Each entry is keyed by `(code, effective_from)`; importing the same key replaces content.
@@ -71,7 +78,8 @@ Scripts are line-oriented `name = expression` statements; the last binding must 
 | `lookup` | `lookup(table, value, column)` — bracket row where `value > wage_from and value <= wage_to` |
 | `ytd_sum` | `ytd_sum(code: c)` / `ytd_sum(type: t)` / `ytd_sum(name: n)` — YTD sum before current month |
 | `calc` | `calc("code")` — evaluate another statutory calc (no cycles) |
-| Math | `min(a,b)`, `max(a,b)`, `ceil(x)`, `floor(x)`, `abs(x)`, `round(x, n)` |
+| Math | `min(a,b)`, `max(a,b)`, `ceil(x)`, `floor(x)`, `abs(x)`, `round(x, n)`, `mod(a,b)` (floored; `mod(x, 0)` is an error) |
+| Text | `upper`, `lower`, `trim`, `replace(s, from, to)`, `left(s, n)`, `right(s, n)`, `mid(s, start, n)` (1-based; a whole number reads as its digits), `num(s)` (digits → number, `""` → 0) |
 
 **Context variables:** `wages`, `bonus`, `fixed_wages`, `age`, `malaysian`, `nationality`, `marital_status`, `partner_working`, `children`, `pay_month`, `pay_year`, `service_years`.
 

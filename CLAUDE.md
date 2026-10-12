@@ -108,6 +108,7 @@ Every entity belongs to a `Company`. Routes are scoped as `/companies/:company_i
 | `Notes` / `Linkable` | Company memory: notes about any record, role visibility, versions, attachments, links |
 | `Tasks` | Recurring duties, job tracking, todos: one row per cycle, Done/Skip/Reopen, nav badge |
 | `BankReconciliation` | Bank statement import/match (LLM parser skill) |
+| `BankPayment` | Bank bulk payment files (RHB Bulk Pay, PB ECP): supplier bank details, profiles, versioned formats, batch lifecycle, bank result import |
 | `EInvMetas` | E-invoice metadata (Malaysia LHDN integration) |
 | `Reporting` | Report queries (cash forecast, CP204, etc.) |
 | `StatutoryConfig` / `PayScript` / `Tax` | Malaysia statutory rates, pay scripts, tax helpers |
@@ -126,7 +127,7 @@ Project skills (non-obvious domain contracts) live in `.claude/skills/`:
 `periodic-inventory-double-entry.md`, `good-snp-report.md`,
 `layer-alive-birds-and-yield.md`, `notes.md`, `tasks.md`, `pl-forecast-model.md`,
 `mix-dependency-overrides.md`, `deploy-image-size.md`, `fit-width-forms.md`,
-`decluttered-index.md`.
+`decluttered-index.md`, `bank-bulk-payment.md`.
 
 ### StdInterface Pattern (`lib/full_circle/std_interface.ex`)
 
