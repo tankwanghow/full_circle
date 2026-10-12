@@ -10,6 +10,7 @@ defmodule FullCircle.FileSpec do
   @default_extension "txt"
   @section_kinds ~w(header detail footer)
   @default_sources ["statutory_rows"]
+  @no_aggregates %{count: 0, sums: %{}}
 
   @doc """
   Validates a spec map. `variables` is the list of allowed PayScript identifiers
@@ -76,6 +77,20 @@ defmodule FullCircle.FileSpec do
     |> validate_line_ending(spec)
     |> validate_delimiter(spec)
     |> validate_extension(spec)
+    |> validate_quote(spec)
+  end
+
+  defp validate_quote(errors, spec) do
+    case Map.get(spec, "quote") do
+      nil ->
+        errors
+
+      "csv" ->
+        if Map.get(spec, "delimiter"), do: errors, else: ["quote requires a delimiter" | errors]
+
+      other ->
+        ["quote must be \"csv\", got #{inspect(other)}" | errors]
+    end
   end
 
   defp validate_renderer(errors, %{"renderer" => "text"}), do: errors
@@ -161,6 +176,7 @@ defmodule FullCircle.FileSpec do
         |> validate_filter(section, prefix, variables, allow_aggregates)
         |> validate_sort(section, prefix)
         |> validate_fields(section, prefix, delimiter, variables, allow_aggregates)
+        |> validate_children(section, prefix, delimiter, variables)
     end
   end
 
@@ -219,6 +235,47 @@ defmodule FullCircle.FileSpec do
           throw({:computed_error, "computed #{name}: #{Exception.message(e)}"})
       end
     end)
+  end
+
+  defp validate_children(errors, %{"kind" => "detail"} = section, prefix, delimiter, variables) do
+    case Map.get(section, "children") do
+      nil ->
+        errors
+
+      children when is_list(children) ->
+        children
+        |> Enum.with_index(1)
+        |> Enum.reduce(errors, fn {child, idx}, acc ->
+          cprefix = "#{prefix}, child #{idx}"
+
+          cond do
+            not is_map(child) -> ["#{cprefix}: must be a map" | acc]
+            not is_binary(child["source"]) -> ["#{cprefix}: source is required" | acc]
+            true -> validate_fields(acc, child, cprefix, delimiter, variables, false)
+          end
+        end)
+
+      _ ->
+        ["#{prefix}: children must be a list" | errors]
+    end
+  end
+
+  defp validate_children(errors, _section, _prefix, _delimiter, _variables), do: errors
+
+  defp validate_field_allow(errors, field, prefix) do
+    case Map.get(field, "allow") do
+      nil ->
+        errors
+
+      allow when is_binary(allow) and allow != "" ->
+        case Regex.compile("[^" <> allow <> "]", "u") do
+          {:ok, _} -> errors
+          {:error, _} -> ["#{prefix}: allow is not a valid character class" | errors]
+        end
+
+      other ->
+        ["#{prefix}: allow must be a non-empty string, got #{inspect(other)}" | errors]
+    end
   end
 
   defp validate_filter(errors, %{"filter" => filter}, prefix, variables, allow_aggregates)
@@ -282,6 +339,7 @@ defmodule FullCircle.FileSpec do
         |> validate_field_format(field, prefix)
         |> validate_field_align(field, prefix)
         |> validate_field_pad(field, prefix)
+        |> validate_field_allow(field, prefix)
         |> then(fn field_errors ->
           expr_errors =
             case validate_expression(field["expr"], variables, allow_aggregates) do
@@ -448,7 +506,7 @@ defmodule FullCircle.FileSpec do
   defp normalize_value(v), do: v
 
   defp render_sections(spec, rows, header_ctx) do
-    delimiter = Map.get(spec, "delimiter")
+    fmt = %{delimiter: Map.get(spec, "delimiter"), quote: Map.get(spec, "quote")}
     ctx = stringify_map(header_ctx)
 
     try do
@@ -467,7 +525,7 @@ defmodule FullCircle.FileSpec do
 
       lines =
         Enum.flat_map(spec["sections"], fn section ->
-          render_section(section, rows, filtered_detail, ctx, delimiter, aggregates)
+          render_section(section, rows, ctx, fmt, aggregates)
         end)
 
       {:ok, lines}
@@ -476,24 +534,34 @@ defmodule FullCircle.FileSpec do
     end
   end
 
-  defp render_section(
-         %{"kind" => "detail"} = section,
-         rows,
-         _filtered_detail,
-         _ctx,
-         delimiter,
-         _aggregates
-       ) do
+  defp render_section(%{"kind" => "detail"} = section, rows, _ctx, fmt, _aggregates) do
     rows
     |> apply_filter(Map.get(section, "filter"))
     |> apply_sort(Map.get(section, "sort"))
-    |> Enum.map(fn row ->
-      render_line(section["fields"], row, delimiter, %{count: 0, sums: %{}})
+    |> Enum.flat_map(fn row ->
+      [
+        render_line(section["fields"], row, fmt, @no_aggregates)
+        | render_children(section, row, fmt)
+      ]
     end)
   end
 
-  defp render_section(section, _rows, _filtered_detail, ctx, delimiter, aggregates) do
-    [render_line(section["fields"], ctx, delimiter, aggregates)]
+  defp render_section(section, _rows, ctx, fmt, aggregates) do
+    [render_line(section["fields"], ctx, fmt, aggregates)]
+  end
+
+  defp render_children(section, row, fmt) do
+    Enum.flat_map(Map.get(section, "children", []), fn child ->
+      source = child["source"]
+
+      row
+      |> Map.get(source, [])
+      |> List.wrap()
+      |> Enum.map(fn item ->
+        item_vars = Map.new(item, fn {k, v} -> {"#{source}_#{k}", normalize_value(v)} end)
+        render_line(child["fields"], Map.merge(row, item_vars), fmt, @no_aggregates)
+      end)
+    end)
   end
 
   defp compute_aggregates(rows) do
@@ -536,18 +604,27 @@ defmodule FullCircle.FileSpec do
     end)
   end
 
-  defp render_line(fields, ctx, delimiter, aggregates) do
-    rendered =
-      Enum.map(fields, fn field ->
-        render_field(field, ctx, aggregates)
-      end)
+  defp render_line(fields, ctx, fmt, aggregates) do
+    rendered = Enum.map(fields, &render_field(&1, ctx, aggregates))
 
-    if delimiter do
-      Enum.join(rendered, delimiter)
-    else
-      Enum.join(rendered, "")
+    case fmt.delimiter do
+      nil -> Enum.join(rendered, "")
+      d -> rendered |> Enum.map(&quote_value(&1, d, fmt.quote)) |> Enum.join(d)
     end
   end
+
+  defp quote_value(value, delimiter, "csv") do
+    if String.contains?(value, [delimiter, "\"", "\r", "\n"]),
+      do: "\"" <> String.replace(value, "\"", "\"\"") <> "\"",
+      else: value
+  end
+
+  defp quote_value(value, _delimiter, _quote), do: value
+
+  defp apply_allow(text, nil), do: text
+
+  defp apply_allow(text, allow),
+    do: String.replace(text, Regex.compile!("[^" <> allow <> "]", "u"), "")
 
   defp render_field(field, ctx, aggregates) do
     expr = field["expr"]
@@ -557,6 +634,7 @@ defmodule FullCircle.FileSpec do
          {:ok, value} <- PayScript.eval_expression(ast, ctx, nil) do
       value
       |> format_value(Map.get(field, "format", "text"))
+      |> apply_allow(Map.get(field, "allow"))
       |> pad_value(field)
     else
       {:error, %Error{} = e} -> raise Exception.message(e)
