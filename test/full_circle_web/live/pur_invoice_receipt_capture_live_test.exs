@@ -113,4 +113,27 @@ defmodule FullCircleWeb.PurInvoiceReceiptCaptureLiveTest do
     assert note.title == "🧾 Receipt"
     assert [%{file_name: "bill.jpg"}] = note.attachments
   end
+
+  test "two bills in one file: the first fills the form, with a warning", %{
+    conn: conn,
+    user: u,
+    company: c
+  } do
+    second = Map.merge(@reply, %{"doc_no" => "INV-999", "supplier" => %{"name" => "Other Co"}})
+
+    Application.put_env(:full_circle, :llm_http, fn _u, _h, _b, _t ->
+      {:ok,
+       %{
+         "content" => [%{"text" => Jason.encode!(%{"documents" => [@reply, second]})}],
+         "usage" => %{"input_tokens" => 1, "output_tokens" => 1}
+       }}
+    end)
+
+    {:ok, lv, _} = live(conn, ~p"/companies/#{c.id}/PurInvoice/new")
+    html = drop_photo(lv, c, u)
+
+    assert value(lv, "pur_invoice_e_inv_internal_id") == "INV-778"
+    assert html =~ "The file shows 2 bills"
+    assert html =~ "MOTOR 2HP"
+  end
 end

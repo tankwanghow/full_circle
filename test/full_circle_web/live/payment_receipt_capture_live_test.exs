@@ -290,4 +290,50 @@ defmodule FullCircleWeb.PaymentReceiptCaptureLiveTest do
     assert value(lv, "payment_contact_id") == picked.id
     assert html =~ pv.payment_no
   end
+
+  defp fuel(shop, no, days_ago, total) do
+    %{
+      "recognized" => true,
+      "summary" => "Fuel receipt",
+      "kind" => "fuel",
+      "supplier" => %{"name" => shop},
+      "doc_no" => no,
+      "date" => Date.to_iso8601(Date.add(Date.utc_today(), -days_ago)),
+      "lines" => [%{"description" => "RON95", "quantity" => 1, "amount" => total}],
+      "total" => total,
+      "payment_method" => "cash"
+    }
+  end
+
+  test "a fuel claim: payee picked first is kept, one line per receipt", %{
+    conn: conn,
+    user: u,
+    company: c
+  } do
+    stub(%{
+      "documents" => [
+        fuel("Shell Juru", "S-9", 2, 60),
+        fuel("Petronas BM", "P-101", 9, 80),
+        fuel("Caltex Alma", "C-7", 5, 45.5)
+      ]
+    })
+
+    salesperson = contact_fixture(c, u, %{"name" => "Ah Kow (sales)"})
+    {:ok, lv, _} = live(conn, ~p"/companies/#{c.id}/Payment/new")
+
+    render_change(lv, "validate", %{
+      "payment" => %{"contact_name" => salesperson.name, "contact_id" => salesperson.id}
+    })
+
+    html = drop_photo(lv, c, u)
+    d9 = Calendar.strftime(Date.add(Date.utc_today(), -9), "%d/%m/%Y")
+
+    assert value(lv, "payment_contact_id") == salesperson.id
+    assert value(lv, "payment_funds_amount") =~ "185.5"
+    assert html =~ "Fuel · Petronas BM #P-101 #{d9}"
+    assert html =~ "Caltex Alma"
+    assert html =~ "Shell Juru"
+    assert html =~ "3 receipts from 3 shops"
+    refute html =~ "RON95"
+  end
 end

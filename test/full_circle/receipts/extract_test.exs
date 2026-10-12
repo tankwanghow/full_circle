@@ -192,18 +192,64 @@ defmodule FullCircle.Receipts.ExtractTest do
     end
   end
 
+  describe "parse_documents/2" do
+    test "one entry per document" do
+      second = Map.merge(@good, %{"doc_no" => "B-2", "supplier" => %{"name" => "Shell"}})
+      docs = Extract.parse_documents(%{"documents" => [@good, second]}, @today)
+
+      assert [%Extracted{doc_no: "A12345"}, %Extracted{doc_no: "B-2", supplier_name: "Shell"}] =
+               docs
+    end
+
+    test "today's single-object reply is one document" do
+      assert [%Extracted{recognized: true, doc_no: "A12345"}] =
+               Extract.parse_documents(@good, @today)
+    end
+
+    test "an empty list is one unrecognised document" do
+      assert [%Extracted{recognized: false, summary: "Blank page"}] =
+               Extract.parse_documents(%{"documents" => [], "summary" => "Blank page"}, @today)
+    end
+
+    test "kind: the fixed label, case-insensitive; unknown is nil" do
+      [fuel, toll, odd, none] =
+        Extract.parse_documents(
+          %{
+            "documents" => [
+              Map.put(@good, "kind", "fuel"),
+              Map.put(@good, "kind", " TOLL "),
+              Map.put(@good, "kind", "petrol"),
+              @good
+            ]
+          },
+          @today
+        )
+
+      assert {fuel.kind, toll.kind, odd.kind, none.kind} == {"Fuel", "Toll", nil, nil}
+    end
+
+    test "entries that are not objects are skipped" do
+      assert [%Extracted{doc_no: "A12345"}] =
+               Extract.parse_documents(%{"documents" => ["junk", 3, nil, @good]}, @today)
+
+      assert [%Extracted{recognized: false}] =
+               Extract.parse_documents(%{"documents" => ["junk"]}, @today)
+    end
+  end
+
   describe "run/4" do
-    test "image: one call with the 90 s timeout and 16k tokens" do
-      stub([Jason.encode!(@good)])
+    test "image: one call with the 180 s timeout and 32k tokens, a list back" do
+      stub([Jason.encode!(%{"documents" => [@good, @good]})])
       path = tmp(".jpg", <<0xFF, 0xD8, 0xFF, 0xE0, 0, 0>>)
 
-      assert {:ok, %Extracted{recognized: true}, usage} =
+      assert {:ok, [%Extracted{recognized: true}, %Extracted{}], usage} =
                Extract.run(path, "image/jpeg", @settings, today: @today)
 
       assert usage.total_tokens == 150
-      assert_received {:llm_called, body, 90_000}
-      assert body["max_tokens"] == 16_384
+      assert_received {:llm_called, body, 180_000}
+      assert body["max_tokens"] == 32_768
       [%{"content" => [%{"type" => "image"}, _]}] = body["messages"]
+      assert body["system"] =~ "documents"
     end
 
     test "pdf goes as a document" do
@@ -218,7 +264,7 @@ defmodule FullCircle.Receipts.ExtractTest do
       stub(["I think this is a receipt", Jason.encode!(@good)])
       path = tmp(".jpg", <<0xFF, 0xD8, 0xFF>>)
 
-      assert {:ok, %Extracted{recognized: true}, _} =
+      assert {:ok, [%Extracted{recognized: true}], _} =
                Extract.run(path, "image/jpeg", @settings, today: @today)
 
       assert_received {:llm_called, _, _}

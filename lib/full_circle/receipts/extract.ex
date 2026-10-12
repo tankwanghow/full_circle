@@ -1,6 +1,7 @@
 defmodule FullCircle.Receipts.Extract do
   @moduledoc """
-  A photographed bill or receipt (JPEG/PNG/WebP/PDF) → `%Extracted{}`, via the
+  A photographed bill or receipt (JPEG/PNG/WebP/PDF) → a list of `%Extracted{}`,
+  one per document in the file, via the
   company's receipt AI (`Sys.llm_settings(company, :receipt)`). Knows nothing
   about forms, so a future captured-receipts inbox can call it as is. The
   model's answer is never trusted: every value is parsed here, and what does
@@ -15,25 +16,51 @@ defmodule FullCircle.Receipts.Extract do
   @summary_max 200
   @image_types ~w(image/jpeg image/png image/webp)
 
+  # Fixed English labels: the line text "<Kind> · …" is the key Prefill
+  # learns goods by, so they are never translated.
+  @kinds %{
+    "fuel" => "Fuel",
+    "toll" => "Toll",
+    "parking" => "Parking",
+    "hotel" => "Hotel",
+    "meal" => "Meal",
+    "transport" => "Transport",
+    "other" => "Other"
+  }
+
   @system_prompt """
   You read photos and PDFs of Malaysian supplier bills, invoices, cash bills and
-  shop receipts. Reply with ONE JSON object and nothing else:
+  shop receipts. One file may hold several of them. Reply with ONE JSON object
+  and nothing else:
 
-  {"recognized": true|false,
-   "summary": "one plain sentence of what the picture shows",
-   "supplier": {"name": str|null, "tin": str|null, "brn": str|null, "sst_no": str|null},
-   "doc_no": str|null, "date": "YYYY-MM-DD"|null, "due_date": "YYYY-MM-DD"|null,
-   "lines": [{"description": str, "quantity": num|null, "unit_price": num|null,
-              "discount": num|null, "tax_rate_percent": num|null, "amount": num|null}],
-   "subtotal": num|null, "tax_total": num|null, "rounding": num|null, "total": num|null,
-   "payment_method": "cash"|"card"|"transfer"|"cheque"|null,
-   "e_invoice_uuid": str|null}
+  {"documents": [
+    {"recognized": true|false,
+     "summary": "one plain sentence of what this document is",
+     "kind": "fuel"|"toll"|"parking"|"hotel"|"meal"|"transport"|"other"|null,
+     "supplier": {"name": str|null, "tin": str|null, "brn": str|null, "sst_no": str|null},
+     "doc_no": str|null, "date": "YYYY-MM-DD"|null, "due_date": "YYYY-MM-DD"|null,
+     "lines": [{"description": str, "quantity": num|null, "unit_price": num|null,
+                "discount": num|null, "tax_rate_percent": num|null, "amount": num|null}],
+     "subtotal": num|null, "tax_total": num|null, "rounding": num|null, "total": num|null,
+     "payment_method": "cash"|"card"|"transfer"|"cheque"|null,
+     "e_invoice_uuid": str|null}
+  ]}
 
   Rules:
+  - One entry per separate bill or receipt, in reading order: page by page,
+    top to bottom, left to right.
+  - One bill can run across pages: lines carried over, "Page 1 of 3", the total
+    on a later page. That is ONE entry, not one per page.
+  - A page can hold several receipts. Each is its own entry.
+  - kind is what the money was spent on: fuel (petrol/diesel stations), toll
+    (toll plazas, Touch 'n Go / RFID toll statements), parking, hotel
+    (lodging), meal (food and drinks), transport (Grab, taxi, bus, train,
+    flight), other. A toll statement listing many trips is ONE entry.
   - Use null for anything not printed or not legible. Never guess.
-  - recognized is false when the picture is not a bill, invoice, cash bill or
+  - recognized is false for something that is not a bill, invoice, cash bill or
     receipt (a delivery order, cheque, letter, product photo, unreadable shot).
-    Then leave every other field null and lines empty.
+    Then leave its other fields null and lines empty. A file with no bill or
+    receipt at all is a single entry with recognized false.
   - summary is always set, max 200 characters, e.g. "Petrol receipt from
     Petronas Bukit Mertajam, RM 80.00" or "Blurry photo of a handwritten note".
   - Dates as YYYY-MM-DD. Printed numeric dates are Malaysian DD/MM/YYYY.
@@ -50,12 +77,12 @@ defmodule FullCircle.Receipts.Extract do
   - e_invoice_uuid is the LHDN e-invoice UUID / validation id if printed.
   """
 
-  @user_prompt "Read this document."
+  @user_prompt "Read every bill or receipt in this file."
   @json_only "Reply with the JSON object only."
 
   def run(path, content_type, settings, opts \\ []) do
     today = Keyword.get(opts, :today, Date.utc_today())
-    llm_opts = [timeout: Keyword.get(opts, :timeout, 90_000), max_tokens: 16_384]
+    llm_opts = [timeout: Keyword.get(opts, :timeout, 180_000), max_tokens: 32_768]
 
     with {:ok, kind} <- kind(content_type),
          {:ok, bin} <- read(path, kind) do
@@ -64,7 +91,7 @@ defmodule FullCircle.Receipts.Extract do
 
       with {:ok, text, usage} <- ask.(@user_prompt) do
         case decode_json(text) do
-          {:ok, map} -> {:ok, parse(map, today), usage}
+          {:ok, map} -> {:ok, parse_documents(map, today), usage}
           :error -> retry(ask, today)
         end
       end
@@ -74,7 +101,7 @@ defmodule FullCircle.Receipts.Extract do
   defp retry(ask, today) do
     with {:ok, text, usage} <- ask.(@user_prompt <> " " <> @json_only) do
       case decode_json(text) do
-        {:ok, map} -> {:ok, parse(map, today), usage}
+        {:ok, map} -> {:ok, parse_documents(map, today), usage}
         :error -> {:error, gettext("The AI's answer could not be read. Try ↻ Read again.")}
       end
     end
@@ -116,6 +143,20 @@ defmodule FullCircle.Receipts.Extract do
 
   def decode_json(_), do: :error
 
+  @doc """
+  A decoded reply → one `%Extracted{}` per document, never an empty list.
+  Today's single-object shape counts as one document; entries that are not
+  objects are skipped; nothing left is one unrecognised document.
+  """
+  def parse_documents(%{"documents" => docs} = map, today) when is_list(docs) do
+    case for(%{} = doc <- docs, do: parse(doc, today)) do
+      [] -> [parse(%{"recognized" => false, "summary" => map["summary"]}, today)]
+      parsed -> parsed
+    end
+  end
+
+  def parse_documents(map, today) when is_map(map), do: [parse(map, today)]
+
   @doc "A decoded model reply → `%Extracted{}`, with warnings for what does not hold."
   def parse(map, today) when is_map(map) do
     summary = map |> Map.get("summary") |> text() |> cut(@summary_max)
@@ -151,6 +192,7 @@ defmodule FullCircle.Receipts.Extract do
       %Extracted{
         recognized: true,
         summary: summary,
+        kind: kind_label(map["kind"]),
         supplier_name: supplier_name,
         supplier_tin: text(supplier["tin"]),
         supplier_brn: text(supplier["brn"]),
@@ -321,6 +363,11 @@ defmodule FullCircle.Receipts.Extract do
 
   defp payment_method(m) when m in ~w(cash card transfer cheque), do: m
   defp payment_method(_), do: nil
+
+  defp kind_label(k) when is_binary(k),
+    do: Map.get(@kinds, k |> String.trim() |> String.downcase())
+
+  defp kind_label(_), do: nil
 
   defp text(s) when is_binary(s) do
     case String.trim(s) do

@@ -2,7 +2,7 @@ defmodule FullCircleWeb.ReceiptCapture do
   @moduledoc """
   Receipt capture on New Payment / New Purchase Invoice. The form owns a note
   tray filled from the phone (📱) or desktop (📎); the first file is read by
-  `Receipts.Extract` and seeds the form's *empty* fields through
+  `Receipts.Extract` (one or many receipts) and seeds the form's *empty* fields through
   `Receipts.Prefill`; Save attaches the tray as a 🧾 Receipt note on the new
   document inside the same transaction. Contract:
   `.claude/skills/receipt-capture.md`.
@@ -148,7 +148,7 @@ defmodule FullCircleWeb.ReceiptCapture do
     files_changed(socket, detail_key)
   end
 
-  @doc "Read one tray file (nil: the first) in the background."
+  @doc "Read one tray file (nil: the first) in the background — one or many receipts."
   def read(socket, att_id, detail_key) do
     %{receipt_files: files, receipt_settings: settings, current_company: com, current_user: user} =
       socket.assigns
@@ -297,8 +297,8 @@ defmodule FullCircleWeb.ReceiptCapture do
         confirm={nil}
       />
       <div :if={@receipt} id={"#{@id}-read"} class="mt-2 grid gap-1">
-        <% ex = @receipt.extracted %>
-        <p :if={ex.recognized}>
+        <% docs = Enum.filter(@receipt.extracted, & &1.recognized) %>
+        <p :for={ex <- docs}>
           <span class="font-medium">{ex.supplier_name || gettext("(no supplier name)")}</span>
           <span :if={ex.supplier_tin}> · TIN {ex.supplier_tin}</span>
           <span :if={ex.supplier_brn}> · BRN {ex.supplier_brn}</span>
@@ -306,7 +306,9 @@ defmodule FullCircleWeb.ReceiptCapture do
           <span :if={ex.date}> · {ex.date}</span>
           <span :if={ex.total}> · {gettext("Total")} {ex.total}</span>
         </p>
-        <p :if={!ex.recognized} class="italic">{ex.summary}</p>
+        <p :if={docs == [] and @receipt.extracted != []} class="italic">
+          {hd(@receipt.extracted).summary}
+        </p>
         <p :if={@receipt.total && @keyed_total} id={"#{@id}-totals"}>
           <% diff = FullCircle.EInvMetas.Prefill.variance(@keyed_total, @receipt.total) %>
           <span class={
