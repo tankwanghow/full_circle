@@ -802,7 +802,6 @@ defmodule FullCircleWeb.PaymentLive.Form do
     <div class="mx-auto grid w-fit min-w-[64rem] max-w-[98vw]">
       <div class="w-fit min-w-[64rem] max-w-[98vw] border rounded-lg border-pink-500 bg-pink-100 p-4 [&>*:not(form)]:[contain:inline-size]">
         <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
-        <.error_box changeset={@form.source} />
         <FullCircleWeb.ReceiptCapture.receipt_capture
           :if={@live_action == :new}
           id="receipt"

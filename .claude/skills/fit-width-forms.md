@@ -1,6 +1,6 @@
 ---
 name: fit-width-forms
-description: Use when building or changing a FullCircle document form with a detail-line table (Invoice, PurInvoice, Receipt, Payment, CreditNote, DebitNote, or a new one) — card width, detail column widths, the ⚙ column chooser, tabs inside the card, or header field layout. Covers the fit-to-columns card, .detail-fit, contain:inline-size and .tab-hidden.
+description: Use when building or changing a FullCircle document form with a detail-line table (Invoice, PurInvoice, Receipt, Payment, CreditNote, DebitNote, or a new one) — card width, detail column widths, the ⚙ column chooser, tabs inside the card, or header field layout, or how form errors and the Save button behave. Covers the fit-to-columns card, .detail-fit, contain:inline-size, .tab-hidden, and the inline errors / ErrorJump Save button.
 ---
 
 # Fit-to-columns document forms
@@ -91,6 +91,31 @@ Equal `grow shrink` fields squeeze the name fields once the card is narrow.
 the page. Invoice/PurInvoice start with Account, Tax Rate, Discount hidden
 (they come from the Good); Receipt/Payment hide Tax Rate and Discount but keep
 Account (lines often post straight to an account). Existing users keep theirs.
+
+## Form errors (no summary box)
+
+- Errors show **on their own field only**: `<.input>` gives a used field with
+  errors a red border, the message under it and `aria-invalid="true"`. The
+  pink "Please fix the following errors" box was removed (2026-10-12) — do
+  not add a summary box back.
+- `save_button` (`core_components.ex`, used by `form_action_button` and
+  ~7 other forms): with errors it is `type="button"`, reads "N Errors ↓" and
+  carries `phx-hook="ErrorJump"` (`assets/js/app.js`). Each click submits the
+  form once through its **phx-change** event (phx-submit is swapped around a
+  synchronous `requestSubmit()`), so LiveView marks every input used and the
+  server shows every error — nothing is saved — then focuses the next
+  `[aria-invalid="true"]` field after the last one jumped to, wrapping.
+- A form's validate handler must accept params **without `_target`** (the
+  reveal submit has none). Existing handlers match only `%{"<name>" => params}`.
+- Errors on fields the form doesn't render (field missing from
+  `form.params`) show in `#save-orphan-errors` beside the button. A field
+  rendered only as a hidden input can't be jumped to: put the error on the
+  visible name field (`validate_id(:good_name, :good_id)`).
+- **Dark mode:** `.dark input:not([type=checkbox]):not([type=radio])` outranks
+  `.dark .border-rose-*`, so the red border comes from the
+  `[aria-invalid="true"]` rule in `assets/css/app.css`.
+- Tests: `test/full_circle_web/live/form_error_ui_test.exs`. The jump itself is
+  JS — check it in a browser (first click reveals and focuses, later clicks cycle).
 
 ## Checking a change
 

@@ -356,6 +356,7 @@ defmodule FullCircleWeb.CoreComponents do
           name={@name}
           value="true"
           checked={@checked}
+          aria-invalid={@errors != [] && "true"}
           class="rounded border-zinc-300 text-zinc-900 focus:ring-0"
           {@rest}
         />
@@ -379,6 +380,7 @@ defmodule FullCircleWeb.CoreComponents do
           @errors != [] && "border-rose-400 focus:border-rose-400"
         ]}
         multiple={@multiple}
+        aria-invalid={@errors != [] && "true"}
         {@rest}
       >
         <option :if={@prompt} value="">{@prompt}</option>
@@ -404,6 +406,7 @@ defmodule FullCircleWeb.CoreComponents do
           @errors != [] && "border-rose-400 focus:border-rose-400"
         ]}
         url={@url}
+        aria-invalid={@errors != [] && "true"}
         {@rest}
       ><%= Phoenix.HTML.Form.normalize_value("textarea", @value) %></textarea>
       <.error :for={msg <- @errors}>{msg}</.error>
@@ -429,6 +432,7 @@ defmodule FullCircleWeb.CoreComponents do
           @errors == [] && "border-zinc-300 focus:border-zinc-400",
           @errors != [] && "border-rose-400 focus:border-rose-400"
         ]}
+        aria-invalid={@errors != [] && "true"}
         {@rest}
       />
       <.error :for={msg <- @errors}>{msg}</.error>
@@ -721,39 +725,6 @@ defmodule FullCircleWeb.CoreComponents do
   end
 
   @doc """
-  Renders a consolidated error summary panel at the top of a form.
-  Only visible when the changeset has errors.
-
-  ## Examples
-
-      <.error_box changeset={@form.source} />
-  """
-  attr :changeset, :any, required: true
-
-  def error_box(assigns) do
-    errors = collect_form_errors(assigns.changeset)
-    assigns = assign(assigns, :errors, errors)
-
-    ~H"""
-    <div
-      :if={@changeset.action && !@changeset.valid? && @errors != []}
-      id="error-summary"
-      class="bg-rose-50 border border-rose-400 rounded-lg p-3 mb-3"
-    >
-      <p class="flex items-center gap-1 text-rose-700 font-semibold text-sm mb-1">
-        <.icon name="hero-exclamation-triangle-mini" class="h-5 w-5 flex-none" />
-        {gettext("Please fix the following errors:")}
-      </p>
-      <div class="flex flex-wrap gap-x-2 gap-y-1 text-sm text-rose-600">
-        <span :for={{label, msg} <- @errors} class="min-w-0 font-medium text-rose-700">
-          [{label}<span class="text-rose-400"> - {msg}</span>]
-        </span>
-      </div>
-    </div>
-    """
-  end
-
-  @doc """
   Collects all errors from a changeset (including nested associations) into
   a flat list of `{label, message}` tuples for display.
   """
@@ -981,22 +952,32 @@ defmodule FullCircleWeb.CoreComponents do
   attr :label, :string, default: gettext("Save")
 
   def save_button(assigns) do
-    has_errors = assigns.form.source.action && !assigns.form.source.valid?
+    cs = assigns.form.source
+    has_errors = cs.action && !cs.valid?
+    error_count = if has_errors, do: length(collect_form_errors(cs)), else: 0
+    orphans = if has_errors, do: orphan_errors(assigns.form), else: []
 
-    error_count =
-      if has_errors,
-        do: length(collect_form_errors(assigns.form.source)),
-        else: 0
+    assigns =
+      assign(assigns, error_count: error_count, has_errors: has_errors, orphans: orphans)
 
-    assigns = assigns |> assign(:error_count, error_count) |> assign(:has_errors, has_errors)
-
+    # With errors the button never submits: the ErrorJump hook reveals every
+    # error once (through the form's validate event) and then focuses the
+    # next invalid field on each click.
     ~H"""
+    <span
+      :if={@orphans != []}
+      id="save-orphan-errors"
+      class="self-center text-sm text-rose-700 dark:text-rose-300"
+    >
+      <.icon name="hero-exclamation-circle-mini" class="inline h-4 w-4 align-text-bottom" />
+      {Enum.map_join(@orphans, " · ", fn {label, msg} -> "#{label} #{msg}" end)}
+    </span>
     <button
+      id="save-button"
       type={if @has_errors, do: "button", else: "submit"}
-      phx-click={
-        if @has_errors,
-          do: JS.dispatch("phx:scroll-to", detail: %{id: "error-summary"})
-      }
+      phx-hook="ErrorJump"
+      data-errors={@error_count}
+      title={@has_errors && gettext("Jump to the next field with an error")}
       class={[
         "phx-submit-loading:opacity-75 rounded-lg py-2 px-3 leading-6 border",
         !@has_errors && "bg-green-200 hover:bg-green-600 border-green-600",
@@ -1005,11 +986,22 @@ defmodule FullCircleWeb.CoreComponents do
       ]}
     >
       {if @has_errors,
-        do: "#{@error_count} #{ngettext("Error", "Errors", @error_count)}",
+        do: "#{@error_count} #{ngettext("Error", "Errors", @error_count)} ↓",
         else: @label}
     </button>
     """
   end
+
+  # Top-level errors on fields the form does not render (the browser sends
+  # every rendered input, so they are missing from the params), e.g. a
+  # computed balance. They have no field to show on, so the button shows them.
+  defp orphan_errors(%Phoenix.HTML.Form{source: %Ecto.Changeset{} = cs, params: params}) do
+    for {field, {msg, opts}} <- cs.errors, not Map.has_key?(params, to_string(field)) do
+      {humanize_field(field), translate_error({msg, opts})}
+    end
+  end
+
+  defp orphan_errors(_form), do: []
 
   attr :form, :any
   attr :live_action, :atom

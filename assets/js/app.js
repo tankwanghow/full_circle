@@ -284,6 +284,52 @@ Hooks.copyAndOpen = {
   }
 };
 
+// Save button while the form has errors (data-errors > 0). Each click sends
+// the form once through its phx-change event as a submit, so LiveView marks
+// every field as used and the server shows every error inline (nothing is
+// saved), then focuses the next invalid field after the last one jumped to.
+Hooks.ErrorJump = {
+  mounted() {
+    this.last = null
+    this.handleClick = (event) => {
+      if (Number(this.el.dataset.errors || 0) === 0) return
+      event.preventDefault()
+      const form = this.el.form || this.el.closest("form")
+      if (!form) return
+      this.reveal(form)
+      this.whenIdle(form, () => this.jump(form))
+    }
+    this.el.addEventListener("click", this.handleClick)
+  },
+  destroyed() {
+    this.el.removeEventListener("click", this.handleClick)
+  },
+  reveal(form) {
+    const submit = form.getAttribute("phx-submit")
+    const change = form.getAttribute("phx-change")
+    if (!change) return
+    // LiveView reads phx-submit while the submit event is dispatched, which
+    // requestSubmit() does synchronously, so the swap is undone at once.
+    form.setAttribute("phx-submit", change)
+    form.requestSubmit()
+    if (submit === null) form.removeAttribute("phx-submit")
+    else form.setAttribute("phx-submit", submit)
+  },
+  whenIdle(form, fn, waited = 0) {
+    if (!form.classList.contains("phx-submit-loading") || waited > 5000) fn()
+    else setTimeout(() => this.whenIdle(form, fn, waited + 50), 50)
+  },
+  jump(form) {
+    const fields = [...form.querySelectorAll('[aria-invalid="true"]')]
+      .filter((el) => !el.disabled && el.offsetParent !== null)
+    if (fields.length === 0) return
+    const next = fields[(fields.indexOf(this.last) + 1) % fields.length]
+    this.last = next
+    next.scrollIntoView({ behavior: "smooth", block: "center" })
+    next.focus({ preventScroll: true })
+  }
+}
+
 // Click map / use browser GPS to fill latitude & longitude on location form
 Hooks.GpsMapPicker = {
   mounted() {
@@ -336,11 +382,6 @@ let liveSocket = new LiveSocket("/live", Socket, {
 topbar.config({ barColors: { 0: "#29d" }, shadowColor: "rgba(0, 0, 0, .3)" })
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
-
-window.addEventListener("phx:scroll-to", (e) => {
-  const el = document.getElementById(e.detail.id)
-  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
-})
 
 window.addEventListener("phx:invalidate_autocomplete_cache", () => {
   import("./tri_autocomplete").then(mod => mod.invalidateAutocompleteCache())

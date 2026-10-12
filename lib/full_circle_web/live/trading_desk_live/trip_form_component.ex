@@ -1242,7 +1242,6 @@ defmodule FullCircleWeb.TradingDeskLive.TripFormComponent do
     ~H"""
     <div>
       <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
-      <.error_box changeset={@form.source} />
 
       <div
         :if={@action_error}

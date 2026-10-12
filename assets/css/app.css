@@ -52,6 +52,13 @@ body.dark {
   @apply bg-gray-700 text-gray-400;
 }
 
+/* Invalid fields keep a red border: the base rule above outranks .border-rose-*. */
+.dark input[aria-invalid="true"]:not([type="checkbox"]):not([type="radio"]),
+.dark select[aria-invalid="true"],
+.dark textarea[aria-invalid="true"] {
+  border-color: var(--color-rose-500);
+}
+
 .dark input[disabled],
 .dark button[disabled] {
   @apply bg-gray-700 text-gray-500;

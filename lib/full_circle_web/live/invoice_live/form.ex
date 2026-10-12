@@ -952,7 +952,6 @@ defmodule FullCircleWeb.InvoiceLive.Form do
     <div class="mx-auto grid w-fit min-w-[64rem] max-w-[98vw]">
       <div class="w-fit min-w-[64rem] max-w-[98vw] border rounded-lg border-yellow-500 bg-yellow-100 p-4 [&>*:not(form)]:[contain:inline-size]">
         <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
-        <.error_box changeset={@form.source} />
         <div
           :if={@live_action == :edit and @trading_settlement.linked?}
           class="mb-3 rounded border border-amber-600 bg-amber-50 px-3 py-2 text-sm"
