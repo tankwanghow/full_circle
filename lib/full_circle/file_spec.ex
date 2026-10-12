@@ -11,6 +11,7 @@ defmodule FullCircle.FileSpec do
   @section_kinds ~w(header detail footer)
   @default_sources ["statutory_rows"]
   @no_aggregates %{count: 0, sums: %{}}
+  @filename_token ~r/\{([A-Za-z_][A-Za-z0-9_]*)(?::([^}]*))?\}/
 
   @doc """
   Validates a spec map. `variables` is the list of allowed PayScript identifiers
@@ -28,6 +29,7 @@ defmodule FullCircle.FileSpec do
       []
       |> validate_top_level(spec)
       |> validate_computed(spec, variables)
+      |> validate_filename(spec, variables)
       |> validate_sections(spec, row_variables, sources)
 
     case errors do
@@ -61,6 +63,95 @@ defmodule FullCircle.FileSpec do
   @doc "File extension (no dot) for the rendered file; `\"txt\"` when the spec sets none."
   def extension(spec) when is_map(spec), do: Map.get(spec, "extension", @default_extension)
 
+  @doc """
+  Renders the spec's `filename` template, or nil when it has none. `seq: nil`
+  leaves the sequence part out (the stem). Raises ArgumentError when `seq` is
+  wider than its `{seq:N}` digits.
+  """
+  def filename(spec, ctx, seq) when is_map(spec) and is_map(ctx) do
+    case Map.get(spec, "filename") do
+      nil ->
+        nil
+
+      tpl ->
+        ctx = stringify_map(ctx)
+
+        Regex.replace(@filename_token, tpl, fn _, name, opt ->
+          filename_part(name, opt, ctx, seq)
+        end)
+    end
+  end
+
+  @doc "Most detail rows per file, or nil for no limit."
+  def max_rows(spec) when is_map(spec), do: Map.get(spec, "max_rows")
+
+  defp filename_part("seq", _opt, _ctx, nil), do: ""
+
+  defp filename_part("seq", opt, _ctx, seq) do
+    width =
+      case Integer.parse(opt) do
+        {n, ""} when n > 0 -> n
+        _ -> 1
+      end
+
+    text = Integer.to_string(seq)
+
+    if String.length(text) > width,
+      do: raise(ArgumentError, "sequence #{seq} does not fit in #{width} digit(s)")
+
+    String.pad_leading(text, width, "0")
+  end
+
+  defp filename_part(name, opt, ctx, _seq) do
+    case Map.get(ctx, name) do
+      %Date{} = d when opt != "" -> Calendar.strftime(d, opt)
+      v -> to_string(v)
+    end
+    |> String.replace(~r/[^A-Za-z0-9._-]/, "")
+  end
+
+  defp validate_filename(errors, spec, variables) do
+    case Map.get(spec, "filename") do
+      nil ->
+        errors
+
+      tpl when is_binary(tpl) and tpl != "" ->
+        @filename_token
+        |> Regex.scan(tpl, capture: :all_but_first)
+        |> Enum.reduce(errors, fn
+          ["seq" | _], acc ->
+            acc
+
+          [name | rest], acc ->
+            acc =
+              if name in variables, do: acc, else: ["filename: unknown name '#{name}'" | acc]
+
+            case rest do
+              [opt] when opt != "" -> validate_date_pattern(acc, opt)
+              _ -> acc
+            end
+        end)
+
+      other ->
+        ["filename must be a non-empty string, got #{inspect(other)}" | errors]
+    end
+  end
+
+  defp validate_date_pattern(errors, opt) do
+    Calendar.strftime(~D[2026-01-31], opt)
+    errors
+  rescue
+    _ -> ["filename: bad date pattern '#{opt}'" | errors]
+  end
+
+  defp validate_max_rows(errors, spec) do
+    case Map.get(spec, "max_rows") do
+      nil -> errors
+      n when is_integer(n) and n > 0 -> errors
+      other -> ["max_rows must be a positive integer, got #{inspect(other)}" | errors]
+    end
+  end
+
   defp detail_variables(rows, header_ctx) do
     row_keys =
       rows
@@ -78,6 +169,7 @@ defmodule FullCircle.FileSpec do
     |> validate_delimiter(spec)
     |> validate_extension(spec)
     |> validate_quote(spec)
+    |> validate_max_rows(spec)
   end
 
   defp validate_quote(errors, spec) do

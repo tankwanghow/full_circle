@@ -211,4 +211,54 @@ defmodule FullCircle.FileSpecBankTest do
       assert msg =~ "allow is not a valid character class"
     end
   end
+
+  describe "filename" do
+    test "renders values, dates and a padded sequence" do
+      spec = %{"filename" => "PAYMENT_{corporate_id}_{today:%d%m%Y}_{seq:3}.CSV"}
+      ctx = %{"corporate_id" => "123456", "today" => ~D[2026-10-12]}
+      assert FileSpec.filename(spec, ctx, 7) == "PAYMENT_123456_12102026_007.CSV"
+      assert FileSpec.filename(spec, ctx, nil) == "PAYMENT_123456_12102026_.CSV"
+    end
+
+    test "drops unsafe characters from inserted values" do
+      assert FileSpec.filename(%{"filename" => "{acct}PM.txt"}, %{"acct" => "3123 456/789"}, 1) ==
+               "3123456789PM.txt"
+    end
+
+    test "a sequence wider than its digits raises" do
+      assert_raise ArgumentError, ~r/does not fit/, fn ->
+        FileSpec.filename(%{"filename" => "{seq:2}"}, %{}, 100)
+      end
+    end
+
+    test "nil without a template" do
+      assert FileSpec.filename(%{}, %{}, 1) == nil
+    end
+
+    test "unknown names and bad date patterns are rejected" do
+      spec =
+        delimited([%{"kind" => "header", "fields" => [%{"expr" => "1"}]}], %{
+          "filename" => "{nope}_{d:%Q}_{seq:2}.txt"
+        })
+
+      assert {:error, msgs} = FileSpec.validate(spec, ["d"], ["payments"])
+      assert Enum.any?(msgs, &(&1 =~ "filename: unknown name 'nope'"))
+      assert Enum.any?(msgs, &(&1 =~ "filename: bad date pattern"))
+    end
+  end
+
+  describe "max_rows" do
+    test "reads a positive integer" do
+      assert FileSpec.max_rows(%{"max_rows" => 100}) == 100
+      assert FileSpec.max_rows(%{}) == nil
+    end
+
+    test "rejects anything else" do
+      spec =
+        delimited([%{"kind" => "header", "fields" => [%{"expr" => "1"}]}], %{"max_rows" => 0})
+
+      assert {:error, [msg]} = FileSpec.validate(spec, [], ["payments"])
+      assert msg =~ "max_rows must be a positive integer"
+    end
+  end
 end
