@@ -11,7 +11,23 @@ defmodule FullCircle.BankPayment do
   alias Ecto.Multi
   alias FullCircle.{FileSpec, Repo, Sys}
   alias FullCircle.Accounting.Account
-  alias FullCircle.BankPayment.{FileFormat, Profile}
+  alias FullCircle.BillPay.Payment
+
+  alias FullCircle.BankPayment.{
+    Banks,
+    Batch,
+    BatchLine,
+    Dismissal,
+    Download,
+    FileFormat,
+    Profile,
+    Rows
+  }
+
+  @max_days_ahead 59
+  @recent_change_days 30
+  @duplicate_days 14
+  @preload [:contact, payment_details: :good, transaction_matchers: :transaction]
 
   @sources ["payments"]
   @row_vars ~w(record_id payment_no doc_date amount bank_code account_no account_name contact_name reg_no email emails descriptions advice advice_text)
@@ -231,6 +247,505 @@ defmodule FullCircle.BankPayment do
       _ ->
         []
     end
+  end
+
+  # ── Eligibility ────────────────────────────────────
+
+  defp base_query(%Profile{} = profile, company) do
+    from(p in Payment,
+      join: c in assoc(p, :contact),
+      as: :contact,
+      where:
+        p.company_id == ^company.id and p.funds_account_id == ^profile.account_id and
+          p.payment_date >= ^profile.start_date and p.funds_amount > 0
+    )
+  end
+
+  defp live_payment_ids, do: from(l in BatchLine, where: l.live, select: l.payment_id)
+  defp dismissed_payment_ids, do: from(d in Dismissal, select: d.payment_id)
+
+  defp eligible_query(profile, company) do
+    from(p in base_query(profile, company),
+      where:
+        p.id not in subquery(live_payment_ids()) and p.id not in subquery(dismissed_payment_ids())
+    )
+  end
+
+  def eligible_payments(%Profile{} = profile, company) do
+    since = DateTime.add(DateTime.utc_now(), -@recent_change_days * 86_400, :second)
+
+    rows =
+      from([p, contact: c] in eligible_query(profile, company),
+        order_by: [desc: p.payment_date, desc: p.payment_no],
+        select: %{
+          id: p.id,
+          payment_no: p.payment_no,
+          payment_date: p.payment_date,
+          amount: p.funds_amount,
+          contact_name: c.name,
+          bank_code: c.bank_code,
+          account_no: c.bank_account_no,
+          account_name: c.bank_account_name,
+          changed_at: c.bank_details_changed_at
+        }
+      )
+      |> Repo.all()
+
+    reasons = last_bank_reasons(Enum.map(rows, & &1.id))
+
+    Enum.map(rows, fn r ->
+      Map.merge(r, %{
+        bank_name: Banks.name(r.bank_code),
+        has_bank:
+          not is_nil(r.bank_code) and not is_nil(r.account_no) and not is_nil(r.account_name),
+        recent_change: not is_nil(r.changed_at) and DateTime.compare(r.changed_at, since) == :gt,
+        last_reason: Map.get(reasons, r.id)
+      })
+    end)
+  end
+
+  defp last_bank_reasons(ids) do
+    from(l in BatchLine,
+      where: l.payment_id in ^ids and l.status == "rejected",
+      order_by: l.record_no,
+      select: {l.payment_id, l.bank_reason}
+    )
+    |> Repo.all()
+    |> Map.new()
+  end
+
+  # ── Batch creation ─────────────────────────────────
+
+  def create_batches(profile_id, payment_ids, %Date{} = payment_date, company, user, opts \\ []) do
+    with true <- can?(user, :create_bank_payment_batch, company) || :not_authorise,
+         %Profile{} = profile <-
+           get_profile(profile_id, company) || {:error, "bank payment profile not found"},
+         :ok <- check_payment_date(payment_date, company),
+         %FileFormat{} = format <-
+           effective_format(company.id, profile.format_code, today(company)) ||
+             {:error, "no bank file format '#{profile.format_code}' in force today"},
+         :ok <- check_profile(format.spec, profile),
+         {:ok, payments} <- load_selected(profile, payment_ids, company),
+         :ok <- preflight(payments),
+         :ok <- if(opts[:force], do: :ok, else: no_duplicates(payments, company)) do
+      do_create(profile, format, Enum.map(payments, & &1.id), payment_date, company, user)
+    end
+  end
+
+  defp check_payment_date(date, company) do
+    first = today(company)
+    last = Date.add(first, @max_days_ahead)
+
+    if Date.compare(date, first) != :lt and Date.compare(date, last) != :gt,
+      do: :ok,
+      else: {:error, "payment date must be between #{first} and #{last}"}
+  end
+
+  defp check_profile(spec, profile) do
+    case missing_params(spec, profile) ++ our_account_errors(spec, profile) do
+      [] -> :ok
+      problems -> {:error, "the bank payment profile needs fixing: " <> Enum.join(problems, "; ")}
+    end
+  end
+
+  defp load_selected(profile, payment_ids, company) do
+    ids = payment_ids |> List.wrap() |> Enum.uniq()
+
+    payments =
+      from(p in base_query(profile, company), where: p.id in ^ids, preload: ^@preload)
+      |> Repo.all()
+
+    cond do
+      ids == [] ->
+        {:error, "tick at least one payment"}
+
+      length(payments) != length(ids) ->
+        {:error, "some ticked payments are not eligible for this bank account"}
+
+      true ->
+        {:ok, Enum.sort_by(payments, &{&1.payment_date, &1.payment_no})}
+    end
+  end
+
+  defp preflight(payments) do
+    ids = Enum.map(payments, & &1.id)
+
+    live =
+      MapSet.new(
+        Repo.all(
+          from(l in BatchLine, where: l.live and l.payment_id in ^ids, select: l.payment_id)
+        )
+      )
+
+    dismissed =
+      MapSet.new(
+        Repo.all(from(d in Dismissal, where: d.payment_id in ^ids, select: d.payment_id))
+      )
+
+    errors =
+      Enum.flat_map(payments, fn p ->
+        c = p.contact
+        bank = Banks.get(c.bank_code)
+
+        cond do
+          MapSet.member?(live, p.id) ->
+            ["#{p.payment_no}: already in a bank batch"]
+
+          MapSet.member?(dismissed, p.id) ->
+            ["#{p.payment_no}: marked paid outside file"]
+
+          is_nil(c.bank_code) or is_nil(c.bank_account_no) or is_nil(c.bank_account_name) ->
+            ["#{p.payment_no}: #{c.name} has no bank details"]
+
+          is_nil(bank) or String.length(c.bank_account_no) not in bank.lengths ->
+            ["#{p.payment_no}: #{c.name}'s account number does not suit #{c.bank_code}"]
+
+          not Decimal.equal?(p.funds_amount, Decimal.round(p.funds_amount, 2)) ->
+            ["#{p.payment_no}: amount #{p.funds_amount} has more than 2 decimal places"]
+
+          true ->
+            []
+        end
+      end)
+
+    if errors == [], do: :ok, else: {:error, errors}
+  end
+
+  defp no_duplicates(payments, company) do
+    since = DateTime.add(DateTime.utc_now(), -@duplicate_days * 86_400, :second)
+    ids = Enum.map(payments, & &1.id)
+
+    existing =
+      from(l in BatchLine,
+        join: b in Batch,
+        on: b.id == l.batch_id,
+        join: p in Payment,
+        on: p.id == l.payment_id,
+        where:
+          b.company_id == ^company.id and l.live and b.inserted_at >= ^since and
+            l.payment_id not in ^ids,
+        select: {p.contact_id, l.amount, l.payment_no, b.filename}
+      )
+      |> Repo.all()
+
+    in_files =
+      for p <- payments,
+          {cid, amt, no, file} <- existing,
+          cid == p.contact_id and Decimal.equal?(amt, p.funds_amount) do
+        "#{p.payment_no}: #{p.contact.name} #{p.funds_amount} looks like #{no} already in #{file}"
+      end
+
+    within =
+      payments
+      |> Enum.group_by(&{&1.contact_id, Decimal.normalize(&1.funds_amount)})
+      |> Enum.filter(fn {_, ps} -> length(ps) > 1 end)
+      |> Enum.map(fn {_, ps} ->
+        "#{Enum.map_join(ps, ", ", & &1.payment_no)}: same supplier and amount in this selection"
+      end)
+
+    case in_files ++ within do
+      [] -> :ok
+      msgs -> {:duplicates, msgs}
+    end
+  end
+
+  defp do_create(profile, format, ids, payment_date, company, user) do
+    Repo.transaction(fn ->
+      # Serialises batch creation per profile so sequence numbers never collide.
+      Repo.one!(from(p in Profile, where: p.id == ^profile.id, lock: "FOR UPDATE", select: p.id))
+      # Any open Payment form now saves stale instead of changing the amount.
+      Repo.update_all(from(p in Payment, where: p.id in ^ids), inc: [lock_version: 1])
+
+      payments =
+        with {:ok, ps} <- load_selected(profile, ids, company),
+             :ok <- preflight(ps) do
+          ps
+        else
+          {:error, e} -> Repo.rollback(e)
+        end
+
+      base = header_ctx(profile, company, payment_date)
+
+      stem =
+        filename!(fn -> FileSpec.filename(format.spec, base, nil) end) ||
+          "#{format.code}_#{Calendar.strftime(payment_date, "%Y%m%d")}_"
+
+      first = next_seq(company.id, stem)
+
+      payments
+      |> Enum.chunk_every(FileSpec.max_rows(format.spec) || length(payments))
+      |> Enum.with_index(first)
+      |> Enum.map(fn {chunk, seq} ->
+        insert_batch!(profile, format, chunk, base, stem, seq, payment_date, company, user)
+      end)
+    end)
+  end
+
+  defp header_ctx(profile, company, payment_date) do
+    profile.params
+    |> Kernel.||(%{})
+    |> Map.drop(reserved_variables())
+    |> Map.merge(%{
+      "our_account_no" => profile.our_account_no,
+      "payment_date" => payment_date,
+      "today" => today(company),
+      "company_name" => company.name
+    })
+  end
+
+  defp filename!(fun) do
+    fun.()
+  rescue
+    e in ArgumentError -> Repo.rollback(Exception.message(e))
+  end
+
+  # Voided batches count: banks refuse a filename that was already uploaded.
+  defp next_seq(company_id, stem) do
+    (Repo.one(
+       from(b in Batch,
+         where: b.company_id == ^company_id and b.filename_stem == ^stem,
+         select: max(b.seq)
+       )
+     ) || 0) + 1
+  end
+
+  defp batch_no(company, seq),
+    do: Calendar.strftime(today(company), "%Y%m%d") <> String.pad_leading("#{seq}", 3, "0")
+
+  defp insert_batch!(profile, format, chunk, base, stem, seq, payment_date, company, user) do
+    header = base |> Map.put("seq", seq) |> Map.put("batch_no", batch_no(company, seq))
+
+    filename =
+      filename!(fn -> FileSpec.filename(format.spec, base, seq) end) ||
+        "#{stem}#{seq}.#{FileSpec.extension(format.spec)}"
+
+    total = Enum.reduce(chunk, Decimal.new(0), &Decimal.add(&1.funds_amount, &2))
+
+    batch =
+      %Batch{}
+      |> Batch.changeset(%{
+        company_id: company.id,
+        profile_id: profile.id,
+        format_id: format.id,
+        spec: format.spec,
+        payment_date: payment_date,
+        filename_stem: stem,
+        filename: filename,
+        seq: seq,
+        header: dump_header(header),
+        count: length(chunk),
+        total: total,
+        created_by_id: user.id
+      })
+      |> Repo.insert()
+      |> case do
+        {:ok, b} -> b
+        {:error, _} -> Repo.rollback("file #{filename} already exists; try again")
+      end
+
+    lines =
+      Enum.map(chunk, fn p ->
+        attrs =
+          p
+          |> Rows.line_attrs()
+          |> Map.merge(%{batch_id: batch.id, payment_id: p.id, record_no: next_record_no()})
+
+        case %BatchLine{} |> BatchLine.changeset(attrs) |> Repo.insert() do
+          {:ok, l} ->
+            l
+
+          {:error, cs} ->
+            if Keyword.has_key?(cs.errors, :payment_id),
+              do: Repo.rollback("#{p.payment_no} was just batched by someone else"),
+              else:
+                Repo.rollback(
+                  "#{p.payment_no}: " <>
+                    Enum.map_join(cs.errors, "; ", fn {f, {m, _}} -> "#{f} #{m}" end)
+                )
+        end
+      end)
+
+    case render_file(format.spec, Enum.map(lines, &Rows.to_row/1), header) do
+      {:ok, _} -> :ok
+      {:error, msg} -> Repo.rollback(msg)
+    end
+
+    Repo.insert!(
+      Sys.log_changeset(
+        :create_bank_payment_batch,
+        batch,
+        %{
+          "filename" => filename,
+          "count" => "#{batch.count}",
+          "total" => Decimal.to_string(total)
+        },
+        company,
+        user
+      )
+    )
+
+    batch
+  end
+
+  defp next_record_no do
+    %{rows: [[n]]} = Repo.query!("SELECT nextval('bank_payment_record_seq')")
+    n
+  end
+
+  defp dump_header(header) do
+    Map.new(header, fn
+      {k, %Date{} = d} -> {k, Date.to_iso8601(d)}
+      kv -> kv
+    end)
+  end
+
+  defp load_header(header) do
+    Enum.reduce(["payment_date", "today"], header, fn k, acc ->
+      Map.update(acc, k, nil, &Date.from_iso8601!/1)
+    end)
+  end
+
+  # ── Listing and downloads ──────────────────────────
+
+  defp get_batch(id, company) do
+    case Ecto.UUID.cast(id || "") do
+      {:ok, uuid} -> Repo.get_by(Batch, id: uuid, company_id: company.id)
+      :error -> nil
+    end
+  end
+
+  def list_batches(company) do
+    from(b in Batch,
+      where: b.company_id == ^company.id,
+      order_by: [desc: b.inserted_at, desc: b.seq],
+      limit: 50,
+      preload: [:created_by]
+    )
+    |> Repo.all()
+  end
+
+  def downloads_by_batch(ids) do
+    from(d in Download, where: d.batch_id in ^ids, order_by: d.inserted_at, preload: [:user])
+    |> Repo.all()
+    |> Enum.group_by(& &1.batch_id)
+  end
+
+  @doc """
+  Rebuilds each batch's file from its saved lines, header and spec, logging the
+  download. A batch already downloaded needs a reason; after submission only an
+  admin may download again; voided batches never.
+  """
+  def download_files(ids, reason, company, user) do
+    reason = String.trim(reason || "")
+
+    with true <- can?(user, :create_bank_payment_batch, company) || :not_authorise do
+      Repo.transaction(fn ->
+        Enum.map(List.wrap(ids), fn id ->
+          case download_one(id, reason, company, user) do
+            {:ok, file} -> file
+            {:error, msg} -> Repo.rollback(msg)
+          end
+        end)
+      end)
+    end
+  end
+
+  defp download_one(id, reason, company, user) do
+    with %Batch{} = batch <- get_batch(id, company) || {:error, "batch not found"},
+         :ok <- may_download(batch, reason, company, user),
+         {:ok, file} <- batch_file(batch) do
+      Repo.insert!(
+        Download.changeset(%Download{}, %{
+          batch_id: batch.id,
+          user_id: user.id,
+          reason: if(reason == "", do: nil, else: reason)
+        })
+      )
+
+      Repo.insert!(
+        Sys.log_changeset(
+          :download_bank_payment_batch,
+          batch,
+          %{"filename" => batch.filename, "reason" => reason},
+          company,
+          user
+        )
+      )
+
+      {:ok, file}
+    end
+  end
+
+  defp may_download(%Batch{status: "voided", filename: f}, _reason, _company, _user),
+    do: {:error, "#{f} is voided and cannot be downloaded; its payments may be in a newer file"}
+
+  defp may_download(batch, reason, company, user) do
+    cond do
+      not Repo.exists?(from(d in Download, where: d.batch_id == ^batch.id)) ->
+        :ok
+
+      reason == "" ->
+        {:error, "a reason is needed to download #{batch.filename} again"}
+
+      batch.status != "exported" and not can?(user, :admin_bank_payment_batch, company) ->
+        {:error,
+         "#{batch.filename} was submitted to the bank; only an admin can download it again"}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp batch_file(batch) do
+    lines = Repo.all(from(l in BatchLine, where: l.batch_id == ^batch.id, order_by: l.record_no))
+
+    case render_file(batch.spec, Enum.map(lines, &Rows.to_row/1), load_header(batch.header)) do
+      {:ok, text} -> {:ok, {batch.filename, text}}
+      {:error, msg} -> {:error, msg}
+    end
+  end
+
+  def zip(files) do
+    entries = Enum.map(files, fn {name, text} -> {String.to_charlist(name), text} end)
+    {:ok, {_name, bin}} = :zip.create(~c"bank_batches.zip", entries, [:memory])
+    {:ok, bin}
+  end
+
+  @doc "Renders `spec` (saved or not) against up to 10 currently eligible payments with bank details."
+  def preview(spec, %Profile{} = profile, company) do
+    rows =
+      from([p, contact: c] in eligible_query(profile, company),
+        where:
+          not is_nil(c.bank_code) and not is_nil(c.bank_account_no) and
+            not is_nil(c.bank_account_name),
+        order_by: [desc: p.payment_date],
+        limit: 10,
+        preload: ^@preload
+      )
+      |> Repo.all()
+      |> Enum.with_index(1)
+      |> Enum.map(fn {p, i} ->
+        p |> Rows.line_attrs() |> Map.put(:record_no, i) |> Rows.to_row()
+      end)
+
+    header =
+      profile
+      |> header_ctx(company, today(company))
+      |> Map.merge(%{"seq" => 1, "batch_no" => batch_no(company, 1)})
+
+    render_file(spec, rows, header)
+  end
+
+  # ── Payment lock ───────────────────────────────────
+
+  def live_batch_filename(payment_id) do
+    from(l in BatchLine,
+      join: b in Batch,
+      on: b.id == l.batch_id,
+      where: l.payment_id == ^payment_id and l.live,
+      select: b.filename
+    )
+    |> Repo.one()
   end
 
   defp stringify(attrs), do: Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
