@@ -16,6 +16,17 @@ defmodule FullCircleWeb.ContactLive.Form do
         :edit -> mount_edit(socket, id)
       end
 
+    socket =
+      assign(
+        socket,
+        :can_bank,
+        FullCircle.Authorization.can?(
+          socket.assigns.current_user,
+          :manage_contact_bank,
+          socket.assigns.current_company
+        )
+      )
+
     {:ok, socket}
   end
 
@@ -277,6 +288,14 @@ defmodule FullCircleWeb.ContactLive.Form do
           />
         </div>
       </.form>
+      <.live_component
+        :if={@live_action == :edit and @can_bank}
+        module={FullCircleWeb.ContactLive.BankComponent}
+        id="contact-bank"
+        contact={@form.data}
+        current_company={@current_company}
+        current_user={@current_user}
+      />
     </div>
     <FullCircleWeb.RecordAside.record_aside
       :if={@live_action == :edit and @id != "new"}
