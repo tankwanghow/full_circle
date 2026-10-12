@@ -79,7 +79,8 @@ defmodule FullCircleWeb.StatutoryFileFormatLiveTest do
     html = lv |> element("button", "Preview") |> render_click()
 
     refute html =~ "unknown identifier"
-    assert html =~ "Member No,Name"
+    # <pre> keeps whitespace: the first line must start right after the tag.
+    assert html =~ ~r/<pre[^>]*>Member No,Name/
   end
 
   test "saving over an existing version asks to confirm, replace updates in place", %{

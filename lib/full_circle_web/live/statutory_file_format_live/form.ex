@@ -316,9 +316,7 @@ defmodule FullCircleWeb.StatutoryFileFormatLive.Form do
           <pre
             :if={@preview_lines}
             class="mt-2 font-mono text-xs overflow-x-auto bg-gray-100 dark:bg-gray-900 p-2 rounded"
-          >
-            {Enum.join(@preview_lines, "\n")}
-          </pre>
+          >{Enum.join(@preview_lines, "\n")}</pre>
         </div>
 
         <div
