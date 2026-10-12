@@ -28,12 +28,12 @@ defmodule FullCircle.BankPayment.Result do
           ["result: detail needs identifier and positions"]
       end
 
-    success =
-      if is_list(r["success"]) and r["success"] != [] and Enum.all?(r["success"], &is_binary/1),
-        do: [],
-        else: ["result: success must list the success status codes"]
+    codes =
+      for key <- ["success", "failure"],
+          not (is_list(r[key]) and r[key] != [] and Enum.all?(r[key], &is_binary/1)),
+          do: "result: #{key} must list the #{key} status codes"
 
-    header ++ detail ++ success
+    header ++ detail ++ codes
   end
 
   def validate(_), do: ["result: layout must be \"fixed\""]
@@ -77,24 +77,32 @@ defmodule FullCircle.BankPayment.Result do
       amount: amount(slice(line, d["amount"]), r["amount_in_cents"]),
       status: status,
       success: status in r["success"],
+      failed: status in (r["failure"] || []),
       reason: line |> slice(d["reason"]) |> String.trim()
     }
   end
 
   defp slice(line, [from, len]), do: String.slice(line, from - 1, len) || ""
 
+  # nil when the amount can't be read; the import reports it.
   defp amount(text, cents?) do
-    digits = String.replace(text, ~r/[^0-9.]/, "")
+    text = String.trim(text)
 
     cond do
-      digits == "" ->
-        Decimal.new(0)
+      text == "" ->
+        nil
 
       cents? ->
-        digits |> String.to_integer() |> Decimal.new() |> Decimal.div(100) |> Decimal.round(2)
+        case Integer.parse(text) do
+          {n, ""} -> n |> Decimal.new() |> Decimal.div(100) |> Decimal.round(2)
+          _ -> nil
+        end
 
       true ->
-        Decimal.new(digits)
+        case Decimal.parse(text) do
+          {d, ""} -> d
+          _ -> nil
+        end
     end
   end
 

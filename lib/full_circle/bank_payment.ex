@@ -89,7 +89,18 @@ defmodule FullCircle.BankPayment do
           ["params must be a list of names"]
       end
 
-    digits ++ params ++ Result.validate(Map.get(spec, "result"))
+    shadows =
+      case Map.get(spec, "computed") do
+        m when is_map(m) ->
+          for name <- Map.keys(m),
+              name in reserved_variables(),
+              do: "computed #{name}: shadows a built-in variable"
+
+        _ ->
+          []
+      end
+
+    digits ++ params ++ shadows ++ Result.validate(Map.get(spec, "result"))
   end
 
   @doc "Renders a bank spec against FileSpec rows and a header context."
@@ -777,73 +788,95 @@ defmodule FullCircle.BankPayment do
 
   def mark_submitted(batch_id, company, user) do
     with true <- can?(user, :create_bank_payment_batch, company) || :not_authorise,
-         %Batch{status: "exported"} = batch <-
-           get_batch(batch_id, company) || {:error, "batch not found"} do
-      Multi.new()
-      |> Multi.update(
-        :submit_bank_payment_batch,
-        Batch.submit_changeset(batch, %{submitted_by_id: user.id, submitted_at: now()})
-      )
-      |> Sys.insert_log_for(
-        :submit_bank_payment_batch,
-        %{"filename" => batch.filename},
-        company,
-        user
-      )
-      |> Repo.transaction()
-      |> case do
-        {:ok, %{submit_bank_payment_batch: b}} -> {:ok, b}
-        {:error, _, cs, _} -> {:error, cs}
-      end
-    else
-      %Batch{} -> {:error, "only an exported batch can be marked submitted"}
-      other -> other
+         %Batch{} = batch <- get_batch(batch_id, company) || {:error, "batch not found"} do
+      Repo.transaction(fn ->
+        batch = lock_batch!(batch.id)
+
+        if batch.status != "exported",
+          do: Repo.rollback("only an exported batch can be marked submitted")
+
+        b =
+          batch
+          |> Batch.submit_changeset(%{submitted_by_id: user.id, submitted_at: now()})
+          |> Repo.update!()
+
+        Repo.insert!(
+          Sys.log_changeset(
+            :submit_bank_payment_batch,
+            b,
+            %{"filename" => b.filename},
+            company,
+            user
+          )
+        )
+
+        b
+      end)
     end
   end
+
+  # Every status-changing action locks the batch row and re-checks the rule on
+  # the locked row, so two users (or a result import) can't interleave.
+  defp lock_batch!(id), do: Repo.one!(from(b in Batch, where: b.id == ^id, lock: "FOR UPDATE"))
 
   def void_batch(batch_id, reason, company, user) do
     reason = String.trim(reason || "")
 
     with true <- can?(user, :create_bank_payment_batch, company) || :not_authorise,
          %Batch{} = batch <- get_batch(batch_id, company) || {:error, "batch not found"},
-         :ok <- may_void(batch, company, user),
          true <- reason != "" || {:error, "a reason is required to void a batch"} do
-      Multi.new()
-      |> Multi.update(
-        :void_bank_payment_batch,
-        Batch.void_changeset(batch, %{
-          void_reason: reason,
-          voided_by_id: user.id,
-          voided_at: now()
-        })
-      )
-      |> Multi.update_all(:free_lines, from(l in BatchLine, where: l.batch_id == ^batch.id),
-        set: [live: false]
-      )
-      |> Sys.insert_log_for(
-        :void_bank_payment_batch,
-        %{"reason" => reason, "filename" => batch.filename},
-        company,
-        user
-      )
-      |> Repo.transaction()
-      |> case do
-        {:ok, %{void_bank_payment_batch: b}} -> {:ok, b}
-        {:error, _, cs, _} -> {:error, cs}
-      end
+      Repo.transaction(fn ->
+        batch = lock_batch!(batch.id)
+
+        case may_void(batch, company, user) do
+          :ok -> :ok
+          {:error, msg} -> Repo.rollback(msg)
+        end
+
+        b =
+          batch
+          |> Batch.void_changeset(%{void_reason: reason, voided_by_id: user.id, voided_at: now()})
+          |> Repo.update!()
+
+        # A line the bank confirmed paid stays live whatever happens.
+        Repo.update_all(
+          from(l in BatchLine, where: l.batch_id == ^batch.id and l.status != "paid"),
+          set: [live: false]
+        )
+
+        Repo.insert!(
+          Sys.log_changeset(
+            :void_bank_payment_batch,
+            b,
+            %{"reason" => reason, "filename" => b.filename},
+            company,
+            user
+          )
+        )
+
+        b
+      end)
     end
-  end
-
-  defp may_void(%Batch{status: "exported"}, _company, _user), do: :ok
-
-  defp may_void(%Batch{status: "submitted"}, company, user) do
-    if can?(user, :admin_bank_payment_batch, company),
-      do: :ok,
-      else: {:error, "this batch was submitted to the bank; only an admin can void it"}
   end
 
   defp may_void(%Batch{status: "voided"}, _company, _user),
     do: {:error, "batch is already voided"}
+
+  defp may_void(%Batch{status: s} = batch, company, user) when s in ["exported", "submitted"] do
+    cond do
+      batch.result_imported_at != nil or
+          Repo.exists?(
+            from(l in BatchLine, where: l.batch_id == ^batch.id and l.status == "paid")
+          ) ->
+        {:error, "this batch has a bank result; release single lines instead"}
+
+      s == "submitted" and not can?(user, :admin_bank_payment_batch, company) ->
+        {:error, "this batch was submitted to the bank; only an admin can void it"}
+
+      true ->
+        :ok
+    end
+  end
 
   defp may_void(_batch, _company, _user),
     do: {:error, "this batch has a bank result; release single lines instead"}
@@ -861,12 +894,19 @@ defmodule FullCircle.BankPayment do
     with true <- can?(user, action, company) || :not_authorise,
          {%BatchLine{} = line, %Batch{} = batch} <-
            get_line(line_id, company) || {:error, "line not found"},
-         :ok <- may_resolve(kind, line, batch),
          true <- reason != "" || {:error, "a reason is required"} do
       log_name =
         if kind == :release, do: :release_bank_payment_line, else: :return_bank_payment_line
 
       Repo.transaction(fn ->
+        batch = lock_batch!(batch.id)
+        line = Repo.get!(BatchLine, line.id)
+
+        case may_resolve(kind, line, batch) do
+          :ok -> :ok
+          {:error, msg} -> Repo.rollback(msg)
+        end
+
         line =
           line
           |> BatchLine.resolve_changeset(%{
@@ -949,32 +989,40 @@ defmodule FullCircle.BankPayment do
 
   def dismiss_payment(payment_id, note, company, user) do
     with true <- can?(user, :create_bank_payment_batch, company) || :not_authorise,
-         %Payment{} = p <- get_payment(payment_id, company) || {:error, "payment not found"},
-         nil <- live_batch_filename(p.id) do
-      Multi.new()
-      |> Multi.insert(
-        :dismiss_bank_payment,
-        Dismissal.changeset(%Dismissal{}, %{
-          company_id: company.id,
-          payment_id: p.id,
-          user_id: user.id,
-          note: note
-        })
-      )
-      |> Sys.insert_log_for(
-        :dismiss_bank_payment,
-        %{"payment_no" => p.payment_no, "note" => note || ""},
-        company,
-        user
-      )
-      |> Repo.transaction()
-      |> case do
-        {:ok, %{dismiss_bank_payment: d}} -> {:ok, d}
-        {:error, _, cs, _} -> {:error, cs}
-      end
-    else
-      filename when is_binary(filename) -> {:error, "this payment is in bank batch #{filename}"}
-      other -> other
+         %Payment{} = p <- get_payment(payment_id, company) || {:error, "payment not found"} do
+      Repo.transaction(fn ->
+        # Batch creation locks the same Payment rows, so the two run one after the other.
+        Repo.one!(from(x in Payment, where: x.id == ^p.id, lock: "FOR UPDATE", select: x.id))
+
+        if filename = live_batch_filename(p.id),
+          do: Repo.rollback("this payment is in bank batch #{filename}")
+
+        d =
+          %Dismissal{}
+          |> Dismissal.changeset(%{
+            company_id: company.id,
+            payment_id: p.id,
+            user_id: user.id,
+            note: note
+          })
+          |> Repo.insert()
+          |> case do
+            {:ok, d} -> d
+            {:error, cs} -> Repo.rollback(cs)
+          end
+
+        Repo.insert!(
+          Sys.log_changeset(
+            :dismiss_bank_payment,
+            d,
+            %{"payment_no" => p.payment_no, "note" => note || ""},
+            company,
+            user
+          )
+        )
+
+        d
+      end)
     end
   end
 
@@ -1048,6 +1096,53 @@ defmodule FullCircle.BankPayment do
     end)
   end
 
+  defp apply_result_line(r, line, acc) do
+    cond do
+      is_nil(r.amount) ->
+        %{acc | mismatched: acc.mismatched ++ ["#{line.payment_no}: bank amount unreadable"]}
+
+      not Decimal.equal?(r.amount, line.amount) ->
+        note = "#{line.payment_no}: bank #{r.amount}, file #{line.amount}"
+        %{acc | mismatched: acc.mismatched ++ [note]}
+
+      # A status that is neither a success nor a failure code (blank,
+      # "processing", garbled) changes nothing.
+      not r.success and not r.failed ->
+        note = "#{line.payment_no}: status '#{r.status}' not recognised"
+        %{acc | unrecognised: acc.unrecognised ++ [note]}
+
+      true ->
+        target = if r.success, do: "paid", else: "rejected"
+
+        cond do
+          line.status == target ->
+            %{acc | seen: MapSet.put(acc.seen, line.record_no)}
+
+          line.status == "pending" ->
+            attrs =
+              if r.success,
+                do: %{status: "paid"},
+                else: %{status: "rejected", live: false, bank_reason: r.reason}
+
+            line |> BatchLine.resolve_changeset(attrs) |> Repo.update!()
+            key = if r.success, do: :paid, else: :rejected
+
+            acc
+            |> Map.update!(key, &(&1 ++ [line.payment_no]))
+            |> Map.update!(:seen, &MapSet.put(&1, line.record_no))
+
+          true ->
+            note = "#{line.payment_no}: bank says #{target}, already #{line.status}"
+
+            %{
+              acc
+              | conflicts: acc.conflicts ++ [note],
+                seen: MapSet.put(acc.seen, line.record_no)
+            }
+        end
+    end
+  end
+
   defp apply_result(batch, parsed, company, user) do
     Repo.transaction(fn ->
       batch = Repo.one!(from(b in Batch, where: b.id == ^batch.id, lock: "FOR UPDATE"))
@@ -1062,50 +1157,29 @@ defmodule FullCircle.BankPayment do
         unmatched: [],
         mismatched: [],
         conflicts: [],
-        seen: MapSet.new()
+        unrecognised: [],
+        seen: MapSet.new(),
+        in_file: MapSet.new()
       }
 
       report =
         Enum.reduce(parsed.lines, empty, fn r, acc ->
           line = Map.get(lines, r.record_no)
-          target = if r.success, do: "paid", else: "rejected"
 
           cond do
             is_nil(line) ->
               %{acc | unmatched: acc.unmatched ++ [r.record_id]}
 
-            not Decimal.equal?(r.amount, line.amount) ->
-              %{
-                acc
-                | mismatched:
-                    acc.mismatched ++
-                      ["#{line.payment_no}: bank #{r.amount}, file #{line.amount}"]
-              }
+            # Only the first result line for a record counts; a repeat could
+            # otherwise flip a paid line back to rejected.
+            MapSet.member?(acc.in_file, line.record_no) ->
+              note =
+                "#{line.payment_no}: appears twice in the result file; only the first was used"
 
-            line.status == target ->
-              %{acc | seen: MapSet.put(acc.seen, line.record_no)}
-
-            line.status == "pending" ->
-              attrs =
-                if r.success,
-                  do: %{status: "paid"},
-                  else: %{status: "rejected", live: false, bank_reason: r.reason}
-
-              line |> BatchLine.resolve_changeset(attrs) |> Repo.update!()
-              key = if r.success, do: :paid, else: :rejected
-
-              acc
-              |> Map.update!(key, &(&1 ++ [line.payment_no]))
-              |> Map.update!(:seen, &MapSet.put(&1, line.record_no))
+              %{acc | conflicts: acc.conflicts ++ [note]}
 
             true ->
-              %{
-                acc
-                | conflicts:
-                    acc.conflicts ++
-                      ["#{line.payment_no}: bank says #{target}, already #{line.status}"],
-                  seen: MapSet.put(acc.seen, line.record_no)
-              }
+              apply_result_line(r, line, %{acc | in_file: MapSet.put(acc.in_file, line.record_no)})
           end
         end)
 
@@ -1140,7 +1214,7 @@ defmodule FullCircle.BankPayment do
         )
       )
 
-      report |> Map.delete(:seen) |> Map.merge(%{batch: batch, missing: missing})
+      report |> Map.drop([:seen, :in_file]) |> Map.merge(%{batch: batch, missing: missing})
     end)
   end
 

@@ -15,7 +15,8 @@
       "header": {"identifier": "H", "filename": [10, 23]},
       "detail": {"identifier": "D", "record_id": [2, 16], "amount": [201, 18], "status": [259, 2], "reason": [261, 40]},
       "amount_in_cents": true,
-      "success": ["01"]
+      "success": ["01"],
+      "failure": ["02"]
     },
     "sections": [
       {
