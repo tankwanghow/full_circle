@@ -119,10 +119,10 @@ defmodule FullCircleWeb.EggStockLive.ProductionReport do
     %{quantities: avg_by_grade, total: avg_total, overall_total: total_sum}
   end
 
-  defp pct(_v, 0), do: "0.00%"
+  defp pct(_v, 0), do: "0.0%"
 
   defp pct(v, total) do
-    (v / total * 100) |> Number.Percentage.number_to_percentage(precision: 2)
+    (v / total * 100) |> Number.Percentage.number_to_percentage(precision: 1)
   end
 
   defp fmt(v), do: Number.Delimit.number_to_delimited(v, precision: 0)
@@ -397,7 +397,7 @@ defmodule FullCircleWeb.EggStockLive.ProductionReport do
                 r="3"
                 fill={s.color}
               >
-                <title>{"#{s.name} @ #{lbl}: #{fmt(qty)} (#{Float.round(y, 2)}%)"}</title>
+                <title>{"#{s.name} @ #{lbl}: #{fmt(qty)} (#{Float.round(y, 1)}%)"}</title>
               </circle>
             <% end %>
           <% end %>
