@@ -88,7 +88,11 @@ Save-time validation rejects parse errors, unknown identifiers/tables, missing `
 
 ## Effective-date semantics
 
-- For pay month M / year Y, the engine uses the calc/table/format version where `effective_from <= end_of_month(Y, M)` and is the latest such version per `code`.
+- For pay month M / year Y, the engine uses the calc/table version where `effective_from <= end_of_month(Y, M)` and is the latest such version per `code`.
+- **File formats are the exception:** `render_file` picks the latest version with
+  `effective_from <= today` (download day), whatever the pay month — agencies
+  accept uploads, even for past months, only in their current layout. A
+  future-dated version waits for its date.
 - New rates take effect on the **first day** of the month in `effective_from` (or later if the circular says so).
 - Once a company has *any* version of a calc code, the registry owns it: pay
   periods **before the first effective version compute zero** (the line is
@@ -100,8 +104,8 @@ Save-time validation rejects parse errors, unknown identifiers/tables, missing `
   a bundle entry with the *same* `(code, effective_from)`, or use the calc
   form's **Replace this version** button. Already-paid slips keep their old
   values until re-paid. The file-format form works the same way: Save always
-  inserts a new version (Effective from defaults to *today*, so it only applies
-  from the current pay month on); saving onto an existing `(code, effective_from)`
+  inserts a new version (Effective from defaults to *today*, so it is used for
+  every download from today on); saving onto an existing `(code, effective_from)`
   offers **Replace this version**. Its Preview renders the spec in the text box
   (unsaved), and a month with no pay slips renders header/footer only.
 

@@ -403,5 +403,41 @@ defmodule FullCircle.StatutoryConfigTest do
 
       assert %{script: "result = 9"} = StatutoryConfig.effective_calc(com.id, "x", ~D[2026-06-30])
     end
+
+    test "render_file uses the newest format effective today, whatever the pay month",
+         %{com: com, user: user} do
+      header_spec = fn title ->
+        %{
+          "renderer" => "text",
+          "delimiter" => ",",
+          "sections" => [
+            %{"kind" => "header", "fields" => [%{"expr" => ~s|"#{title}"|}]},
+            %{
+              "kind" => "detail",
+              "source" => "statutory_rows",
+              "fields" => [%{"expr" => "name"}]
+            }
+          ]
+        }
+      end
+
+      today = Date.utc_today()
+
+      for {title, date} <- [
+            {"OLD", ~D[2001-01-01]},
+            {"NOW", today},
+            {"FUTURE", Date.add(today, 365)}
+          ] do
+        {:ok, _} =
+          StatutoryConfig.save_file_format(
+            %{code: "hdr_csv", name: "Hdr", effective_from: date, spec: header_spec.(title)},
+            com,
+            user
+          )
+      end
+
+      # A pay month long before the newest version still gets today's layout.
+      assert {:ok, {_, "NOW\r\n"}} = StatutoryConfig.render_file(com.id, "hdr_csv", 1, 2002, "")
+    end
   end
 end

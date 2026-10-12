@@ -113,8 +113,10 @@ defmodule FullCircle.StatutoryConfig do
     end
   end
 
+  # Uses the format in force on the download day, not in the pay month: an
+  # agency takes uploads, even for past months, only in its current layout.
   def render_file(company_id, code, month, year, employer_code) do
-    case effective_file_format(company_id, code, Timex.end_of_month(year, month)) do
+    case effective_file_format(company_id, code, Date.utc_today()) do
       nil ->
         {:error, "no file format '#{code}' configured"}
 
