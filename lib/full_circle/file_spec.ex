@@ -9,16 +9,25 @@ defmodule FullCircle.FileSpec do
   @default_line_ending "\r\n"
   @default_extension "txt"
   @section_kinds ~w(header detail footer)
+  @default_sources ["statutory_rows"]
 
   @doc """
   Validates a spec map. `variables` is the list of allowed PayScript identifiers
-  (detail-row keys plus header context keys).
+  (detail-row keys plus header context keys). `sources` lists the detail
+  `source` values the caller supplies rows for.
   """
-  def validate(spec, variables) when is_map(spec) and is_list(variables) do
+  def validate(spec, variables) when is_map(spec) and is_list(variables),
+    do: validate(spec, variables, @default_sources)
+
+  def validate(spec, variables, sources)
+      when is_map(spec) and is_list(variables) and is_list(sources) do
+    row_variables = Enum.uniq(variables ++ computed_names(spec))
+
     errors =
       []
       |> validate_top_level(spec)
-      |> validate_sections(spec, variables)
+      |> validate_computed(spec, variables)
+      |> validate_sections(spec, row_variables, sources)
 
     case errors do
       [] -> :ok
@@ -31,10 +40,13 @@ defmodule FullCircle.FileSpec do
   names identifiers that are valid even when no row carries them, so a month
   without pay slips still renders its header and footer.
   """
-  def render(spec, rows, header_ctx, variables \\ [])
-      when is_map(spec) and is_list(rows) and is_map(header_ctx) and is_list(variables) do
-    with :ok <- validate(spec, Enum.uniq(variables ++ detail_variables(rows, header_ctx))),
+  def render(spec, rows, header_ctx, variables \\ [], sources \\ @default_sources)
+      when is_map(spec) and is_list(rows) and is_map(header_ctx) and is_list(variables) and
+             is_list(sources) do
+    with :ok <-
+           validate(spec, Enum.uniq(variables ++ detail_variables(rows, header_ctx)), sources),
          {:ok, prepared} <- prepare_rows(rows, header_ctx),
+         {:ok, prepared} <- apply_computed(spec, prepared),
          {:ok, lines} <- render_sections(spec, prepared, header_ctx) do
       ending = line_ending(spec)
       text = Enum.join(lines, ending) <> ending
@@ -102,7 +114,7 @@ defmodule FullCircle.FileSpec do
     end
   end
 
-  defp validate_sections(errors, spec, variables) do
+  defp validate_sections(errors, spec, variables, sources) do
     case Map.get(spec, "sections") do
       sections when is_list(sections) and sections != [] ->
         delimiter = Map.get(spec, "delimiter")
@@ -111,7 +123,7 @@ defmodule FullCircle.FileSpec do
         |> Enum.with_index(1)
         |> Enum.reduce(errors, fn {section, idx}, acc ->
           acc
-          |> validate_section(section, idx, delimiter, variables)
+          |> validate_section(section, idx, delimiter, variables, sources)
         end)
 
       [] ->
@@ -122,7 +134,7 @@ defmodule FullCircle.FileSpec do
     end
   end
 
-  defp validate_section(errors, section, idx, delimiter, variables) do
+  defp validate_section(errors, section, idx, delimiter, variables, sources) do
     prefix = "section #{idx}"
 
     cond do
@@ -135,8 +147,12 @@ defmodule FullCircle.FileSpec do
       section["kind"] not in @section_kinds ->
         ["#{prefix}: kind must be one of #{inspect(@section_kinds)}" | errors]
 
-      section["kind"] == "detail" and section["source"] != "statutory_rows" ->
-        ["#{prefix}: detail section requires source \"statutory_rows\"" | errors]
+      section["kind"] == "detail" and section["source"] not in sources ->
+        [
+          "#{prefix}: detail section requires source " <>
+            Enum.map_join(sources, " or ", &inspect/1)
+          | errors
+        ]
 
       true ->
         allow_aggregates = section["kind"] in ["header", "footer"]
@@ -146,6 +162,63 @@ defmodule FullCircle.FileSpec do
         |> validate_sort(section, prefix)
         |> validate_fields(section, prefix, delimiter, variables, allow_aggregates)
     end
+  end
+
+  defp computed_names(spec) do
+    case Map.get(spec, "computed") do
+      m when is_map(m) -> Map.keys(m)
+      _ -> []
+    end
+  end
+
+  defp validate_computed(errors, spec, variables) do
+    case Map.get(spec, "computed") do
+      nil ->
+        errors
+
+      m when is_map(m) ->
+        Enum.reduce(m, errors, fn
+          {name, expr}, acc when is_binary(expr) ->
+            case validate_expression(expr, variables, false) do
+              :ok -> acc
+              {:error, msgs} -> Enum.map(msgs, &"computed #{name}: #{&1}") ++ acc
+            end
+
+          {name, _}, acc ->
+            ["computed #{name}: expression must be a string" | acc]
+        end)
+
+      _ ->
+        ["computed must be a map of name => expression" | errors]
+    end
+  end
+
+  defp apply_computed(spec, rows) do
+    case Map.get(spec, "computed") do
+      m when is_map(m) and map_size(m) > 0 ->
+        try do
+          {:ok, Enum.map(rows, &compute_row(&1, m))}
+        rescue
+          e -> {:error, "computed: " <> Exception.message(e)}
+        catch
+          {:computed_error, msg} -> {:error, msg}
+        end
+
+      _ ->
+        {:ok, rows}
+    end
+  end
+
+  defp compute_row(row, computed) do
+    Enum.reduce(computed, row, fn {name, expr}, acc ->
+      case PayScript.eval_expression(expr, row, nil) do
+        {:ok, v} ->
+          Map.put(acc, name, v)
+
+        {:error, %Error{} = e} ->
+          throw({:computed_error, "computed #{name}: #{Exception.message(e)}"})
+      end
+    end)
   end
 
   defp validate_filter(errors, %{"filter" => filter}, prefix, variables, allow_aggregates)
