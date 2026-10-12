@@ -748,5 +748,262 @@ defmodule FullCircle.BankPayment do
     |> Repo.one()
   end
 
+  # ── Lifecycle ──────────────────────────────────────
+
+  defp now, do: DateTime.utc_now() |> DateTime.truncate(:second)
+
+  def batch_lines(batch_id, company) do
+    case get_batch(batch_id, company) do
+      nil -> []
+      b -> Repo.all(from(l in BatchLine, where: l.batch_id == ^b.id, order_by: l.record_no))
+    end
+  end
+
+  def mark_submitted(batch_id, company, user) do
+    with true <- can?(user, :create_bank_payment_batch, company) || :not_authorise,
+         %Batch{status: "exported"} = batch <-
+           get_batch(batch_id, company) || {:error, "batch not found"} do
+      Multi.new()
+      |> Multi.update(
+        :submit_bank_payment_batch,
+        Batch.submit_changeset(batch, %{submitted_by_id: user.id, submitted_at: now()})
+      )
+      |> Sys.insert_log_for(
+        :submit_bank_payment_batch,
+        %{"filename" => batch.filename},
+        company,
+        user
+      )
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{submit_bank_payment_batch: b}} -> {:ok, b}
+        {:error, _, cs, _} -> {:error, cs}
+      end
+    else
+      %Batch{} -> {:error, "only an exported batch can be marked submitted"}
+      other -> other
+    end
+  end
+
+  def void_batch(batch_id, reason, company, user) do
+    reason = String.trim(reason || "")
+
+    with true <- can?(user, :create_bank_payment_batch, company) || :not_authorise,
+         %Batch{} = batch <- get_batch(batch_id, company) || {:error, "batch not found"},
+         :ok <- may_void(batch, company, user),
+         true <- reason != "" || {:error, "a reason is required to void a batch"} do
+      Multi.new()
+      |> Multi.update(
+        :void_bank_payment_batch,
+        Batch.void_changeset(batch, %{
+          void_reason: reason,
+          voided_by_id: user.id,
+          voided_at: now()
+        })
+      )
+      |> Multi.update_all(:free_lines, from(l in BatchLine, where: l.batch_id == ^batch.id),
+        set: [live: false]
+      )
+      |> Sys.insert_log_for(
+        :void_bank_payment_batch,
+        %{"reason" => reason, "filename" => batch.filename},
+        company,
+        user
+      )
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{void_bank_payment_batch: b}} -> {:ok, b}
+        {:error, _, cs, _} -> {:error, cs}
+      end
+    end
+  end
+
+  defp may_void(%Batch{status: "exported"}, _company, _user), do: :ok
+
+  defp may_void(%Batch{status: "submitted"}, company, user) do
+    if can?(user, :admin_bank_payment_batch, company),
+      do: :ok,
+      else: {:error, "this batch was submitted to the bank; only an admin can void it"}
+  end
+
+  defp may_void(%Batch{status: "voided"}, _company, _user),
+    do: {:error, "batch is already voided"}
+
+  defp may_void(_batch, _company, _user),
+    do: {:error, "this batch has a bank result; release single lines instead"}
+
+  def release_line(line_id, reason, company, user),
+    do: resolve_line(line_id, reason, company, user, :release)
+
+  def return_line(line_id, reason, company, user),
+    do: resolve_line(line_id, reason, company, user, :return)
+
+  defp resolve_line(line_id, reason, company, user, kind) do
+    reason = String.trim(reason || "")
+    action = if kind == :release, do: :create_bank_payment_batch, else: :admin_bank_payment_batch
+
+    with true <- can?(user, action, company) || :not_authorise,
+         {%BatchLine{} = line, %Batch{} = batch} <-
+           get_line(line_id, company) || {:error, "line not found"},
+         :ok <- may_resolve(kind, line, batch),
+         true <- reason != "" || {:error, "a reason is required"} do
+      log_name =
+        if kind == :release, do: :release_bank_payment_line, else: :return_bank_payment_line
+
+      Repo.transaction(fn ->
+        line =
+          line
+          |> BatchLine.resolve_changeset(%{
+            status: "rejected",
+            live: false,
+            bank_reason: reason,
+            released_by_id: user.id,
+            released_at: now()
+          })
+          |> Repo.update!()
+
+        batch = refresh_batch_status!(batch)
+
+        Repo.insert!(
+          Sys.log_changeset(
+            log_name,
+            batch,
+            %{"payment_no" => line.payment_no, "reason" => reason},
+            company,
+            user
+          )
+        )
+
+        line
+      end)
+    end
+  end
+
+  defp may_resolve(:release, %BatchLine{status: "pending"}, %Batch{status: s})
+       when s in ["submitted", "partly_rejected"], do: :ok
+
+  defp may_resolve(:release, _line, _batch),
+    do: {:error, "only a pending line of a submitted batch can be released"}
+
+  defp may_resolve(:return, %BatchLine{status: "paid"}, %Batch{status: s})
+       when s in ["completed", "partly_rejected"], do: :ok
+
+  defp may_resolve(:return, _line, _batch),
+    do: {:error, "only a paid line of a completed batch can be marked returned"}
+
+  defp get_line(line_id, company) do
+    case Ecto.UUID.cast(line_id || "") do
+      {:ok, uuid} ->
+        from(l in BatchLine,
+          join: b in Batch,
+          on: b.id == l.batch_id,
+          where: l.id == ^uuid and b.company_id == ^company.id,
+          select: {l, b}
+        )
+        |> Repo.one()
+
+      :error ->
+        nil
+    end
+  end
+
+  defp refresh_batch_status!(%Batch{} = batch) do
+    statuses = Repo.all(from(l in BatchLine, where: l.batch_id == ^batch.id, select: l.status))
+
+    status =
+      cond do
+        "pending" in statuses -> batch.status
+        Enum.all?(statuses, &(&1 == "paid")) -> "completed"
+        true -> "partly_rejected"
+      end
+
+    if status == batch.status,
+      do: batch,
+      else: batch |> Batch.status_changeset(status) |> Repo.update!()
+  end
+
+  # ── Paid outside file ──────────────────────────────
+
+  defp get_payment(id, company) do
+    case Ecto.UUID.cast(id || "") do
+      {:ok, uuid} -> Repo.get_by(Payment, id: uuid, company_id: company.id)
+      :error -> nil
+    end
+  end
+
+  def dismiss_payment(payment_id, note, company, user) do
+    with true <- can?(user, :create_bank_payment_batch, company) || :not_authorise,
+         %Payment{} = p <- get_payment(payment_id, company) || {:error, "payment not found"},
+         nil <- live_batch_filename(p.id) do
+      Multi.new()
+      |> Multi.insert(
+        :dismiss_bank_payment,
+        Dismissal.changeset(%Dismissal{}, %{
+          company_id: company.id,
+          payment_id: p.id,
+          user_id: user.id,
+          note: note
+        })
+      )
+      |> Sys.insert_log_for(
+        :dismiss_bank_payment,
+        %{"payment_no" => p.payment_no, "note" => note || ""},
+        company,
+        user
+      )
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{dismiss_bank_payment: d}} -> {:ok, d}
+        {:error, _, cs, _} -> {:error, cs}
+      end
+    else
+      filename when is_binary(filename) -> {:error, "this payment is in bank batch #{filename}"}
+      other -> other
+    end
+  end
+
+  def undismiss_payment(payment_id, company, user) do
+    with true <- can?(user, :create_bank_payment_batch, company) || :not_authorise,
+         %Payment{} = p <- get_payment(payment_id, company) || {:error, "payment not found"},
+         %Dismissal{} = d <-
+           Repo.get_by(Dismissal, payment_id: p.id) ||
+             {:error, "payment is not marked paid outside file"} do
+      Multi.new()
+      |> Multi.delete(:undismiss_bank_payment, d)
+      |> Sys.insert_log_for(
+        :undismiss_bank_payment,
+        %{"payment_no" => p.payment_no},
+        company,
+        user
+      )
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{undismiss_bank_payment: d}} -> {:ok, d}
+        {:error, _, cs, _} -> {:error, cs}
+      end
+    end
+  end
+
+  def list_dismissed(company) do
+    from(d in Dismissal,
+      join: p in Payment,
+      on: p.id == d.payment_id,
+      join: c in assoc(p, :contact),
+      where: d.company_id == ^company.id,
+      order_by: [desc: d.inserted_at],
+      limit: 200,
+      select: %{
+        payment_id: p.id,
+        payment_no: p.payment_no,
+        payment_date: p.payment_date,
+        contact_name: c.name,
+        amount: p.funds_amount,
+        note: d.note,
+        inserted_at: d.inserted_at
+      }
+    )
+    |> Repo.all()
+  end
+
   defp stringify(attrs), do: Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
 end
