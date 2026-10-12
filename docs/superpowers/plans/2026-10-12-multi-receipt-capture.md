@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** One photo or (multi-page) PDF holding many receipts fills one Payment with one line per receipt and no payee (a salesperson's fuel claim). One receipt behaves exactly as today.
+**Goal:** One photo or (multi-page) PDF holding many receipts fills one Payment with one line per receipt and no payee (a salesperson's claim — fuel, tolls, hotel…), each line tagged with its kind and given the good last used for that kind. One receipt behaves exactly as today.
 
-**Architecture:** `Receipts.Extract` asks the AI for `{"documents": [...]}` and returns a list of `%Extracted{}`. `Receipts.Prefill.build/4` gains a list clause that dispatches: one recognised document → today's struct clause; PurInvoice → first document + warning; Payment with 2+ → new `build_many/3`. The seed map shape is unchanged, so the Payment/PurInvoice forms and `ReceiptCapture.merge_params/3` do not change; only `ReceiptCapture`'s read summary renders a list.
+**Architecture:** `Receipts.Extract` asks the AI for `{"documents": [...]}` and returns a list of `%Extracted{}`. `Receipts.Prefill.build/4` gains a list clause that dispatches: one recognised document → today's struct clause; PurInvoice → first document + warning; Payment with 2+ → new `build_many/3`, which tags each line with the receipt's kind and copies the good/account/tax code of the last saved line of that kind (`learnt_goods/2`). The seed map shape is unchanged, so the Payment/PurInvoice forms and `ReceiptCapture.merge_params/3` do not change; only `ReceiptCapture`'s read summary renders a list.
 
 **Tech Stack:** Elixir 1.19, Phoenix LiveView 1.2, Ecto/PostgreSQL, ExUnit with the `:llm_http` stub.
 
@@ -16,6 +16,8 @@
 - One recognised receipt → today's behaviour exactly (payee, item lines, SST/rounding lines, funds account, duplicate check, TIN learning).
 - 2+ recognised receipts → **no payee keys in the seed at all** (`contact_name/contact_id/tax_id/reg_no` absent), `learn: nil`, `contact_ids: {nil, nil}`, `duplicate: nil`.
 - Line text: `"<shop> #<doc_no> <DD/MM/YYYY>"`, parts not read left out, `"Receipt"` when nothing was read. Quantity 1, unit price = the receipt total (0 when no total), discount 0, no good, no tax code.
+- Kind labels are fixed English words, **never translated**: `Fuel`, `Toll`, `Parking`, `Hotel`, `Meal`, `Transport`, `Other`. With a kind the line text is `"<Kind> · <shop> #<doc_no> <DD/MM/YYYY>"` (`·` is U+00B7, one space each side) — the prefix is the learning key.
+- Learnt goods: per kind except `Other`, the most recent saved Payment line (latest `payment_date`, then latest payment `inserted_at`) whose `descriptions` starts with `"<Kind> · "` and has a good. Apply its good with the good's default package, then that line's account and tax code (tax code's current rate). Nothing learnt → the line stays blank. The AI never picks a good.
 - At most **40** receipts per read (first 40 in read order, then sorted by date). Over 40 warns `"<n> receipts read; only the first 40 were used. Split the claim into two Payments."` *(The cap lives in `Prefill`, not `Extract` as the spec's "Code shape" says: the model has already produced the extra entries, and the cap is a seeding decision.)*
 - LLM options for every receipt read: `max_tokens: 32_768`, `timeout: 180_000`.
 - Every warning is advisory; nothing new blocks Save.
@@ -28,10 +30,10 @@
 ## Review Focus
 
 1. **A receipt with no date among dated ones** — it must sort last, not crash, and not become the pay date. Test in Task 1.
-2. **No shop names read at all** — descriptions `"3 receipts"` and warning `"3 receipts — pick the payee …"`, never `"from 0 shops"`. Test in Task 1.
+2. **A learnt tax code with a rate** (a hotel booked under an 8% code last time) — receipt totals already include tax, so the line would overstate; warn `"Hotel lines take tax code … from the last claim — receipt totals already include tax; check the amounts."` Test in Task 3.
 3. **Receipt nos with regex/LIKE metacharacters** (`INV/26-001(A)`, `50%`) in the duplicate-claim query — must not raise, must match literally, and `#12` must not match `#123`. Test in Task 2.
 4. **The same receipt twice in one file** (photographed twice, or on two scanned pages) — warn `"<receipt> appears more than once in this file."` Test in Task 2.
-5. **Odd model replies** — `"documents": []`, entries that are not objects, or today's single-object shape — must give a usable result, never a crash. Test in Task 3.
+5. **Odd model replies** — `"documents": []`, entries that are not objects, an unknown `kind` (`"Fuel"`, `"petrol"`), or today's single-object shape — must give a usable result, never a crash. Test in Task 4.
 
 ---
 
@@ -39,8 +41,10 @@
 
 | File | Change | Responsibility |
 |---|---|---|
-| `lib/full_circle/receipts/prefill.ex` | modify | list dispatch, `build_many/3`, per-receipt and batch warnings, `claimed_warning/2` |
-| `lib/full_circle/receipts/extract.ex` | modify | `documents` prompt, `parse_documents/2`, list return, new LLM options |
+| `lib/full_circle/receipts/extracted.ex` | modify | `kind` field |
+| `lib/full_circle/receipts/prefill.ex` | modify | list dispatch, `build_many/3`, per-receipt and batch warnings, `claimed_warning/2`, `learnt_goods/2` |
+| `lib/full_circle/doc_prefill.ex` | modify | public `apply_purchase_good/4` |
+| `lib/full_circle/receipts/extract.ex` | modify | `documents` prompt with `kind`, `parse_documents/2`, kind parsing, list return, new LLM options |
 | `lib/full_circle_web/receipt_capture.ex` | modify | read summary renders one line per recognised document |
 | `test/full_circle/receipts/prefill_test.exs` | modify | multi-receipt seeding and warnings |
 | `test/full_circle/receipts/extract_test.exs` | modify | list contract, options |
@@ -53,12 +57,13 @@
 ### Task 1: `Prefill.build/4` takes a list; Payment with 2+ receipts
 
 **Files:**
+- Modify: `lib/full_circle/receipts/extracted.ex`
 - Modify: `lib/full_circle/receipts/prefill.ex`
 - Test: `test/full_circle/receipts/prefill_test.exs`
 
 **Interfaces:**
 - Consumes: `%FullCircle.Receipts.Extracted{}` (fields `recognized, summary, supplier_name, supplier_tin, supplier_brn, doc_no, date, total, payment_method, e_invoice_uuid, warnings, …`); `DocPrefill.seed_lines/1` (list of `%{descriptions, quantity, unit_price, discount, tax_rate, amount}` → string-keyed line maps); existing private `put_funds_account/5`, `period_warning/2`, `e_invoice_warning/2`.
-- Produces: `Prefill.build(docs :: [%Extracted{}], com, user, detail_key) :: %{attrs: map, warnings: [String.t()], duplicate: nil | String.t(), learn: nil | tuple, contact_ids: {tin, brn}, total: Decimal.t() | nil}` — same map shape as the existing struct clause. The struct clause `build(%Extracted{}, …)` stays public and unchanged. Private `receipt_text/2` (doc, with_date?) is reused in Task 2.
+- Produces: `Prefill.build(docs :: [%Extracted{}], com, user, detail_key) :: %{attrs: map, warnings: [String.t()], duplicate: nil | String.t(), learn: nil | tuple, contact_ids: {tin, brn}, total: Decimal.t() | nil}` — same map shape as the existing struct clause. The struct clause `build(%Extracted{}, …)` stays public and unchanged. `%Extracted{}` gains `kind :: String.t() | nil` (a fixed label). Private `receipt_text/2` (doc, with_date?) is reused in Task 2; private `build_many/3` is extended in Tasks 2 and 3.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -202,6 +207,14 @@ Append to `test/full_circle/receipts/prefill_test.exs`, before the final `end`:
       assert "Shell Juru #S-9: Receipt lines don't add up: x" in seed.warnings
     end
 
+    test "the kind leads the line text; no kind, no prefix", %{c: c, u: u} do
+      docs = [%{fuel("Shell Juru", "S-9", 2, "60.00") | kind: "Fuel"}, fuel("PLUS", "T-1", 1, "5")]
+      seed = Prefill.build(docs, c, u, :payment_details)
+
+      assert Enum.map(seed.attrs.payment_details, & &1["descriptions"]) ==
+               ["Fuel · Shell Juru #S-9 #{dmy(2)}", "PLUS #T-1 #{dmy(1)}"]
+    end
+
     test "a receipt with no date sorts last and is not the pay date", %{c: c, u: u} do
       docs = [%{fuel("Nodate", "N-1", 0, "5") | date: nil}, fuel("A", "1", 4, "10")]
       seed = Prefill.build(docs, c, u, :payment_details)
@@ -254,6 +267,8 @@ Run: `mix test test/full_circle/receipts/prefill_test.exs`
 Expected: the new `build/4 with a list` tests FAIL with `FunctionClauseError` (no `build/4` clause for a list); the existing tests still pass.
 
 - [ ] **Step 3: Implement the list clause and `build_many/3`**
+
+In `lib/full_circle/receipts/extracted.ex`, add `kind: nil,` after `summary: nil,` in `defstruct`, and append to the `@moduledoc`: `` `kind` is a fixed English label (Fuel, Toll, Parking, Hotel, Meal, Transport, Other) or nil. ``
 
 In `lib/full_circle/receipts/prefill.ex`:
 
@@ -372,7 +387,7 @@ Add these private functions after the existing `build(%Extracted{} = ex, …)` c
     amount = doc.total || Decimal.new(0)
 
     %{
-      descriptions: receipt_text(doc, true),
+      descriptions: line_text(doc),
       quantity: Decimal.new(1),
       unit_price: amount,
       discount: Decimal.new(0),
@@ -380,6 +395,11 @@ Add these private functions after the existing `build(%Extracted{} = ex, …)` c
       amount: amount
     }
   end
+
+  # The kind leads the line: the "<Kind> · " prefix is also the key
+  # learnt_goods/2 looks up, so kind labels are never translated.
+  defp line_text(%{kind: nil} = doc), do: receipt_text(doc, true)
+  defp line_text(doc), do: doc.kind <> " · " <> receipt_text(doc, true)
 
   # "<shop> #<doc_no> <DD/MM/YYYY>", parts not read left out.
   defp receipt_text(doc, with_date?) do
@@ -464,8 +484,8 @@ Expected: all PASS, no compile warnings.
 - [ ] **Step 5: Format and commit**
 
 ```bash
-mix format lib/full_circle/receipts/prefill.ex test/full_circle/receipts/prefill_test.exs
-git add lib/full_circle/receipts/prefill.ex test/full_circle/receipts/prefill_test.exs
+mix format lib/full_circle/receipts/extracted.ex lib/full_circle/receipts/prefill.ex test/full_circle/receipts/prefill_test.exs
+git add lib/full_circle/receipts/extracted.ex lib/full_circle/receipts/prefill.ex test/full_circle/receipts/prefill_test.exs
 git commit -m "feat(receipts): Prefill takes a list — many receipts make one Payment line each, no payee
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
@@ -523,6 +543,11 @@ Append inside the `describe "build/4 with a list"` block from Task 1:
       assert "Shell #777 (RM 50.00) may already be claimed on #{pv.payment_no}." in seed.warnings
     end
 
+    test "a kind-prefixed earlier line still counts as claimed", %{c: c, u: u} do
+      claimed_payment!(c, u, "Fuel · Shell #888 01/10/2026", "40.00")
+      assert Prefill.claimed_warning(fuel("Shell", "888", 1, "40.00"), c)
+    end
+
     test "same receipt no, different amount: no claimed warning", %{c: c, u: u} do
       claimed_payment!(c, u, "Shell #777 01/10/2026", "50.00")
       refute Prefill.claimed_warning(fuel("Shell", "777", 1, "51.00"), c)
@@ -555,7 +580,7 @@ Append inside the `describe "build/4 with a list"` block from Task 1:
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `mix test test/full_circle/receipts/prefill_test.exs`
-Expected: the four new tests FAIL (`UndefinedFunctionError` for `claimed_warning/2`, missing warnings).
+Expected: the five new tests FAIL (`UndefinedFunctionError` for `claimed_warning/2`, missing warnings).
 
 - [ ] **Step 3: Implement**
 
@@ -663,7 +688,262 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 3: `Extract` returns a list; the capture strip shows every receipt
+### Task 3: Learn each kind's good from the last saved claim line
+
+**Files:**
+- Modify: `lib/full_circle/doc_prefill.ex`
+- Modify: `lib/full_circle/receipts/prefill.ex`
+- Test: `test/full_circle/receipts/prefill_test.exs`
+
+**Interfaces:**
+- Consumes: Task 1's `build_many/3` and `line_text/1` (the `"<Kind> · "` prefix); private `DocPrefill.apply_good/5` (`detail, name, com, user, packaging: bool, side: :purchase`), which merges `"good_name", "good_id", "account_*", "tax_code_*", "tax_rate", "unit", "unit_multiplier" => 0, "package_qty" => detail["quantity"]` and, with packaging, `"package_name", "package_id"`; it returns the line unchanged when the good name is unknown.
+- Produces: `DocPrefill.apply_purchase_good(detail :: map, good_name :: String.t(), com, user) :: map`; `Prefill.learnt_goods(kinds :: [String.t() | nil], com) :: %{String.t() => %{good_name, account_id, account_name, tax_code_id, tax_code_name, tax_rate}}`.
+
+- [ ] **Step 1: Write the failing tests**
+
+Append inside the `describe "build/4 with a list"` block:
+
+```elixir
+    defp claim_line!(c, u, line_text, good, account, tax_code, days_ago \\ 0) do
+      attrs =
+        payment_attrs(contact_fixture(c, u), good, account, tax_code,
+          pay_funds_account_fixture(c, u),
+          tax_rate: Decimal.to_string(tax_code.rate),
+          quantity: "1",
+          unit_price: "10.00",
+          funds_amount: "20.00"
+        )
+        |> put_in(["payment_details", "0", "descriptions"], line_text)
+        |> Map.put("payment_date", Date.to_iso8601(Date.add(Date.utc_today(), -days_ago)))
+
+      {:ok, %{create_payment: pv}} = BillPay.create_payment(attrs, c, u)
+      pv
+    end
+
+    defp kinded(kind, shop, no), do: %{fuel(shop, no, 1, "30.00") | kind: kind}
+
+    test "a Fuel line takes the good, account and tax code of the last Fuel line", %{
+      c: c,
+      u: u
+    } do
+      good = good_fixture(c, u, %{"name" => "Diesel"})
+      travel = account_fixture(%{name: "Travelling - Sales", account_type: "Expenses"}, c, u)
+      claim_line!(c, u, "Fuel · Shell #1 01/10/2026", good, travel, no_ptax(c))
+
+      seed =
+        Prefill.build(
+          [kinded("Fuel", "Petronas", "P-1"), kinded("Hotel", "Seri", "H-1")],
+          c,
+          u,
+          :payment_details
+        )
+
+      fuel_line = Enum.find(seed.attrs.payment_details, &(&1["descriptions"] =~ "Fuel · "))
+      hotel_line = Enum.find(seed.attrs.payment_details, &(&1["descriptions"] =~ "Hotel · "))
+
+      assert fuel_line["good_id"] == good.id
+      assert fuel_line["good_name"] == "Diesel"
+      assert fuel_line["account_id"] == travel.id
+      assert fuel_line["account_name"] == "Travelling - Sales"
+      assert fuel_line["tax_code_name"] == "NoPTax"
+      assert fuel_line["package_name"] not in [nil, ""]
+      assert Decimal.eq?(fuel_line["unit_price"], Decimal.new("30.00"))
+      assert hotel_line["good_name"] == ""
+    end
+
+    test "the latest saved line of a kind wins", %{c: c, u: u} do
+      pur = Accounting.get_account_by_name("General Purchases", c, u)
+      old = good_fixture(c, u, %{"name" => "Petrol Old"})
+      new = good_fixture(c, u, %{"name" => "Petrol New"})
+      claim_line!(c, u, "Fuel · A #1 01/10/2026", new, pur, no_ptax(c), 0)
+      claim_line!(c, u, "Fuel · B #2 01/10/2026", old, pur, no_ptax(c), 5)
+
+      [line | _] =
+        Prefill.build([kinded("Fuel", "X", "9"), kinded("Toll", "PLUS", "T")], c, u, :payment_details).attrs.payment_details
+        |> Enum.filter(&(&1["descriptions"] =~ "Fuel · "))
+
+      assert line["good_name"] == "Petrol New"
+    end
+
+    test "Other is never learnt", %{c: c, u: u} do
+      pur = Accounting.get_account_by_name("General Purchases", c, u)
+      claim_line!(c, u, "Other · A #1 01/10/2026", good_fixture(c, u), pur, no_ptax(c))
+
+      assert Prefill.learnt_goods(["Other", nil], c) == %{}
+
+      seed =
+        Prefill.build([kinded("Other", "X", "1"), kinded("Other", "Y", "2")], c, u, :payment_details)
+
+      assert Enum.all?(seed.attrs.payment_details, &(&1["good_name"] == ""))
+    end
+
+    test "a learnt tax code with a rate warns that totals already include tax", %{c: c, u: u} do
+      pur = Accounting.get_account_by_name("General Purchases", c, u)
+      sst = purchase_tax_code_fixture(c, u, %{"code" => "SST8", "rate" => "0.08"})
+      claim_line!(c, u, "Hotel · Seri #1 01/10/2026", good_fixture(c, u), pur, sst)
+
+      seed =
+        Prefill.build([kinded("Hotel", "Seri", "2"), kinded("Fuel", "Shell", "3")], c, u, :payment_details)
+
+      assert "Hotel lines take tax code SST8 (8%) from the last claim — receipt totals already include tax; check the amounts." in seed.warnings
+    end
+```
+
+- [ ] **Step 2: Run them to verify they fail**
+
+Run: `mix test test/full_circle/receipts/prefill_test.exs`
+Expected: the four new tests FAIL (`learnt_goods/2` undefined; lines have no good).
+
+- [ ] **Step 3: Implement**
+
+In `lib/full_circle/doc_prefill.ex`, after `def put_goods(attrs, _detail_key, _com, _user, _side), do: attrs`:
+
+```elixir
+  @doc """
+  Applies a good by name to a purchase line, with the good's default package.
+  An unknown name leaves the line unchanged.
+  """
+  def apply_purchase_good(detail, name, com, user),
+    do: apply_good(detail, name, com, user, packaging: true, side: :purchase)
+```
+
+In `lib/full_circle/receipts/prefill.ex`, add aliases:
+
+```elixir
+  alias FullCircle.Accounting.{Account, TaxCode}
+  alias FullCircle.Product.Good
+```
+
+In `build_many/3`, replace the `payment_details:` entry and add the learnt warnings:
+
+```elixir
+    learnt = learnt_goods(Enum.map(used, & &1.kind), com)
+
+    lines =
+      used
+      |> Enum.map(&receipt_line/1)
+      |> DocPrefill.seed_lines()
+      |> Enum.zip(used)
+      |> Enum.map(fn {line, doc} -> apply_learnt(line, learnt[doc.kind], com, user) end)
+
+    attrs =
+      %{
+        payment_details: lines,
+        payment_date: pay_date,
+        funds_amount: total,
+        descriptions: many_descriptions(length(used), shops)
+      }
+      |> put_funds_account(%{payment_method: method}, :payment_details, com, user)
+
+    warnings =
+      [payee_warning(length(used), length(shops))] ++
+        span_warning(dates, pay_date) ++
+        over_warning(length(used) + length(over)) ++
+        repeated_warnings(used) ++
+        taxed_kind_warnings(learnt) ++
+        Enum.flat_map(used, &receipt_warnings(&1, com))
+```
+
+Add the functions:
+
+```elixir
+  @doc """
+  Kind → the most recent saved Payment line of that kind that has a good
+  (latest pay date, then latest saved). "Other" and nil are never learnt. The
+  "<Kind> · " prefix is the key, which is why kind labels are never translated.
+  """
+  def learnt_goods(kinds, com) do
+    kinds
+    |> Enum.uniq()
+    |> Enum.reject(&(&1 in [nil, "Other"]))
+    |> Enum.flat_map(fn kind ->
+      case last_line_of_kind(kind, com) do
+        nil -> []
+        line -> [{kind, line}]
+      end
+    end)
+    |> Map.new()
+  end
+
+  defp last_line_of_kind(kind, com) do
+    prefix = kind <> " · %"
+
+    from(d in PaymentDetail,
+      join: p in Payment,
+      on: p.id == d.payment_id,
+      join: g in Good,
+      on: g.id == d.good_id,
+      join: a in Account,
+      on: a.id == d.account_id,
+      join: t in TaxCode,
+      on: t.id == d.tax_code_id,
+      where: p.company_id == ^com.id,
+      where: like(d.descriptions, ^prefix),
+      order_by: [desc: p.payment_date, desc: p.inserted_at],
+      limit: 1,
+      select: %{
+        good_name: g.name,
+        account_id: a.id,
+        account_name: a.name,
+        tax_code_id: t.id,
+        tax_code_name: t.code,
+        tax_rate: t.rate
+      }
+    )
+    |> Repo.one()
+  end
+
+  # The good with its default package, then the account and tax code the
+  # clerk used last time (an override carries forward). A good that no
+  # longer resolves leaves the line blank rather than half-filled.
+  defp apply_learnt(line, nil, _com, _user), do: line
+
+  defp apply_learnt(line, learnt, com, user) do
+    case DocPrefill.apply_purchase_good(line, learnt.good_name, com, user) do
+      %{"good_id" => id} = applied when not is_nil(id) ->
+        Map.merge(applied, %{
+          "account_name" => learnt.account_name,
+          "account_id" => learnt.account_id,
+          "tax_code_name" => learnt.tax_code_name,
+          "tax_code_id" => learnt.tax_code_id,
+          "tax_rate" => learnt.tax_rate
+        })
+
+      _ ->
+        line
+    end
+  end
+
+  defp taxed_kind_warnings(learnt) do
+    for {kind, %{tax_rate: %Decimal{} = rate} = l} <- learnt, Decimal.gt?(rate, 0) do
+      gettext(
+        "%{kind} lines take tax code %{code} (%{rate}%) from the last claim — receipt totals already include tax; check the amounts.",
+        kind: kind,
+        code: l.tax_code_name,
+        rate: rate |> Decimal.mult(100) |> Decimal.normalize() |> Decimal.to_string(:normal)
+      )
+    end
+  end
+```
+
+- [ ] **Step 4: Run the tests to verify they pass**
+
+Run: `mix test test/full_circle/receipts/prefill_test.exs test/full_circle/doc_prefill_test.exs`
+Expected: all PASS.
+
+- [ ] **Step 5: Format and commit**
+
+```bash
+mix format lib/full_circle/doc_prefill.ex lib/full_circle/receipts/prefill.ex test/full_circle/receipts/prefill_test.exs
+git add lib/full_circle/doc_prefill.ex lib/full_circle/receipts/prefill.ex test/full_circle/receipts/prefill_test.exs
+git commit -m "feat(receipts): each claim line takes the good last used for its kind
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 4: `Extract` returns a list with kinds; the capture strip shows every receipt
 
 **Files:**
 - Modify: `lib/full_circle/receipts/extract.ex`
@@ -674,7 +954,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: Task 1's `Prefill.build(docs :: list, com, user, detail_key)`.
-- Produces: `Extract.run(path, content_type, settings, opts) :: {:ok, [%Extracted{}], usage} | {:error, String.t()}` (list is never empty); `Extract.parse_documents(map, today) :: [%Extracted{}]`. `ReceiptCapture` keeps `receipt.extracted` but it is now a list.
+- Produces: `Extract.run(path, content_type, settings, opts) :: {:ok, [%Extracted{}], usage} | {:error, String.t()}` (list is never empty); `Extract.parse_documents(map, today) :: [%Extracted{}]`; each `%Extracted{}` carries `kind` parsed from the reply (`"fuel"` → `"Fuel"`, unknown → nil). `ReceiptCapture` keeps `receipt.extracted` but it is now a list.
 
 - [ ] **Step 1: Write the failing Extract tests**
 
@@ -698,6 +978,23 @@ In `test/full_circle/receipts/extract_test.exs`, add a `describe` block after `d
     test "an empty list is one unrecognised document" do
       assert [%Extracted{recognized: false, summary: "Blank page"}] =
                Extract.parse_documents(%{"documents" => [], "summary" => "Blank page"}, @today)
+    end
+
+    test "kind: the fixed label, case-insensitive; unknown is nil" do
+      [fuel, toll, odd, none] =
+        Extract.parse_documents(
+          %{
+            "documents" => [
+              Map.put(@good, "kind", "fuel"),
+              Map.put(@good, "kind", " TOLL "),
+              Map.put(@good, "kind", "petrol"),
+              @good
+            ]
+          },
+          @today
+        )
+
+      assert {fuel.kind, toll.kind, odd.kind, none.kind} == {"Fuel", "Toll", nil, nil}
     end
 
     test "entries that are not objects are skipped" do
@@ -752,6 +1049,7 @@ In `lib/full_circle/receipts/extract.ex`, replace `@system_prompt` with:
   {"documents": [
     {"recognized": true|false,
      "summary": "one plain sentence of what this document is",
+     "kind": "fuel"|"toll"|"parking"|"hotel"|"meal"|"transport"|"other"|null,
      "supplier": {"name": str|null, "tin": str|null, "brn": str|null, "sst_no": str|null},
      "doc_no": str|null, "date": "YYYY-MM-DD"|null, "due_date": "YYYY-MM-DD"|null,
      "lines": [{"description": str, "quantity": num|null, "unit_price": num|null,
@@ -767,6 +1065,10 @@ In `lib/full_circle/receipts/extract.ex`, replace `@system_prompt` with:
   - One bill can run across pages: lines carried over, "Page 1 of 3", the total
     on a later page. That is ONE entry, not one per page.
   - A page can hold several receipts. Each is its own entry.
+  - kind is what the money was spent on: fuel (petrol/diesel stations), toll
+    (toll plazas, Touch 'n Go / RFID toll statements), parking, hotel
+    (lodging), meal (food and drinks), transport (Grab, taxi, bus, train,
+    flight), other. A toll statement listing many trips is ONE entry.
   - Use null for anything not printed or not legible. Never guess.
   - recognized is false for something that is not a bill, invoice, cash bill or
     receipt (a delivery order, cheque, letter, product photo, unreadable shot).
@@ -826,6 +1128,27 @@ Add, above `@doc "A decoded model reply → …"` (`parse/2`):
   def parse_documents(map, today) when is_map(map), do: [parse(map, today)]
 ```
 
+In `parse/2`'s recognised branch (the `%Extracted{recognized: true, …}` struct), add `kind: kind(map["kind"]),` after `summary: summary,`. Add, next to `payment_method/1`:
+
+```elixir
+  # Fixed English labels: the line text "<Kind> · …" is the key Prefill
+  # learns goods by, so they are never translated.
+  @kinds %{
+    "fuel" => "Fuel",
+    "toll" => "Toll",
+    "parking" => "Parking",
+    "hotel" => "Hotel",
+    "meal" => "Meal",
+    "transport" => "Transport",
+    "other" => "Other"
+  }
+
+  defp kind(k) when is_binary(k), do: Map.get(@kinds, k |> String.trim() |> String.downcase())
+  defp kind(_), do: nil
+```
+
+(Put `@kinds` with the other module attributes at the top of the module.)
+
 Update the `@moduledoc` first sentence to: `A photographed bill or receipt (JPEG/PNG/WebP/PDF) → a list of \`%Extracted{}\`, one per document in the file, via …`.
 
 - [ ] **Step 4: Run the Extract tests**
@@ -842,6 +1165,7 @@ In `test/full_circle_web/live/payment_receipt_capture_live_test.exs`, add before
     %{
       "recognized" => true,
       "summary" => "Fuel receipt",
+      "kind" => "fuel",
       "supplier" => %{"name" => shop},
       "doc_no" => no,
       "date" => Date.to_iso8601(Date.add(Date.utc_today(), -days_ago)),
@@ -876,7 +1200,7 @@ In `test/full_circle_web/live/payment_receipt_capture_live_test.exs`, add before
 
     assert value(lv, "payment_contact_id") == salesperson.id
     assert value(lv, "payment_funds_amount") =~ "185.5"
-    assert html =~ "Petronas BM #P-101 #{d9}"
+    assert html =~ "Fuel · Petronas BM #P-101 #{d9}"
     assert html =~ "Caltex Alma"
     assert html =~ "Shell Juru"
     assert html =~ "3 receipts from 3 shops"
@@ -947,14 +1271,14 @@ Expected: all PASS, no compile warnings.
 ```bash
 mix format lib/full_circle/receipts/extract.ex lib/full_circle_web/receipt_capture.ex test/full_circle/receipts/extract_test.exs test/full_circle_web/live/payment_receipt_capture_live_test.exs test/full_circle_web/live/pur_invoice_receipt_capture_live_test.exs
 git add lib/full_circle/receipts/extract.ex lib/full_circle_web/receipt_capture.ex test/full_circle/receipts/extract_test.exs test/full_circle_web/live/payment_receipt_capture_live_test.exs test/full_circle_web/live/pur_invoice_receipt_capture_live_test.exs
-git commit -m "feat(receipts): read every receipt in a photo or multi-page PDF; 32k tokens, 180 s
+git commit -m "feat(receipts): read every receipt (and its kind) in a photo or multi-page PDF; 32k tokens, 180 s
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 4: Skill contract and full suite
+### Task 5: Skill contract and full suite
 
 **Files:**
 - Modify: `.claude/skills/receipt-capture.md`
@@ -970,7 +1294,7 @@ In `.claude/skills/receipt-capture.md`:
 Change the frontmatter `description` to:
 
 ```
-description: Use when working on photo/PDF receipt capture on New Payment or New Purchase Invoice — Receipts.Extract (AI prompt, {"documents": […]} list contract, checks), Receipts.Prefill (field mapping, multi-receipt claims, funds account, SST/rounding lines, warnings), FullCircleWeb.ReceiptCapture (tray, blank-only merge, receipt note on save), or the "llm_receipt" AI settings.
+description: Use when working on photo/PDF receipt capture on New Payment or New Purchase Invoice — Receipts.Extract (AI prompt, {"documents": […]} list contract, kinds, checks), Receipts.Prefill (field mapping, multi-receipt claims, learnt goods per kind, funds account, SST/rounding lines, warnings), FullCircleWeb.ReceiptCapture (tray, blank-only merge, receipt note on save), or the "llm_receipt" AI settings.
 ```
 
 Under `## Pipeline`, replace the first sentence's `(file → \`%Extracted{}\`)` with `(file → \`[%Extracted{}]\`, never empty)` and add after the pipeline paragraph:
@@ -994,6 +1318,12 @@ Add these bullets to `## Contracts that bite`, after "Not recognised":
   price = total (0 + warning when none), date-sorted (undated last). Amount =
   sum, pay date = latest, Cash In Hand only if all cash. Per-receipt warnings
   are prefixed with `"<shop> #<doc_no>: "`. Cap 40 (in `Prefill`, read order).
+- **Kinds and learnt goods:** the AI tags each receipt `kind` (Fuel, Toll,
+  Parking, Hotel, Meal, Transport, Other — fixed English, never translated).
+  2+ receipt lines read `"<Kind> · <shop> #<no> <date>"`; `learnt_goods/2`
+  copies the good (default package), account and tax code of the latest saved
+  Payment line starting `"<Kind> · "` with a good. Never for Other. A learnt
+  tax code with a rate warns (receipt totals already include tax).
 - **Duplicate claims:** `claimed_warning/2` matches an earlier Payment line whose
   text holds `#<doc_no>` as a whole word (bound regex param, escaped) and whose
   `qty × price + discount` is within 0.01 (discount is stored ≤ 0). It depends

@@ -26,6 +26,8 @@ several receipts, or as a multi-page Scan PDF with several receipts per page.
 | 8 | **Per-receipt duplicate warning** for 2+ receipts: an earlier Payment line with the same receipt no and amount. Advisory only |
 | 9 | **At most 40 receipts per read.** Beyond 40, the first 40 are used and a warning tells the clerk to split the claim |
 | 10 | Every warning stays advisory. Nothing new blocks Save |
+| 11 | **Mixed claims (fuel, tolls, hotel…):** the AI tags each receipt with a fixed **kind** — Fuel, Toll, Parking, Hotel, Meal, Transport, Other. The kind leads the line text |
+| 12 | **The good is learnt from past claims, per kind.** A line of kind K takes the good, account and tax code of the most recent saved Payment line whose text starts with `"K · "` and has a good. Never for Other; blank when there is no such line. The AI never picks a good itself |
 
 ## Seeding a Payment from 2+ receipts
 
@@ -40,10 +42,29 @@ recognised, today's "Not recognised" result applies (summary → `descriptions`)
 | `funds_amount` | sum of the receipt totals |
 | `descriptions` | `"<n> receipts: <shop>, <shop>, …"` with distinct shop names in read order, cut to 200 chars |
 | funds account | **Cash In Hand** when every receipt's payment method is cash and that account exists; else blank (no payee → no sole-account lookup) |
-| `payment_details` | one line per receipt: `descriptions` = `"<shop> #<doc_no> <DD/MM/YYYY>"` (parts that were not read are left out), `quantity` 1, `unit_price` = the receipt total, `discount` 0, no good, no tax code |
+| `payment_details` | one line per receipt: `descriptions` = `"<Kind> · <shop> #<doc_no> <DD/MM/YYYY>"` (the kind and parts that were not read are left out), `quantity` 1, `unit_price` = the receipt total, `discount` 0. Good, account and tax code learnt per kind (below), else blank |
 
 A receipt with no total gets a line with amount 0 and a warning naming the shop,
 so it is visible on the form rather than lost.
+
+### Kinds and learnt goods
+
+The kind labels are fixed English words (`Fuel`, `Toll`, `Parking`, `Hotel`,
+`Meal`, `Transport`, `Other`), never translated: the label in the line text is
+the key the learning looks up, so a Chinese-locale clerk must write the same
+prefix. A Touch 'n Go / toll statement listing many trips is one Toll receipt.
+
+For each kind in the read except Other: the most recent `payment_details` row
+in the company (latest `payment_date`, then latest insert) whose `descriptions`
+starts with `"<Kind> · "` and whose `good_id` is set. Its good is applied the
+way seeded goods are (`DocPrefill`, purchase side, with the good's default
+package so the line is complete), then that row's account and tax code
+(with the tax code's current rate) replace the good's defaults, so an account
+the clerk overrode carries forward. One lookup per kind per read.
+
+Risk accepted: a line booked to the wrong good is copied into the next claim
+until someone corrects it. Lines are only seeded into a blank form and the
+clerk sees every line before Save.
 
 `Prefill` returns `learn: nil`, `contact_ids: {nil, nil}` and `duplicate: nil`
 for a multi-receipt read. TIN learning and the header duplicate check both
@@ -116,7 +137,11 @@ The 5 MB base64 limit for images is unchanged. PDFs have no new limit.
   (the seed shape `%{attrs, warnings, duplicate, learn, contact_ids, total}` is unchanged,
   so the forms and `merge_params/3` do not change). `total` is the sum for 2+.
 - Receipt note on save: unchanged (it keeps the file, whatever it holds).
-- `.claude/skills/receipt-capture.md` — the list contract, the 2+ rules, the new limits.
+- `Receipts.Extracted` gains `kind`; `Extract` parses it (unknown → nil).
+- `DocPrefill.apply_purchase_good/4` — public wrapper over the private
+  `apply_good/5` (purchase side, with packaging).
+- `Prefill.learnt_goods/3` — kind → past line lookup.
+- `.claude/skills/receipt-capture.md` — the list contract, the 2+ rules, kinds, the new limits.
 
 ## Testing
 
@@ -136,5 +161,9 @@ Stubbed AI replies (`:llm_http`), in the existing receipt test files:
 - 2 bills on PurInvoice → first used, "only the first" warning.
 - Per-receipt duplicate: an existing Payment line `"Shell #777 01/10/2026"` at
   50.00 → warning naming its payment no. Different amount → no warning.
+- Kinds: line text `"Fuel · Shell #1 …"`; a saved `"Fuel · …"` line with a good
+  and an overridden account → the next Fuel line takes that good, account and
+  tax code; a Hotel line with no history stays blank; Other is never learnt;
+  the latest saved line wins.
 - Payment LiveView: payee picked first, then a 3-receipt read → payee kept,
   3 lines filled.
