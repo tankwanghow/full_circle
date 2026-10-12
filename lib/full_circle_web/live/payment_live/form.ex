@@ -24,6 +24,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
      |> assign(query_match_trans: [])
      |> assign(details_got_error: false)
      |> assign(matchers_got_error: false)
+     |> assign_new(:bank_batch, fn -> nil end)
      |> assign(
        active_tab:
          FullCircleWeb.Helpers.default_doc_tab(socket.assigns.form,
@@ -301,6 +302,7 @@ defmodule FullCircleWeb.PaymentLive.Form do
     |> assign(live_action: :edit)
     |> assign(id: id)
     |> assign(page_title: gettext("Edit Payment") <> " " <> object.payment_no)
+    |> assign(:bank_batch, FullCircle.BankPayment.live_batch_filename(object.id))
     |> assign(:form, to_form(cs))
   end
 
@@ -742,6 +744,17 @@ defmodule FullCircleWeb.PaymentLive.Form do
            )
          )}
 
+      {:error, :bank_batched, filename} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           gettext(
+             "In bank batch %{file}: the amount, supplier, funds account and date can't change.",
+             file: filename
+           )
+         )}
+
       {:error, failed_operation, changeset, _} ->
         {:noreply,
          socket
@@ -802,6 +815,15 @@ defmodule FullCircleWeb.PaymentLive.Form do
     <div class="mx-auto grid w-fit min-w-[64rem] max-w-[98vw]">
       <div class="w-fit min-w-[64rem] max-w-[98vw] border rounded-lg border-pink-500 bg-pink-100 p-4 [&>*:not(form)]:[contain:inline-size]">
         <p class="w-full text-3xl text-center font-medium">{@page_title}</p>
+        <div
+          :if={@bank_batch}
+          id="bank-batch-banner"
+          class="text-center rounded border border-amber-500 bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100 p-1 mb-1"
+        >
+          {gettext("In bank batch %{file}: amount, supplier, funds account and date are locked.",
+            file: @bank_batch
+          )}
+        </div>
         <FullCircleWeb.ReceiptCapture.receipt_capture
           :if={@live_action == :new}
           id="receipt"

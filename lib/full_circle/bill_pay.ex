@@ -401,7 +401,12 @@ defmodule FullCircle.BillPay do
 
     with true <- can?(user, :update_payment, com) || :not_authorise,
          :ok <-
-           Accounting.assert_doc_editable(payment.id, "Payment", com.id, check_matchers: false) do
+           Accounting.assert_doc_editable(payment.id, "Payment", com.id, check_matchers: false),
+         :ok <-
+           FullCircle.BankPayment.assert_payment_unlocked(
+             payment,
+             make_changeset(Payment, payment, attrs, com, user)
+           ) do
       Multi.new()
       |> update_payment_multi(payment, attrs, com, user)
       |> Repo.transaction()

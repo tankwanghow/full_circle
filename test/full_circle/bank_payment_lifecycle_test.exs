@@ -33,7 +33,9 @@ defmodule FullCircle.BankPaymentLifecycleTest do
         Enum.map(ps, & &1.id),
         BankPayment.today(ctx.company),
         ctx.company,
-        ctx.admin, force: true)
+        ctx.admin,
+        force: true
+      )
 
     {b, ps}
   end
@@ -159,5 +161,38 @@ defmodule FullCircle.BankPaymentLifecycleTest do
     {_b, [p]} = batch!(ctx)
     assert {:error, msg} = BankPayment.dismiss_payment(p.id, nil, ctx.company, ctx.mgr)
     assert msg =~ "bank batch"
+  end
+
+  test "locked fields refused while a line is live; other edits pass; release unlocks", ctx do
+    {b, [p]} = batch!(ctx)
+
+    assert :ok =
+             BankPayment.assert_payment_unlocked(p, Ecto.Changeset.change(p, descriptions: "x"))
+
+    assert {:error, :bank_batched, name} =
+             BankPayment.assert_payment_unlocked(
+               p,
+               Ecto.Changeset.change(p, funds_amount: Decimal.new("1"))
+             )
+
+    assert name == b.filename
+
+    fresh = FullCircle.BillPay.get_payment!(p.id, ctx.company, ctx.admin)
+
+    assert {:error, :bank_batched, ^name} =
+             FullCircle.BillPay.update_payment(
+               fresh,
+               %{"funds_amount" => "1.00", "payment_no" => fresh.payment_no},
+               ctx.company,
+               ctx.admin
+             )
+
+    {:ok, _} = BankPayment.void_batch(b.id, "redo", ctx.company, ctx.admin)
+
+    assert :ok =
+             BankPayment.assert_payment_unlocked(
+               p,
+               Ecto.Changeset.change(p, funds_amount: Decimal.new("1"))
+             )
   end
 end

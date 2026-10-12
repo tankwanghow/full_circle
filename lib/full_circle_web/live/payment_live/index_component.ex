@@ -17,6 +17,9 @@ defmodule FullCircleWeb.PaymentLive.IndexComponent do
     {:ok,
      socket
      |> assign(assigns)
+     |> assign_new(:bank_batch, fn %{obj: obj} ->
+       FullCircle.BankPayment.live_batch_filename(obj.id)
+     end)
      |> assign_new(:note_count, fn -> 0 end)
      |> assign_new(:einv_open, fn -> false end)
      |> get_e_invoices()}
@@ -165,6 +168,13 @@ defmodule FullCircleWeb.PaymentLive.IndexComponent do
               {@obj.payment_no}
             </.link>
             <.row_notes_badge count={@note_count} tasks={@task_count} id={@obj.id} />
+            <span
+              :if={@bank_batch}
+              class="text-xs rounded px-1 bg-amber-200 text-amber-900 dark:bg-amber-800 dark:text-amber-100"
+              title={@bank_batch}
+            >
+              {gettext("Bank")}
+            </span>
             <span
               :if={@obj.e_inv_internal_id && @obj.payment_no != @obj.e_inv_internal_id}
               class="min-w-0 truncate text-xs text-slate-500"

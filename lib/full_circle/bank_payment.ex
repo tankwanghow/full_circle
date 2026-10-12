@@ -739,6 +739,21 @@ defmodule FullCircle.BankPayment do
 
   # ── Payment lock ───────────────────────────────────
 
+  @locked_fields [:funds_amount, :contact_id, :funds_account_id, :payment_date]
+
+  @doc "Refuses changes to a batched Payment's amount, supplier, funds account or date."
+  def assert_payment_unlocked(%Payment{id: id}, %Ecto.Changeset{} = cs) do
+    case live_batch_filename(id) do
+      nil ->
+        :ok
+
+      filename ->
+        if Enum.any?(@locked_fields, &Map.has_key?(cs.changes, &1)),
+          do: {:error, :bank_batched, filename},
+          else: :ok
+    end
+  end
+
   def live_batch_filename(payment_id) do
     from(l in BatchLine,
       join: b in Batch,
