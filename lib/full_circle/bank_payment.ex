@@ -21,6 +21,7 @@ defmodule FullCircle.BankPayment do
     Download,
     FileFormat,
     Profile,
+    Result,
     Rows
   }
 
@@ -88,7 +89,7 @@ defmodule FullCircle.BankPayment do
           ["params must be a list of names"]
       end
 
-    digits ++ params
+    digits ++ params ++ Result.validate(Map.get(spec, "result"))
   end
 
   @doc "Renders a bank spec against FileSpec rows and a header context."
@@ -1003,6 +1004,129 @@ defmodule FullCircle.BankPayment do
       }
     )
     |> Repo.all()
+  end
+
+  # ── Bank result import ─────────────────────────────
+
+  def import_result(text, company, user) when is_binary(text) do
+    with true <- can?(user, :create_bank_payment_batch, company) || :not_authorise,
+         {:ok, batch, parsed} <- find_result_batch(text, company) do
+      apply_result(batch, parsed, company, user)
+    end
+  end
+
+  defp find_result_batch(text, company) do
+    from(b in Batch,
+      where: b.company_id == ^company.id and b.status != "voided",
+      order_by: [desc: b.inserted_at],
+      limit: 200
+    )
+    |> Repo.all()
+    |> Enum.find_value({:error, "no batch matches this result file"}, fn b ->
+      with %{} = r <- b.spec["result"],
+           {:ok, parsed} <- Result.parse(text, r),
+           true <- Result.same_file?(parsed.filename, b.filename) do
+        {:ok, b, parsed}
+      else
+        _ -> nil
+      end
+    end)
+  end
+
+  defp apply_result(batch, parsed, company, user) do
+    Repo.transaction(fn ->
+      batch = Repo.one!(from(b in Batch, where: b.id == ^batch.id, lock: "FOR UPDATE"))
+
+      lines =
+        Repo.all(from(l in BatchLine, where: l.batch_id == ^batch.id))
+        |> Map.new(&{&1.record_no, &1})
+
+      empty = %{
+        paid: [],
+        rejected: [],
+        unmatched: [],
+        mismatched: [],
+        conflicts: [],
+        seen: MapSet.new()
+      }
+
+      report =
+        Enum.reduce(parsed.lines, empty, fn r, acc ->
+          line = Map.get(lines, r.record_no)
+          target = if r.success, do: "paid", else: "rejected"
+
+          cond do
+            is_nil(line) ->
+              %{acc | unmatched: acc.unmatched ++ [r.record_id]}
+
+            not Decimal.equal?(r.amount, line.amount) ->
+              %{
+                acc
+                | mismatched:
+                    acc.mismatched ++
+                      ["#{line.payment_no}: bank #{r.amount}, file #{line.amount}"]
+              }
+
+            line.status == target ->
+              %{acc | seen: MapSet.put(acc.seen, line.record_no)}
+
+            line.status == "pending" ->
+              attrs =
+                if r.success,
+                  do: %{status: "paid"},
+                  else: %{status: "rejected", live: false, bank_reason: r.reason}
+
+              line |> BatchLine.resolve_changeset(attrs) |> Repo.update!()
+              key = if r.success, do: :paid, else: :rejected
+
+              acc
+              |> Map.update!(key, &(&1 ++ [line.payment_no]))
+              |> Map.update!(:seen, &MapSet.put(&1, line.record_no))
+
+            true ->
+              %{
+                acc
+                | conflicts:
+                    acc.conflicts ++
+                      ["#{line.payment_no}: bank says #{target}, already #{line.status}"],
+                  seen: MapSet.put(acc.seen, line.record_no)
+              }
+          end
+        end)
+
+      missing =
+        for {no, l} <- Enum.sort_by(lines, &elem(&1, 0)),
+            l.status == "pending",
+            not MapSet.member?(report.seen, no),
+            do: l.payment_no
+
+      batch =
+        batch
+        |> Batch.result_changeset(%{
+          result_imported_at: now(),
+          result_filename: parsed.filename,
+          submitted_at: batch.submitted_at || now(),
+          submitted_by_id: batch.submitted_by_id || user.id
+        })
+        |> Repo.update!()
+        |> refresh_batch_status!()
+
+      Repo.insert!(
+        Sys.log_changeset(
+          :import_bank_payment_result,
+          batch,
+          %{
+            "result_file" => parsed.filename,
+            "paid" => "#{length(report.paid)}",
+            "rejected" => "#{length(report.rejected)}"
+          },
+          company,
+          user
+        )
+      )
+
+      report |> Map.delete(:seen) |> Map.merge(%{batch: batch, missing: missing})
+    end)
   end
 
   defp stringify(attrs), do: Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
