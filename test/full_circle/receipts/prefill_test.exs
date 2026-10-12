@@ -241,4 +241,198 @@ defmodule FullCircle.Receipts.PrefillTest do
     assert seed.attrs.contact_id
     assert seed.learn == nil
   end
+
+  describe "build/4 with a list" do
+    defp fuel(shop, no, days_ago, total, method \\ "cash") do
+      ex(%{
+        supplier_name: shop,
+        supplier_tin: nil,
+        doc_no: no,
+        date: Date.add(Date.utc_today(), -days_ago),
+        total: Decimal.new(total),
+        payment_method: method,
+        lines: []
+      })
+    end
+
+    defp dmy(days_ago), do: Calendar.strftime(Date.add(Date.utc_today(), -days_ago), "%d/%m/%Y")
+
+    test "one recognised document seeds exactly like the struct clause", %{c: c, u: u} do
+      assert Prefill.build([ex()], c, u, :payment_details) ==
+               Prefill.build(ex(), c, u, :payment_details)
+    end
+
+    test "3 receipts, 3 shops: no payee, one dated line each, sum, latest date", %{c: c, u: u} do
+      contact_fixture(c, u, %{"name" => "Petronas BM", "tax_id" => "C2345678901"})
+
+      docs = [
+        fuel("Shell Juru", "S-9", 2, "60.00"),
+        fuel("Petronas BM", "P-101", 9, "80.00"),
+        fuel("Caltex Alma", "C-7", 5, "45.50")
+      ]
+
+      seed = Prefill.build(docs, c, u, :payment_details)
+
+      refute Map.has_key?(seed.attrs, :contact_id)
+      refute Map.has_key?(seed.attrs, :contact_name)
+      assert seed.learn == nil
+      assert seed.contact_ids == {nil, nil}
+      assert seed.duplicate == nil
+
+      assert Enum.map(seed.attrs.payment_details, & &1["descriptions"]) == [
+               "Petronas BM #P-101 #{dmy(9)}",
+               "Caltex Alma #C-7 #{dmy(5)}",
+               "Shell Juru #S-9 #{dmy(2)}"
+             ]
+
+      [first | _] = seed.attrs.payment_details
+      assert Decimal.eq?(first["quantity"], 1)
+      assert Decimal.eq?(first["unit_price"], Decimal.new("80.00"))
+      assert first["good_name"] == ""
+
+      assert Decimal.eq?(seed.attrs.funds_amount, Decimal.new("185.50"))
+      assert Decimal.eq?(seed.total, Decimal.new("185.50"))
+      assert seed.attrs.payment_date == Date.add(Date.utc_today(), -2)
+      assert seed.attrs.descriptions == "3 receipts: Shell Juru, Petronas BM, Caltex Alma"
+
+      assert "3 receipts from 3 shops — pick the payee (e.g. the salesperson)." in seed.warnings
+
+      assert "Receipts are dated #{dmy(9)} to #{dmy(2)}; the pay date was set to #{dmy(2)}." in seed.warnings
+    end
+
+    test "receipts from one shop still leave the payee blank", %{c: c, u: u} do
+      contact_fixture(c, u, %{"name" => "Petronas BM", "tax_id" => "C2345678901"})
+
+      docs = [
+        %{fuel("Petronas BM", "P-1", 3, "50.00") | supplier_tin: "C2345678901"},
+        %{fuel("Petronas BM", "P-2", 1, "70.00") | supplier_tin: "C2345678901"}
+      ]
+
+      seed = Prefill.build(docs, c, u, :payment_details)
+      refute Map.has_key?(seed.attrs, :contact_id)
+      assert "2 receipts from 1 shop — pick the payee (e.g. the salesperson)." in seed.warnings
+    end
+
+    test "all cash → Cash In Hand; any other method → no funds account", %{c: c, u: u} do
+      cash = account_fixture(%{name: "Cash In Hand", account_type: "Cash or Equivalent"}, c, u)
+
+      seed =
+        Prefill.build([fuel("A", "1", 1, "10"), fuel("B", "2", 1, "20")], c, u, :payment_details)
+
+      assert seed.attrs.funds_account_id == cash.id
+
+      seed =
+        Prefill.build(
+          [fuel("A", "1", 1, "10"), fuel("B", "2", 1, "20", "card")],
+          c,
+          u,
+          :payment_details
+        )
+
+      refute Map.has_key?(seed.attrs, :funds_account_id)
+    end
+
+    test "unrecognised entries are dropped with a warning", %{c: c, u: u} do
+      junk = %Extracted{recognized: false, summary: "A coffee cup", warnings: []}
+
+      seed =
+        Prefill.build(
+          [fuel("A", "1", 1, "10"), junk, fuel("B", "2", 1, "20")],
+          c,
+          u,
+          :payment_details
+        )
+
+      assert length(seed.attrs.payment_details) == 2
+      assert "1 document in the file could not be read as a receipt." in seed.warnings
+
+      one = Prefill.build([fuel("A", "1", 1, "10"), junk], c, u, :payment_details)
+      assert one.attrs.descriptions == "A #1"
+      assert "1 document in the file could not be read as a receipt." in one.warnings
+    end
+
+    test "nothing recognised → today's not-recognised seed", %{c: c, u: u} do
+      junk = %Extracted{
+        recognized: false,
+        summary: "Photo of a cheque",
+        warnings: ["Not recognised as a bill or receipt."]
+      }
+
+      seed = Prefill.build([junk], c, u, :payment_details)
+      assert seed.attrs == %{descriptions: "Photo of a cheque"}
+      assert seed.warnings == ["Not recognised as a bill or receipt."]
+    end
+
+    test "receipt with no total: 0 line and a warning naming it", %{c: c, u: u} do
+      docs = [fuel("A", "1", 1, "10"), %{fuel("Shell Juru", "S-9", 1, "1") | total: nil}]
+      seed = Prefill.build(docs, c, u, :payment_details)
+
+      line = Enum.find(seed.attrs.payment_details, &(&1["descriptions"] =~ "Shell Juru"))
+      assert Decimal.eq?(line["unit_price"], 0)
+      assert Decimal.eq?(seed.attrs.funds_amount, Decimal.new("10"))
+      assert "Shell Juru #S-9: no total read — its line is 0.00." in seed.warnings
+    end
+
+    test "per-receipt warnings carry the receipt's name", %{c: c, u: u} do
+      bad = %{fuel("Shell Juru", "S-9", 1, "10") | warnings: ["Receipt lines don't add up: x"]}
+      seed = Prefill.build([fuel("A", "1", 1, "10"), bad], c, u, :payment_details)
+      assert "Shell Juru #S-9: Receipt lines don't add up: x" in seed.warnings
+    end
+
+    test "the kind leads the line text; no kind, no prefix", %{c: c, u: u} do
+      docs = [
+        %{fuel("Shell Juru", "S-9", 2, "60.00") | kind: "Fuel"},
+        fuel("PLUS", "T-1", 1, "5")
+      ]
+
+      seed = Prefill.build(docs, c, u, :payment_details)
+
+      assert Enum.map(seed.attrs.payment_details, & &1["descriptions"]) ==
+               ["Fuel · Shell Juru #S-9 #{dmy(2)}", "PLUS #T-1 #{dmy(1)}"]
+    end
+
+    test "a receipt with no date sorts last and is not the pay date", %{c: c, u: u} do
+      docs = [%{fuel("Nodate", "N-1", 0, "5") | date: nil}, fuel("A", "1", 4, "10")]
+      seed = Prefill.build(docs, c, u, :payment_details)
+
+      assert Enum.map(seed.attrs.payment_details, & &1["descriptions"]) ==
+               ["A #1 #{dmy(4)}", "Nodate #N-1"]
+
+      assert seed.attrs.payment_date == Date.add(Date.utc_today(), -4)
+      refute Enum.any?(seed.warnings, &(&1 =~ "Receipts are dated"))
+    end
+
+    test "no shop names read: plain count, no 'from 0 shops'", %{c: c, u: u} do
+      docs = for i <- 1..3, do: %{fuel("x", "#{i}", 1, "10") | supplier_name: nil}
+      seed = Prefill.build(docs, c, u, :payment_details)
+
+      assert seed.attrs.descriptions == "3 receipts"
+      assert "3 receipts — pick the payee (e.g. the salesperson)." in seed.warnings
+      assert hd(seed.attrs.payment_details)["descriptions"] == "#1 #{dmy(1)}"
+    end
+
+    test "41 receipts: the first 40 read are used, with a split warning", %{c: c, u: u} do
+      docs = for i <- 1..41, do: fuel("Shop#{i}", "#{i}", 1, "1")
+      seed = Prefill.build(docs, c, u, :payment_details)
+
+      assert length(seed.attrs.payment_details) == 40
+      refute Enum.any?(seed.attrs.payment_details, &(&1["descriptions"] =~ "Shop41 "))
+
+      assert "41 receipts read; only the first 40 were used. Split the claim into two Payments." in seed.warnings
+    end
+
+    test "pur invoice with 2 bills: the first is used, with a warning", %{c: c, u: u} do
+      seed =
+        Prefill.build(
+          [ex(), ex(%{doc_no: "B-2", supplier_name: "Other"})],
+          c,
+          u,
+          :pur_invoice_details
+        )
+
+      assert seed.attrs.e_inv_internal_id == "A12345"
+
+      assert "The file shows 2 bills — only the first was used. One Purchase Invoice per bill." in seed.warnings
+    end
+  end
 end

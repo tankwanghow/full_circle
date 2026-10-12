@@ -3,9 +3,12 @@ defmodule FullCircle.Receipts.Extracted do
   What the AI read off a bill or receipt, already parsed and checked by
   `Receipts.Extract`. Amounts are Decimals, dates Dates, a line's `tax_rate`
   is a percent. `recognized: false` means only `summary` is meaningful.
+  `kind` is a fixed English label (Fuel, Toll, Parking, Hotel, Meal, Transport,
+  Other) or nil.
   """
   defstruct recognized: true,
             summary: nil,
+            kind: nil,
             supplier_name: nil,
             supplier_tin: nil,
             supplier_brn: nil,

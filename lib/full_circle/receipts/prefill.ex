@@ -16,6 +16,34 @@ defmodule FullCircle.Receipts.Prefill do
 
   @descriptions_max 200
   @cash_account "Cash In Hand"
+  @max_receipts 40
+
+  @doc """
+  A read's documents → one seed. Only recognised documents count. One seeds
+  as before; a PurInvoice takes the first; a Payment with 2+ gets one line
+  per receipt and no payee (`build_many/3`) — for a claim the payee is the
+  claimant, not the shops.
+  """
+  def build(docs, com, user, detail_key) when is_list(docs) do
+    {known, unknown} = Enum.split_with(docs, & &1.recognized)
+    dropped = dropped_warning(known, unknown)
+
+    case {known, detail_key} do
+      {[], _} ->
+        build(List.first(docs) || not_recognised(), com, user, detail_key)
+
+      {[one], _} ->
+        one |> build(com, user, detail_key) |> add_warnings(dropped)
+
+      {[first | _], :pur_invoice_details} ->
+        first
+        |> build(com, user, detail_key)
+        |> add_warnings([only_first_warning(length(known)) | dropped])
+
+      {many, :payment_details} ->
+        many |> build_many(com, user) |> add_warnings(dropped)
+    end
+  end
 
   def build(%Extracted{recognized: false} = ex, _com, _user, _detail_key) do
     %{
@@ -69,6 +97,167 @@ defmodule FullCircle.Receipts.Prefill do
       contact_ids: {ex.supplier_tin, ex.supplier_brn},
       total: ex.total
     }
+  end
+
+  defp not_recognised,
+    do: %Extracted{recognized: false, warnings: [gettext("Not recognised as a bill or receipt.")]}
+
+  defp add_warnings(seed, []), do: seed
+  defp add_warnings(seed, extra), do: %{seed | warnings: seed.warnings ++ extra}
+
+  defp dropped_warning([], _unknown), do: []
+  defp dropped_warning(_known, []), do: []
+
+  defp dropped_warning(_known, unknown),
+    do: [
+      ngettext(
+        "%{count} document in the file could not be read as a receipt.",
+        "%{count} documents in the file could not be read as receipts.",
+        length(unknown)
+      )
+    ]
+
+  defp only_first_warning(n),
+    do:
+      gettext(
+        "The file shows %{n} bills — only the first was used. One Purchase Invoice per bill.",
+        n: n
+      )
+
+  # 2+ receipts on a Payment (a claim): one line per receipt, payee left for
+  # the clerk. The first @max_receipts in read order are used, then sorted by date.
+  defp build_many(docs, com, user) do
+    {used, over} = Enum.split(docs, @max_receipts)
+    # Shop names in read order (descriptions); lines in date order.
+    shops = used |> Enum.map(& &1.supplier_name) |> Enum.reject(&is_nil/1) |> Enum.uniq()
+    used = sort_by_date(used)
+    dates = used |> Enum.map(& &1.date) |> Enum.reject(&is_nil/1)
+    pay_date = if dates == [], do: nil, else: Enum.max(dates, Date)
+    total = Enum.reduce(used, Decimal.new(0), &Decimal.add(&1.total || 0, &2))
+    method = if Enum.all?(used, &(&1.payment_method == "cash")), do: "cash"
+
+    attrs =
+      %{
+        payment_details: used |> Enum.map(&receipt_line/1) |> DocPrefill.seed_lines(),
+        payment_date: pay_date,
+        funds_amount: total,
+        descriptions: many_descriptions(length(used), shops)
+      }
+      |> put_funds_account(%{payment_method: method}, :payment_details, com, user)
+
+    warnings =
+      [payee_warning(length(used), length(shops))] ++
+        span_warning(dates, pay_date) ++
+        over_warning(length(used) + length(over)) ++
+        Enum.flat_map(used, &receipt_warnings(&1, com))
+
+    %{
+      attrs: attrs,
+      warnings: warnings,
+      duplicate: nil,
+      learn: nil,
+      contact_ids: {nil, nil},
+      total: total
+    }
+  end
+
+  # ISO strings sort by date (Date structs compare structurally); undated last,
+  # read order breaks ties.
+  defp sort_by_date(docs) do
+    docs
+    |> Enum.with_index()
+    |> Enum.sort_by(fn {d, i} -> {if(d.date, do: Date.to_iso8601(d.date), else: "9999"), i} end)
+    |> Enum.map(&elem(&1, 0))
+  end
+
+  defp receipt_line(doc) do
+    amount = doc.total || Decimal.new(0)
+
+    %{
+      descriptions: line_text(doc),
+      quantity: Decimal.new(1),
+      unit_price: amount,
+      discount: Decimal.new(0),
+      tax_rate: nil,
+      amount: amount
+    }
+  end
+
+  # The kind leads the line: the "<Kind> · " prefix is also the key
+  # learnt_goods/2 looks up, so kind labels are never translated.
+  defp line_text(%{kind: nil} = doc), do: receipt_text(doc, true)
+  defp line_text(doc), do: doc.kind <> " · " <> receipt_text(doc, true)
+
+  # "<shop> #<doc_no> <DD/MM/YYYY>", parts not read left out.
+  defp receipt_text(doc, with_date?) do
+    [
+      doc.supplier_name,
+      doc.doc_no && "#" <> doc.doc_no,
+      with_date? && doc.date && Calendar.strftime(doc.date, "%d/%m/%Y")
+    ]
+    |> Enum.reject(&(&1 in [nil, false]))
+    |> case do
+      [] -> gettext("Receipt")
+      parts -> Enum.join(parts, " ")
+    end
+  end
+
+  defp many_descriptions(n, []), do: gettext("%{n} receipts", n: n)
+
+  defp many_descriptions(n, shops),
+    do:
+      String.slice(
+        gettext("%{n} receipts: %{shops}", n: n, shops: Enum.join(shops, ", ")),
+        0,
+        @descriptions_max
+      )
+
+  defp payee_warning(n, 0),
+    do: gettext("%{n} receipts — pick the payee (e.g. the salesperson).", n: n)
+
+  defp payee_warning(n, shops),
+    do:
+      ngettext(
+        "%{n} receipts from %{count} shop — pick the payee (e.g. the salesperson).",
+        "%{n} receipts from %{count} shops — pick the payee (e.g. the salesperson).",
+        shops,
+        n: n
+      )
+
+  defp span_warning([], _pay_date), do: []
+
+  defp span_warning(dates, pay_date) do
+    first = Enum.min(dates, Date)
+
+    if Date.compare(first, pay_date) == :eq,
+      do: [],
+      else: [
+        gettext("Receipts are dated %{first} to %{last}; the pay date was set to %{last}.",
+          first: Calendar.strftime(first, "%d/%m/%Y"),
+          last: Calendar.strftime(pay_date, "%d/%m/%Y")
+        )
+      ]
+  end
+
+  defp over_warning(n) when n > @max_receipts,
+    do: [
+      gettext(
+        "%{n} receipts read; only the first %{max} were used. Split the claim into two Payments.",
+        n: n,
+        max: @max_receipts
+      )
+    ]
+
+  defp over_warning(_n), do: []
+
+  defp receipt_warnings(doc, com) do
+    label = receipt_text(doc, false)
+    no_total = if is_nil(doc.total), do: gettext("no total read — its line is 0.00.")
+
+    (doc.warnings ++
+       [no_total, period_warning(doc.date, com), e_invoice_warning(doc.e_invoice_uuid, com)])
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map(&"#{label}: #{&1}")
   end
 
   defp header(ex, :payment_details) do
