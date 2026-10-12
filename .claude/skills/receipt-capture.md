@@ -34,9 +34,12 @@ Multi-receipt spec: `docs/superpowers/specs/2026-10-11-multi-receipt-capture-des
   the first, plus "only the first was used". Payment with 2+ → `build_many/3`.
 - **2+ receipts on a Payment (a claim):** no payee keys in the seed at all (the
   claimant isn't a shop; the merge keeps one picked first), `learn`/`duplicate`
-  nil. One line per receipt, `"<shop> #<doc_no> <DD/MM/YYYY>"`, qty 1,
+  nil. One line per receipt, `"<Kind> · <shop> #<doc_no> <DD/MM/YYYY>"` (kind
+  and unread parts left out), qty 1,
   price = total (0 + warning when none), date-sorted (undated last). Amount =
-  sum, pay date = latest, Cash In Hand only if all cash. Per-receipt warnings
+  sum, pay date = latest (only lands if the form's date is blank — the new form
+  pre-fills today, so the span warning says "check the pay date"), Cash In
+  Hand only if all cash. Per-receipt warnings
   are prefixed with `"<shop> #<doc_no>: "`. Cap 40 (in `Prefill`, read order).
 - **Kinds and learnt goods:** the AI tags each receipt `kind` (Fuel, Toll,
   Parking, Hotel, Meal, Transport, Other — fixed English, never translated).
@@ -52,7 +55,9 @@ Multi-receipt spec: `docs/superpowers/specs/2026-10-11-multi-receipt-capture-des
   value that doesn't parse becomes nil + a warning. Lines that don't add up warn.
   Tax-inclusive or tax-exclusive line amounts both pass.
 - **Seeded-line traps** live in `DocPrefill.seed_lines/1` (`unit_multiplier` 0;
-  qty into `quantity`, then `package_qty` once a good is applied; percent → fraction).
+  qty into `quantity`, then `package_qty` once a good is applied; percent → fraction;
+  `descriptions` cut to 255 — every `*_details.descriptions` column is
+  `varchar(255)` and an over-long AI value made Save raise).
 - **Extra lines:** SST given only as a total, and a non-zero rounding, each become
   their own line with the good blank.
 - **Funds account:** the sole account → "Cash In Hand" (exact name) for a cash
