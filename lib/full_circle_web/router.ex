@@ -127,6 +127,7 @@ defmodule FullCircleWeb.Router do
     pipe_through([:browser, :require_authenticated_user])
 
     get "/csv", CsvController, :show
+    get "/bank_batches/download", BankBatchController, :download
     get "/TimeAttend/:id/photo", PunchPhotoController, :show
     post "/notes/:note_id/attachments", NoteAttachmentController, :create
     post "/note_trays/:tray_id/files", NoteAttachmentController, :create_tray
@@ -215,6 +216,8 @@ defmodule FullCircleWeb.Router do
 
       live("/bank_file_formats", BankFileFormatLive.Index, :index)
       live("/bank_file_formats/new", BankFileFormatLive.Form, :new)
+
+      live("/bank_batches", BankBatchLive.Index, :index)
 
       live("/goods", GoodLive.Index, :index)
       live("/goods/new", GoodLive.Form, :new)

@@ -36,6 +36,13 @@ defmodule FullCircleWeb.DashboardLive do
         <.link navigate={~p"/companies/#{@current_company.id}/Payment"} class="button blue">
           {gettext("Payments")}
         </.link>
+        <.link
+          :if={@current_role in ["admin", "manager"]}
+          navigate={~p"/companies/#{@current_company.id}/bank_batches"}
+          class="button blue"
+        >
+          {gettext("Bank Batches")}
+        </.link>
         <.link navigate={~p"/companies/#{@current_company.id}/Deposit"} class="button blue">
           {gettext("Deposits")}
         </.link>

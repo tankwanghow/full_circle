@@ -389,6 +389,15 @@ window.addEventListener("phx:invalidate_autocomplete_cache", () => {
 
 window.addEventListener("phx:history_back", () => window.history.back())
 
+// Bank batch files: the server pushes a download URL after creating a batch.
+window.addEventListener("phx:download", (e) => {
+  const a = document.createElement("a")
+  a.href = e.detail.url
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+})
+
 // connect if there are any LiveViews on the page
 liveSocket.connect()
 
