@@ -10,7 +10,7 @@ defmodule FullCircle.Receipts.Prefill do
 
   alias FullCircle.{Accounting, BillPay, DocPrefill, Repo, Sys}
   alias FullCircle.Billing.PurInvoice
-  alias FullCircle.BillPay.Payment
+  alias FullCircle.BillPay.{Payment, PaymentDetail}
   alias FullCircle.EInvMetas.EInvoice
   alias FullCircle.Receipts.Extracted
 
@@ -149,6 +149,7 @@ defmodule FullCircle.Receipts.Prefill do
       [payee_warning(length(used), length(shops))] ++
         span_warning(dates, pay_date) ++
         over_warning(length(used) + length(over)) ++
+        repeated_warnings(used) ++
         Enum.flat_map(used, &receipt_warnings(&1, com))
 
     %{
@@ -258,6 +259,66 @@ defmodule FullCircle.Receipts.Prefill do
        [no_total, period_warning(doc.date, com), e_invoice_warning(doc.e_invoice_uuid, com)])
     |> Enum.reject(&is_nil/1)
     |> Enum.map(&"#{label}: #{&1}")
+    |> Kernel.++(List.wrap(claimed_warning(doc, com)))
+  end
+
+  @doc """
+  An earlier Payment line that already claims this receipt — its text holds
+  "#<doc_no>" as a whole word and its amount is within 0.01 — or nil.
+  Relies on the line text `build_many/3` writes; advisory only.
+  """
+  def claimed_warning(%Extracted{doc_no: no, total: %Decimal{} = total} = doc, com)
+      when is_binary(no) do
+    # A bound regex parameter: metacharacters in the receipt no are escaped,
+    # and "#12" must not match "#123".
+    pattern = "#" <> Regex.escape(no) <> "(\\s|$)"
+
+    from(d in PaymentDetail,
+      join: p in Payment,
+      on: p.id == d.payment_id,
+      where: p.company_id == ^com.id,
+      where: fragment("? ~* ?", d.descriptions, ^pattern),
+      where:
+        fragment(
+          "abs(round(? * ? + ?, 2) - ?) < 0.01",
+          d.quantity,
+          d.unit_price,
+          d.discount,
+          ^total
+        ),
+      order_by: p.payment_no,
+      select: p.payment_no,
+      limit: 1
+    )
+    |> Repo.one()
+    |> case do
+      nil ->
+        nil
+
+      payment_no ->
+        gettext("%{receipt} (RM %{amount}) may already be claimed on %{doc}.",
+          receipt: receipt_text(doc, false),
+          amount: Decimal.round(total, 2),
+          doc: payment_no
+        )
+    end
+  end
+
+  def claimed_warning(_doc, _com), do: nil
+
+  # The same receipt photographed twice, or on two scanned pages.
+  defp repeated_warnings(docs) do
+    docs
+    |> Enum.filter(&(&1.doc_no && &1.total))
+    |> Enum.group_by(
+      &{&1.supplier_name, &1.doc_no, Decimal.to_string(Decimal.round(&1.total, 2))}
+    )
+    |> Enum.filter(fn {_key, group} -> length(group) > 1 end)
+    |> Enum.map(fn {_key, [doc | _]} ->
+      gettext("%{receipt} appears more than once in this file.",
+        receipt: receipt_text(doc, false)
+      )
+    end)
   end
 
   defp header(ex, :payment_details) do

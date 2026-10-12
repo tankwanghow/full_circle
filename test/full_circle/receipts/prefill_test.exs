@@ -434,5 +434,73 @@ defmodule FullCircle.Receipts.PrefillTest do
 
       assert "The file shows 2 bills — only the first was used. One Purchase Invoice per bill." in seed.warnings
     end
+
+    defp claimed_payment!(c, u, line_text, amount) do
+      contact = contact_fixture(c, u)
+      good = good_fixture(c, u)
+      pur_acct = Accounting.get_account_by_name("General Purchases", c, u)
+
+      attrs =
+        payment_attrs(contact, good, pur_acct, no_ptax(c), pay_funds_account_fixture(c, u),
+          tax_rate: "0",
+          quantity: "1",
+          unit_price: amount,
+          funds_amount: amount
+        )
+        |> put_in(["payment_details", "0", "descriptions"], line_text)
+
+      {:ok, %{create_payment: pv}} = BillPay.create_payment(attrs, c, u)
+      pv
+    end
+
+    test "a receipt already on an earlier Payment line warns with its payment no", %{
+      c: c,
+      u: u
+    } do
+      pv = claimed_payment!(c, u, "Shell #777 01/10/2026", "50.00")
+
+      seed =
+        Prefill.build(
+          [fuel("Shell", "777", 1, "50.00"), fuel("A", "1", 1, "10")],
+          c,
+          u,
+          :payment_details
+        )
+
+      assert "Shell #777 (RM 50.00) may already be claimed on #{pv.payment_no}." in seed.warnings
+    end
+
+    test "a kind-prefixed earlier line still counts as claimed", %{c: c, u: u} do
+      claimed_payment!(c, u, "Fuel · Shell #888 01/10/2026", "40.00")
+      assert Prefill.claimed_warning(fuel("Shell", "888", 1, "40.00"), c)
+    end
+
+    test "same receipt no, different amount: no claimed warning", %{c: c, u: u} do
+      claimed_payment!(c, u, "Shell #777 01/10/2026", "50.00")
+      refute Prefill.claimed_warning(fuel("Shell", "777", 1, "51.00"), c)
+    end
+
+    test "receipt nos match literally and whole", %{c: c, u: u} do
+      claimed_payment!(c, u, "Shell #INV/26-001(A) 01/10/2026", "20.00")
+      claimed_payment!(c, u, "Esso #123 01/10/2026", "30.00")
+
+      assert Prefill.claimed_warning(fuel("Shell", "INV/26-001(A)", 1, "20.00"), c)
+      refute Prefill.claimed_warning(fuel("Esso", "12", 1, "30.00"), c)
+      refute Prefill.claimed_warning(fuel("Esso", "50%", 1, "30.00"), c)
+      refute Prefill.claimed_warning(fuel("Esso", nil, 1, "30.00"), c)
+    end
+
+    test "the same receipt twice in one file warns once", %{c: c, u: u} do
+      seed =
+        Prefill.build(
+          [fuel("Shell", "777", 1, "50.00"), fuel("Shell", "777", 1, "50.0")],
+          c,
+          u,
+          :payment_details
+        )
+
+      assert Enum.count(seed.warnings, &(&1 == "Shell #777 appears more than once in this file.")) ==
+               1
+    end
   end
 end
