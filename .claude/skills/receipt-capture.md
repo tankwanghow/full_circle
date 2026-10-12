@@ -1,6 +1,6 @@
 ---
 name: receipt-capture
-description: Use when working on photo/PDF receipt capture on New Payment or New Purchase Invoice — Receipts.Extract (AI prompt, JSON contract, checks), Receipts.Prefill (field mapping, funds account, SST/rounding lines, warnings), FullCircleWeb.ReceiptCapture (tray, blank-only merge, receipt note on save), or the "llm_receipt" AI settings.
+description: Use when working on photo/PDF receipt capture on New Payment or New Purchase Invoice — Receipts.Extract (AI prompt, {"documents": […]} list contract, kinds, checks), Receipts.Prefill (field mapping, multi-receipt claims, learnt goods per kind, funds account, SST/rounding lines, warnings), FullCircleWeb.ReceiptCapture (tray, blank-only merge, receipt note on save), or the "llm_receipt" AI settings.
 ---
 
 # Receipt capture (PurInvoice / Payment from a photo)
@@ -10,9 +10,10 @@ For bills that have an LHDN e-invoice, use `e-invoice-bill-prefill.md` instead.
 OCR only serves the paper-only tail.
 
 ## Pipeline
-`Receipts.Extract.run/4` (file → `%Extracted{}`) → `Receipts.Prefill.build/4`
+`Receipts.Extract.run/4` (file → `[%Extracted{}]`, never empty) → `Receipts.Prefill.build/4`
 (→ attrs + warnings) → `ReceiptCapture.merge_params/3` (blank-only) → the form's `validate/2`.
 Extract and Prefill know nothing about LiveView. A future inbox calls them as they are.
+Multi-receipt spec: `docs/superpowers/specs/2026-10-11-multi-receipt-capture-design.md`.
 
 ## Contracts that bite
 - **Settings:** use `Sys.llm_settings(company, :receipt)`. Never read `"llm"` directly.
@@ -25,6 +26,28 @@ Extract and Prefill know nothing about LiveView. A future inbox calls them as th
   number and is never seeded. Payment puts "<shop> #<doc_no>" in `descriptions`.
 - **Not recognised** (`recognized: false`, or no total and no lines): only
   `descriptions` = summary (≤ 200 chars) is seeded, plus a warning.
+- **List contract:** the AI replies `{"documents": [...]}`, one entry per bill or
+  receipt (a bill across pages is one entry). `Extract.parse_documents/2` also
+  takes the old single-object shape and never returns `[]`.
+  `Prefill.build/4` takes the list: only recognised entries count (the rest
+  are dropped with a warning). One → the struct clause, unchanged. PurInvoice →
+  the first, plus "only the first was used". Payment with 2+ → `build_many/3`.
+- **2+ receipts on a Payment (a claim):** no payee keys in the seed at all (the
+  claimant isn't a shop; the merge keeps one picked first), `learn`/`duplicate`
+  nil. One line per receipt, `"<shop> #<doc_no> <DD/MM/YYYY>"`, qty 1,
+  price = total (0 + warning when none), date-sorted (undated last). Amount =
+  sum, pay date = latest, Cash In Hand only if all cash. Per-receipt warnings
+  are prefixed with `"<shop> #<doc_no>: "`. Cap 40 (in `Prefill`, read order).
+- **Kinds and learnt goods:** the AI tags each receipt `kind` (Fuel, Toll,
+  Parking, Hotel, Meal, Transport, Other — fixed English, never translated).
+  2+ receipt lines read `"<Kind> · <shop> #<no> <date>"`; `learnt_goods/2`
+  copies the good (default package), account and tax code of the latest saved
+  Payment line starting `"<Kind> · "` with a good. Never for Other. A learnt
+  tax code with a rate warns (receipt totals already include tax).
+- **Duplicate claims:** `claimed_warning/2` matches an earlier Payment line whose
+  text holds `#<doc_no>` as a whole word (bound regex param, escaped) and whose
+  `qty × price + discount` is within 0.01 (discount is stored ≤ 0). It depends
+  on the line text above. Repeats inside one file warn too.
 - **The model is never trusted:** every value is parsed in `Extract.parse/2`. A
   value that doesn't parse becomes nil + a warning. Lines that don't add up warn.
   Tax-inclusive or tax-exclusive line amounts both pass.
@@ -44,8 +67,7 @@ Extract and Prefill know nothing about LiveView. A future inbox calls them as th
   commit together. A failed save leaves the tray for a re-save. With no
   `:create_note` permission the step is skipped and a `:warn` flash says so.
 - **Limits:** an image whose **base64** exceeds 5 MB (raw ≳ 3.75 MB) is refused
-  before the call — the AI's limit is on the encoded payload; 90 s timeout;
-  `max_tokens` 16_384 (Gemini 2.5 thinking tokens count against it).
+  before the call — the AI's limit is on the encoded payload; 180 s timeout; `max_tokens` 32_768 (40 receipts with lines) (Gemini 2.5 thinking tokens count against it).
 - **Learning identifiers:** `Prefill` returns `learn: {contact_id, tin, brn}`
   only when the contact matched by TIN/BRN (nil on a name match or no match).
   After save, `ReceiptCapture.learn_identifiers/4` stamps them only if the
