@@ -225,8 +225,8 @@ defmodule FullCircle.Sys do
   def load_settings(page, company, user) do
     settings = Repo.all(load_settings_query(page, company, user))
 
-    if Enum.empty?(settings) do
-      insert_default_settings(page, company, user)
+    # Also back-fills defaults added to a page after the user's set was saved.
+    if insert_default_settings(page, company, user, Enum.map(settings, & &1.code)) do
       Repo.all(load_settings_query(page, company, user))
     else
       settings
@@ -238,19 +238,31 @@ defmodule FullCircle.Sys do
     Repo.update!(cs)
   end
 
-  defp insert_default_settings(page, company, user) do
-    cua =
-      Repo.one!(
-        from cu in CompanyUser,
-          where: cu.user_id == ^user.id,
-          where: cu.company_id == ^company.id
-      )
+  # Inserts the page's default settings whose code is not in `have_codes`;
+  # returns true when anything was inserted.
+  defp insert_default_settings(page, company, user, have_codes) do
+    missing =
+      FullCircle.Sys.UserSetting.default_settings(page, nil)
+      |> Enum.reject(&(&1.code in have_codes))
 
-    settings = FullCircle.Sys.UserSetting.default_settings(page, cua.id)
+    if missing == [] do
+      false
+    else
+      cua =
+        Repo.one!(
+          from cu in CompanyUser,
+            where: cu.user_id == ^user.id,
+            where: cu.company_id == ^company.id
+        )
 
-    Multi.new()
-    |> Multi.insert_all(:insert_invoice_settings, FullCircle.Sys.UserSetting, settings)
-    |> FullCircle.Repo.transaction()
+      settings = Enum.map(missing, &%{&1 | company_user_id: cua.id})
+
+      Multi.new()
+      |> Multi.insert_all(:insert_invoice_settings, FullCircle.Sys.UserSetting, settings)
+      |> FullCircle.Repo.transaction()
+
+      true
+    end
   end
 
   defp load_settings_query(page, company, user) do

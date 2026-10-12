@@ -423,5 +423,28 @@ defmodule FullCircle.SysTest do
       assert cu.role == "manager"
       assert cu.default_company == false
     end
+
+    test "load_settings adds default settings missing from an older saved set" do
+      user = user_fixture()
+      com = company_fixture(user, %{})
+      settings = Sys.load_settings("EpfSocsoEis", com, user)
+
+      # Simulate a user whose settings predate the per-agency employer codes.
+      Repo.delete_all(
+        from s in FullCircle.Sys.UserSetting,
+          where: s.id in ^Enum.map(settings, & &1.id),
+          where: s.code != "report"
+      )
+
+      report = Enum.find(settings, &(&1.code == "report"))
+      Sys.update_setting(report, "PCB")
+
+      reloaded = Sys.load_settings("EpfSocsoEis", com, user)
+
+      assert reloaded |> Enum.map(& &1.code) |> Enum.sort() ==
+               ~w(eis_code epf_code pcb_code report socso_code)
+
+      assert Enum.find(reloaded, &(&1.code == "report")).value == "PCB"
+    end
   end
 end
