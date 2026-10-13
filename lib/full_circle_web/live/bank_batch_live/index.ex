@@ -16,6 +16,7 @@ defmodule FullCircleWeb.BankBatchLive.Index do
        socket
        |> assign(page_title: gettext("Bank Batches"), today: today)
        |> assign(is_admin: FullCircle.Authorization.can?(user, :admin_bank_payment_batch, com))
+       |> assign(can_contact: FullCircle.Authorization.can?(user, :update_contact, com))
        |> assign(profiles: profiles, profile: List.first(profiles), payment_date: today)
        |> assign(
          selected: MapSet.new(),
@@ -310,6 +311,27 @@ defmodule FullCircleWeb.BankBatchLive.Index do
 
   # ── View helpers ──
 
+  attr :name, :string, required: true
+  attr :id, :string, required: true
+  attr :company, :map, required: true
+  attr :allowed, :boolean, required: true
+
+  # Opens the supplier in a new tab for users who may edit contacts.
+  defp contact_link(assigns) do
+    ~H"""
+    <.link
+      :if={@allowed}
+      href={~p"/companies/#{@company.id}/contacts/#{@id}/edit"}
+      target="_blank"
+      rel="noopener"
+      class="text-blue-600 dark:text-blue-400 hover:font-bold"
+    >
+      {@name}
+    </.link>
+    <span :if={!@allowed}>{@name}</span>
+    """
+  end
+
   defp upload_error_text(:not_accepted), do: gettext("file type not accepted (use .txt or .csv)")
   defp upload_error_text(:too_large), do: gettext("file too large")
   defp upload_error_text(:too_many_files), do: gettext("one file at a time")
@@ -451,7 +473,12 @@ defmodule FullCircleWeb.BankBatchLive.Index do
             >{r.payment_no}</.link>
           </div>
           <div class="col-span-4 truncate">
-            {r.contact_name}
+            <.contact_link
+              name={r.contact_name}
+              id={r.contact_id}
+              company={@current_company}
+              allowed={@can_contact}
+            />
             <span :if={r.last_reason} class="block text-xs text-rose-700 dark:text-rose-300">{gettext(
               "last rejected: %{r}",
               r: r.last_reason
@@ -633,7 +660,14 @@ defmodule FullCircleWeb.BankBatchLive.Index do
                 class="text-blue-600 dark:text-blue-400 hover:font-bold"
               >{l.payment_no}</.link>
             </div>
-            <div class="col-span-3 truncate">{l.contact_name}</div>
+            <div class="col-span-3 truncate">
+              <.contact_link
+                name={l.contact_name}
+                id={l.contact_id}
+                company={@current_company}
+                allowed={@can_contact}
+              />
+            </div>
             <div class="col-span-2 text-right tabular-nums">{money(l.amount)}</div>
             <div class="col-span-1">{l.status}</div>
             <div class="col-span-3 truncate">{l.bank_reason}</div>

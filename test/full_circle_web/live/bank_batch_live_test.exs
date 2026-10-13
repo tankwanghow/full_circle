@@ -208,4 +208,26 @@ defmodule FullCircleWeb.BankBatchLiveTest do
     assert row =~ ~s|href="/companies/#{com.id}/Payment/#{p.id}/edit"|
     assert row =~ ~s|target="_blank"|
   end
+
+  test "supplier names open the contact in a new tab", %{
+    com: com,
+    p: p,
+    supplier: supplier,
+    profile: profile,
+    admin: admin,
+    mgr_conn: conn
+  } do
+    {:ok, lv, _} = live(conn, ~p"/companies/#{com.id}/bank_batches")
+    href = ~s|href="/companies/#{com.id}/contacts/#{supplier.id}/edit"|
+    row = lv |> element("#row-#{p.id}") |> render()
+    assert row =~ href
+    assert row =~ ~s|target="_blank"|
+
+    {:ok, [b]} =
+      BankPayment.create_batches(profile.id, [p.id], BankPayment.today(com), com, admin)
+
+    {:ok, lv, _} = live(conn, ~p"/companies/#{com.id}/bank_batches")
+    lv |> element("#open-#{b.id}") |> render_click()
+    assert lv |> element("#batch-#{b.id}") |> render() =~ href
+  end
 end

@@ -295,6 +295,7 @@ defmodule FullCircle.BankPayment do
           payment_date: p.payment_date,
           amount: p.funds_amount,
           contact_name: c.name,
+          contact_id: c.id,
           bank_code: c.bank_code,
           account_no: c.bank_account_no,
           account_name: c.bank_account_name,
@@ -790,8 +791,18 @@ defmodule FullCircle.BankPayment do
 
   def batch_lines(batch_id, company) do
     case get_batch(batch_id, company) do
-      nil -> []
-      b -> Repo.all(from(l in BatchLine, where: l.batch_id == ^b.id, order_by: l.record_no))
+      nil ->
+        []
+
+      b ->
+        from(l in BatchLine,
+          join: p in Payment,
+          on: p.id == l.payment_id,
+          where: l.batch_id == ^b.id,
+          order_by: l.record_no,
+          select_merge: %{contact_id: p.contact_id}
+        )
+        |> Repo.all()
     end
   end
 

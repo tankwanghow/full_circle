@@ -23,6 +23,7 @@ defmodule FullCircle.BankPayment.BatchLine do
     field :reg_no, :string
     field :descriptions, :string
     field :advice, {:array, :map}, default: []
+    field :contact_id, :binary_id, virtual: true
   end
 
   @required [
