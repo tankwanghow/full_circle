@@ -414,11 +414,12 @@ defmodule FullCircleWeb.BankBatchLive.Index do
         <div class="grid grid-cols-12 bg-amber-200 dark:bg-amber-800 border-y-2 border-amber-500 font-bold p-1">
           <div class="col-span-1"></div>
           <div class="col-span-1">{gettext("Date")}</div>
-          <div class="col-span-2">{gettext("Payment No")}</div>
-          <div class="col-span-3">{gettext("Supplier")}</div>
-          <div class="col-span-2">{gettext("Bank / Account")}</div>
+          <div class="col-span-1">{gettext("Payment No")}</div>
+          <div class="col-span-4">{gettext("Supplier")}</div>
+          <div class="col-span-1">{gettext("Bank")}</div>
+          <div class="col-span-2">{gettext("Account No")}</div>
           <div class="col-span-1 text-right">{gettext("Amount")}</div>
-          <div class="col-span-2"></div>
+          <div class="col-span-1"></div>
         </div>
         <div
           :for={r <- @rows}
@@ -441,19 +442,19 @@ defmodule FullCircleWeb.BankBatchLive.Index do
             >⚠</span>
           </div>
           <div class="col-span-1">{FullCircleWeb.Helpers.format_date(r.payment_date)}</div>
-          <div class="col-span-2">{r.payment_no}</div>
-          <div class="col-span-3 truncate">
+          <div class="col-span-1 whitespace-nowrap">{r.payment_no}</div>
+          <div class="col-span-4 truncate">
             {r.contact_name}
             <span :if={r.last_reason} class="block text-xs text-rose-700 dark:text-rose-300">{gettext(
               "last rejected: %{r}",
               r: r.last_reason
             )}</span>
           </div>
-          <div class="col-span-2 truncate">
-            {if r.has_bank, do: "#{r.bank_name} #{r.account_no}", else: gettext("no bank details")}
-          </div>
+          <div :if={r.has_bank} class="col-span-1 truncate" title={r.bank_name}>{r.bank_short}</div>
+          <div :if={r.has_bank} class="col-span-2 whitespace-nowrap tabular-nums">{r.account_no}</div>
+          <div :if={!r.has_bank} class="col-span-3">{gettext("no bank details")}</div>
           <div class="col-span-1 text-right tabular-nums">{money(r.amount)}</div>
-          <div class="col-span-2 text-right">
+          <div class="col-span-1 text-right whitespace-nowrap">
             <button
               id={"dismiss-#{r.id}"}
               phx-click="start"

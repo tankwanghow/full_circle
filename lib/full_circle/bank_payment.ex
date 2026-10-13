@@ -308,6 +308,7 @@ defmodule FullCircle.BankPayment do
     Enum.map(rows, fn r ->
       Map.merge(r, %{
         bank_name: Banks.name(r.bank_code),
+        bank_short: Banks.short_name(r.bank_code),
         has_bank:
           not is_nil(r.bank_code) and not is_nil(r.account_no) and not is_nil(r.account_name),
         recent_change: not is_nil(r.changed_at) and DateTime.compare(r.changed_at, since) == :gt,

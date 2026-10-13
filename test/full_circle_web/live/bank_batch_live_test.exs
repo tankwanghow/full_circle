@@ -188,4 +188,17 @@ defmodule FullCircleWeb.BankBatchLiveTest do
     html = lv |> form("#action-form", %{"reason" => "cheque"}) |> render_submit()
     assert html =~ "0 ticked, total 0.00"
   end
+
+  test "rows show a short bank name and the full account number", %{
+    com: com,
+    p: p,
+    mgr_conn: conn
+  } do
+    {:ok, lv, _} = live(conn, ~p"/companies/#{com.id}/bank_batches")
+    row = lv |> element("#row-#{p.id}") |> render()
+    # The full name stays in the hover title; the visible text is the short name.
+    assert row =~ ">Public Bank<"
+    refute row =~ ">Public Bank Berhad<"
+    assert row =~ "3123456789"
+  end
 end

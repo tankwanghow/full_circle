@@ -27,6 +27,10 @@ defmodule FullCircle.ContactBankTest do
     assert Banks.get("PIBEMYK1")
     assert Banks.get("NOPE") == nil
     assert {"RHB Bank Berhad", "RHBBMYKL"} in Banks.options()
+    assert Banks.short_name("MBBEMYKL") == "Maybank"
+    assert Banks.short_name("PBBEMYKL") == "Public Bank"
+    assert Banks.short_name("NOPE") == nil
+    assert Enum.all?(Banks.all(), &(is_binary(&1.short) and String.length(&1.short) <= 18))
   end
 
   defp bank_logs(c),
