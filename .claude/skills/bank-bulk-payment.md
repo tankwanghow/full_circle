@@ -108,6 +108,19 @@ log is visible to every contact editor). Account length is checked against
 `FullCircle.BankPayment.Banks`. Saved SQL queries are admin/manager only
 because they can read these columns.
 
+## Go-live backfill
+
+`FullCircle.BankPayment.Backfill` (via `FullCircle.Release.bank_backfill/3`) creates
+the formats and Kim Poh Sitt Tat's RHB / Public Bank profiles, then fills supplier
+bank details parsed from Payment descriptions (`IBG (MBB 507116409616)`,
+`TRANSFER RHB …`; bare 6-digit numbers are cheques). Dry run by default; a real
+run writes through the audited save functions as the named admin, skips the
+owner's five unclear/agent-paid suppliers, never overwrites existing bank
+details, and is idempotent. On the server:
+
+    docker compose run --rm web /app/bin/full_circle eval \
+      'FullCircle.Release.bank_backfill("<company id>", "<admin email>", dry_run: true)'
+
 ## Verify on first real upload
 
 - PB footer totals in cents; PB account number left-aligned, space-padded (the
