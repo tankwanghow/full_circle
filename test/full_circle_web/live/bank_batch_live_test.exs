@@ -201,4 +201,11 @@ defmodule FullCircleWeb.BankBatchLiveTest do
     refute row =~ ">Public Bank Berhad<"
     assert row =~ "3123456789"
   end
+
+  test "payment numbers open the Payment in a new tab", %{com: com, p: p, mgr_conn: conn} do
+    {:ok, lv, _} = live(conn, ~p"/companies/#{com.id}/bank_batches")
+    row = lv |> element("#row-#{p.id}") |> render()
+    assert row =~ ~s|href="/companies/#{com.id}/Payment/#{p.id}/edit"|
+    assert row =~ ~s|target="_blank"|
+  end
 end

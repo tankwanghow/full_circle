@@ -442,7 +442,14 @@ defmodule FullCircleWeb.BankBatchLive.Index do
             >⚠</span>
           </div>
           <div class="col-span-1">{FullCircleWeb.Helpers.format_date(r.payment_date)}</div>
-          <div class="col-span-1 whitespace-nowrap">{r.payment_no}</div>
+          <div class="col-span-1 whitespace-nowrap">
+            <.link
+              href={~p"/companies/#{@current_company.id}/Payment/#{r.id}/edit"}
+              target="_blank"
+              rel="noopener"
+              class="text-blue-600 dark:text-blue-400 hover:font-bold"
+            >{r.payment_no}</.link>
+          </div>
           <div class="col-span-4 truncate">
             {r.contact_name}
             <span :if={r.last_reason} class="block text-xs text-rose-700 dark:text-rose-300">{gettext(
@@ -618,7 +625,14 @@ defmodule FullCircleWeb.BankBatchLive.Index do
         </div>
         <div :if={@open_id == b.id} class="ml-8 mt-1 text-sm">
           <div :for={l <- @open_lines} class="grid grid-cols-12 border-b p-1">
-            <div class="col-span-2">{l.payment_no}</div>
+            <div class="col-span-2 whitespace-nowrap">
+              <.link
+                href={~p"/companies/#{@current_company.id}/Payment/#{l.payment_id}/edit"}
+                target="_blank"
+                rel="noopener"
+                class="text-blue-600 dark:text-blue-400 hover:font-bold"
+              >{l.payment_no}</.link>
+            </div>
             <div class="col-span-3 truncate">{l.contact_name}</div>
             <div class="col-span-2 text-right tabular-nums">{money(l.amount)}</div>
             <div class="col-span-1">{l.status}</div>
